@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sensores_data', function (Blueprint $table) {
+        Schema::create('medicoes', function (Blueprint $table) {
             $table->id('private_id');
             $table->uuid('public_id')->unique();
 
-            $table->foreignId('sensor_id')
-                ->constrained('sensores', 'private_id')
+            $table->foreignId('estacao_id')
+                ->constrained('estacoes', 'private_id')
                 ->cascadeOnDelete();
 
             $table->decimal('temperatura', 4, 1);
@@ -27,8 +27,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Índice composto para otimizar as consultas de longo prazo
-            $table->index(['sensor_id', 'data_hora']);
+            $table->index(['estacao_id', 'data_hora']);
         });
     }
 
@@ -37,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sensores_data');
+        Schema::dropIfExists('medicoes');
     }
 };

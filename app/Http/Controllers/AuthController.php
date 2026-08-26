@@ -44,4 +44,20 @@ class AuthController extends Controller
             'email' => 'As credenciais informadas não correspondem aos nossos registros.',
         ])->onlyInput('email');
     }
+
+    /**
+     * Encerra a sessão do usuário.
+     */
+    public function destroy(Request $request)
+    {
+        Auth::logout();
+
+        // Invalida a sessão atual
+        $request->session()->invalidate();
+
+        // Regenera o token CSRF para a próxima requisição
+        $request->session()->regenerateToken();
+
+        return redirect('/');
+    }
 }

@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sensores', function (Blueprint $table) {
+        Schema::create('estacoes', function (Blueprint $table) {
             $table->id('private_id');
             $table->uuid('public_id')->unique();
-            $table->decimal('latitude', 10, 8);
-            $table->decimal('longitude', 11, 8);
 
-            // Relacionamento limpo apontando para a tabela nativa 'users'
+            // Substitui latitude e longitude separadas por um tipo espacial POINT
+            $table->geometry('coordenadas', subtype: 'point');
+
             $table->foreignId('created_by')
                 ->constrained('users')
                 ->restrictOnDelete();
@@ -31,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sensores');
+        Schema::dropIfExists('estacoes');
     }
 };
