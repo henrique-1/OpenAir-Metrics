@@ -19,8 +19,8 @@
     {{-- Travamos a tela em 100% de largura e altura, sem scroll --}}
     <body class="font-sans antialiased h-screen w-screen overflow-hidden bg-athens-gray-50">
         
-        {{-- Header Flutuante e Transparente (Apenas fora do Dashboard) --}}
-        @if(!request()->routeIs('dashboard'))
+        {{-- Header Flutuante e Transparente (Apenas fora do Dashboard e Áreas Administrativas) --}}
+        @if(!request()->routeIs('dashboard*') && !request()->routeIs('estacoes.*'))
             <header class="absolute top-0 left-0 w-full z-[2000] pointer-events-none p-4">
                 <div class="relative flex items-center w-full h-12">
                     

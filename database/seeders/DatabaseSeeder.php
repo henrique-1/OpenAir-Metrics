@@ -26,5 +26,7 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(), // Opcional: já marca o e-mail como verificado
             ]
         );
+
+        $this->call(LocalidadesSeeder::class);
     }
 }

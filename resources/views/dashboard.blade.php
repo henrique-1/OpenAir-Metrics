@@ -2,73 +2,25 @@
     <!-- Container que ocupa o espaço livre abaixo do Header absoluto (pt-20) -->
     <div class="flex h-full w-full bg-athens-gray-50">        
         <!-- Barra de Navegação Lateral (Sidebar) -->
-        <aside class="w-64 bg-white/95 backdrop-blur-md shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-athens-gray-200 flex flex-col hidden md:flex z-10 h-full">
-            
-            <!-- Logotipo embutido na Sidebar -->
-            <div class="p-6 border-b border-athens-gray-200 flex items-center justify-center bg-white/50">
-                <a href="/" class="transition hover:opacity-80 block">
-                    <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-12 w-auto drop-shadow-sm">
-                </a>
-            </div>
-
-            <div class="p-5 pb-2">
-                <h2 class="text-xs font-bold text-athens-gray-500 uppercase tracking-wider">Menu Principal</h2>
-            </div>
-            
-            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-                <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-600 hover:bg-athens-gray-100 hover:text-blue-dianne-900 px-3 py-2.5 rounded-lg font-medium transition-colors">
-                    <x-heroicon-o-map class="w-5 h-5" />
-                    Voltar para o Mapa
-                </a>
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 bg-blue-dianne-50 text-blue-dianne-950 px-3 py-2.5 rounded-lg font-bold transition-colors border border-blue-dianne-200 shadow-sm">
-                    <x-heroicon-o-chart-pie class="w-5 h-5 text-blue-dianne-600" />
-                    Visão Geral
-                </a>
-                <a href="#" class="flex items-center gap-3 text-athens-gray-600 hover:bg-athens-gray-100 hover:text-blue-dianne-900 px-3 py-2.5 rounded-lg font-medium transition-colors">
-                    <x-heroicon-o-signal class="w-5 h-5" />
-                    Meus Sensores
-                </a>
-                <a href="#" class="flex items-center gap-3 text-athens-gray-600 hover:bg-athens-gray-100 hover:text-blue-dianne-900 px-3 py-2.5 rounded-lg font-medium transition-colors">
-                    <x-heroicon-o-bell-alert class="w-5 h-5" />
-                    Gerenciar Alertas
-                </a>
-            </nav>
-
-            <!-- NOVO: Rodapé da Sidebar com Perfil e Logout -->
-            <div class="p-4 border-t border-athens-gray-200 bg-athens-gray-50 mt-auto">
-                
-                <!-- Informações do Usuário -->
-                <div class="flex items-center gap-3 px-2 mb-4">
-                    <x-heroicon-o-user-circle class="w-9 h-9 text-blue-dianne-600" />
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-blue-dianne-950 truncate">{{ Auth::user()->name }}</p>
-                        <p class="text-xs text-athens-gray-500 truncate">{{ Auth::user()->email }}</p>
-                    </div>
-                </div>
-
-                <!-- Botão de Sair -->
-                <form method="POST" action="{{ route('logout') }}" class="m-0 p-0">
-                    @csrf
-                    <button type="submit" class="w-full flex items-center justify-center gap-2 bg-white text-cinnabar-600 hover:bg-cinnabar-50 hover:text-cinnabar-700 px-3 py-2.5 rounded-lg font-bold transition-colors border border-athens-gray-200 shadow-sm">
-                        <x-heroicon-o-arrow-left-on-rectangle class="w-5 h-5" />
-                        Sair do Sistema
-                    </button>
-                </form>
-                
-            </div>
-        </aside>
+        <x-sidebar active="dashboard" />
 
         <!-- Área de Conteúdo Principal -->
         <main class="flex-1 overflow-y-auto p-6 lg:p-8">
             <div class="max-w-7xl mx-auto space-y-8">
                 
                 <!-- Título da Página -->
-                <div>
-                    <h1 class="text-2xl font-bold text-blue-dianne-950 tracking-tight">Visão Geral</h1>
-                    <p class="text-sm text-athens-gray-600 mt-1">Acompanhe as métricas e alertas da sua rede IoT de qualidade do ar.</p>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-blue-dianne-950 tracking-tight">Painel Analítico de Monitoramento</h1>
+                        <p class="text-sm text-athens-gray-600 mt-1">Acompanhe as métricas e médias históricas de qualidade do ar por cidade ou bairro.</p>
+                    </div>
+                    <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm self-start sm:self-auto">
+                        <x-heroicon-o-plus class="w-4 h-4" />
+                        Nova Estação
+                    </a>
                 </div>
 
-                <!-- Grid de Métricas (Responsivo) -->
+                <!-- Grid de Métricas Gerais da Rede -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     
                     <!-- Sensores Ativos -->
@@ -77,8 +29,8 @@
                             <x-heroicon-o-cpu-chip class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Sensores Ativos</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $sensores->count() }}</p>
+                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Estações Ativas</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $totalEstacoes }}</p>
                         </div>
                     </div>
 
@@ -88,117 +40,462 @@
                             <x-heroicon-o-chart-bar class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Leituras Registradas</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">12.432</p>
+                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Total de Leituras</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950">{{ number_format($totalLeituras, 0, ',', '.') }}</p>
                         </div>
                     </div>
                     
-                    <!-- Alertas IQA (Qualidade Geral) -->
+                    <!-- Alertas IQA -->
                     <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
                         <div class="p-3 bg-purple-50 rounded-lg text-purple-500">
                             <x-heroicon-o-globe-americas class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Qualidade</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">2</p>
-                        </div>
-                    </div>
-
-                    <!-- Alertas de Temperatura -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-tahiti-gold-50 rounded-lg text-tahiti-gold-500">
-                            <x-heroicon-o-sun class="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Temp.</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">1</p>
-                        </div>
-                    </div>
-
-                    <!-- Alertas de Umidade -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-blue-50 rounded-lg text-blue-500">
-                            <x-heroicon-o-cloud class="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Umidade</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">0</p>
-                        </div>
-                    </div>
-
-                    <!-- Alertas de CO2 -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-stone-100 rounded-lg text-stone-600">
-                            <x-heroicon-o-building-office-2 class="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas CO₂</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">3</p>
+                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Qualidade (IQA)</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $alertasIqa }}</p>
                         </div>
                     </div>
 
                     <!-- Alertas de PM -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4 sm:col-span-2 lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
                         <div class="p-3 bg-cinnabar-50 rounded-lg text-cinnabar-500">
                             <x-heroicon-o-shield-exclamation class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas de Material Particulado</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">5</p>
+                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Particulado</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $alertasPm }}</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tabela de Gerenciamento que você já corrigiu -->
-                <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 overflow-hidden">
-                    <div class="px-6 py-5 border-b border-athens-gray-200 flex justify-between items-center bg-athens-gray-50/50">
-                        <h3 class="text-lg font-bold text-blue-dianne-950">Sensores Cadastrados</h3>
-                        <button class="bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm flex items-center gap-2">
-                            <x-heroicon-o-plus class="w-4 h-4" />
-                            Novo Sensor
-                        </button>
-                    </div>
+                <!-- Painel Principal de Gráficos Analíticos -->
+                <div class="bg-white rounded-2xl shadow-sm border border-athens-gray-200 overflow-hidden">
                     
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="bg-athens-gray-50 border-b border-athens-gray-200 text-xs uppercase tracking-wider text-athens-gray-500">
-                                    <th class="px-6 py-3 font-bold">ID Público (UUID)</th>
-                                    <th class="px-6 py-3 font-bold">Localização</th>
-                                    <th class="px-6 py-3 font-bold">Última Leitura</th>
-                                    <th class="px-6 py-3 font-bold text-center">Status</th>
-                                    <th class="px-6 py-3 font-bold text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-athens-gray-200 text-sm">
-                                @forelse ($sensores as $sensor)
-                                    <tr class="hover:bg-athens-gray-50 transition-colors">
-                                        <td class="px-6 py-4 font-mono text-xs text-athens-gray-700">{{ $sensor->public_id }}</td>
-                                        <td class="px-6 py-4 text-blue-dianne-950 font-medium">Lat: {{ $sensor->latitude }} | Lng: {{ $sensor->longitude }}</td>
-                                        <td class="px-6 py-4 text-athens-gray-600">{{ $sensor->created_at->diffForHumans() }}</td>
-                                        <td class="px-6 py-4 text-center">
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                Ativo
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 text-right">
-                                            <button class="text-blue-dianne-600 hover:text-blue-dianne-800 font-medium transition">Detalhes</button>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="px-6 py-10 text-center text-athens-gray-500 bg-white">
-                                            <x-heroicon-o-signal-slash class="w-10 h-10 mx-auto text-athens-gray-300 mb-3" />
-                                            Nenhum sensor IoT cadastrado no momento.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                    <!-- Header do Painel com Filtros de Agrupamento -->
+                    <div class="p-6 border-b border-athens-gray-200 bg-white">
+                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            
+                            <!-- Controles de Localidade (Cidade vs Bairro) -->
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Agrupar por:</span>
+                                
+                                <!-- Toggle Cidade / Bairro -->
+                                <div class="inline-flex p-1 bg-athens-gray-100 rounded-lg border border-athens-gray-200 text-xs font-semibold">
+                                    <button type="button" id="btn-tipo-cidade" class="px-3 py-1.5 rounded-md transition-all bg-white text-blue-dianne-950 shadow-sm font-bold">
+                                        Cidade
+                                    </button>
+                                    <button type="button" id="btn-tipo-bairro" class="px-3 py-1.5 rounded-md transition-all text-athens-gray-600 hover:text-blue-dianne-950">
+                                        Bairro
+                                    </button>
+                                </div>
+
+                                <!-- Select de Cidade -->
+                                <div id="container-select-cidade" class="min-w-[220px]">
+                                    <select id="select-cidade" class="w-full text-xs font-medium bg-athens-gray-50 border border-athens-gray-300 rounded-lg px-3 py-2 text-blue-dianne-950 focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
+                                        @forelse ($cidades as $cidade)
+                                            <option value="{{ $cidade->id }}">{{ $cidade->nome }} - {{ $cidade->estado?->uf }}</option>
+                                        @empty
+                                            <option value="">Nenhuma cidade com estações</option>
+                                        @endforelse
+                                    </select>
+                                </div>
+
+                                <!-- Select de Bairro (Oculto inicialmente) -->
+                                <div id="container-select-bairro" class="min-w-[240px] hidden">
+                                    <select id="select-bairro" class="w-full text-xs font-medium bg-athens-gray-50 border border-athens-gray-300 rounded-lg px-3 py-2 text-blue-dianne-950 focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
+                                        @forelse ($bairros as $bairro)
+                                            <option value="{{ $bairro->id }}">{{ $bairro->nome }} ({{ $bairro->cidade?->nome }} - {{ $bairro->cidade?->estado?->uf }})</option>
+                                        @empty
+                                            <option value="">Nenhum bairro com estações</option>
+                                        @endforelse
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Filtro de Período -->
+                            <div class="flex items-center gap-2 self-start lg:self-auto">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Período:</span>
+                                <div class="inline-flex p-1 bg-athens-gray-100 rounded-lg border border-athens-gray-200 text-xs font-medium">
+                                    <button type="button" data-periodo="24h" class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white text-blue-dianne-950 font-bold shadow-sm">24 Horas</button>
+                                    <button type="button" data-periodo="7d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 hover:text-blue-dianne-950">7 Dias</button>
+                                    <button type="button" data-periodo="30d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 hover:text-blue-dianne-950">30 Dias</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Abas de Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2) -->
+                        <div class="mt-6 flex flex-wrap gap-2 border-t border-athens-gray-100 pt-5">
+                            <!-- Qualidade do Ar (IQA) -->
+                            <button type="button" data-metrica="qualidade_ar" class="btn-metrica active flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                Qualidade do Ar (IQA)
+                            </button>
+
+                            <!-- Temperatura -->
+                            <button type="button" data-metrica="temperatura" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                                Temperatura (°C)
+                            </button>
+
+                            <!-- Umidade Relativa -->
+                            <button type="button" data-metrica="umidade" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
+                                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                                Umidade Relativa (%)
+                            </button>
+
+                            <!-- Material Particulado -->
+                            <button type="button" data-metrica="poeira" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
+                                <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                                Material Particulado (µg/m³)
+                            </button>
+
+                            <!-- CO2 -->
+                            <button type="button" data-metrica="co2" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
+                                <span class="w-2.5 h-2.5 rounded-full bg-stone-600"></span>
+                                Dióxido de Carbono (CO₂)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Cards de Estatísticas em Tempo Real (Média, Máximo, Mínimo e Amostras) -->
+                    <div class="p-6 bg-athens-gray-50/50 border-b border-athens-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        
+                        <!-- Média -->
+                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Média Calculada</span>
+                                <span id="stat-classificacao" class="px-2 py-0.5 text-[11px] font-bold rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    Normal
+                                </span>
+                            </div>
+                            <div class="mt-2 flex items-baseline gap-1.5">
+                                <span id="stat-media" class="text-2xl font-black text-blue-dianne-950">--</span>
+                                <span id="stat-unidade-media" class="text-xs font-bold text-athens-gray-500">IQA</span>
+                            </div>
+                            <p class="text-[11px] text-athens-gray-500 mt-1">Média ponderada do período selecionado</p>
+                        </div>
+
+                        <!-- Valor Máximo -->
+                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
+                            <div class="flex items-center justify-between text-cinnabar-600">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Valor Máximo</span>
+                                <x-heroicon-m-arrow-trending-up class="w-4 h-4 text-cinnabar-500" />
+                            </div>
+                            <div class="mt-2 flex items-baseline gap-1.5">
+                                <span id="stat-maximo" class="text-2xl font-black text-cinnabar-600">--</span>
+                                <span id="stat-unidade-max" class="text-xs font-bold text-athens-gray-500">IQA</span>
+                            </div>
+                            <p class="text-[11px] text-athens-gray-500 mt-1">Pico máximo registrado na localidade</p>
+                        </div>
+
+                        <!-- Valor Mínimo -->
+                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
+                            <div class="flex items-center justify-between text-blue-600">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Valor Mínimo</span>
+                                <x-heroicon-m-arrow-trending-down class="w-4 h-4 text-blue-500" />
+                            </div>
+                            <div class="mt-2 flex items-baseline gap-1.5">
+                                <span id="stat-minimo" class="text-2xl font-black text-blue-600">--</span>
+                                <span id="stat-unidade-min" class="text-xs font-bold text-athens-gray-500">IQA</span>
+                            </div>
+                            <p class="text-[11px] text-athens-gray-500 mt-1">Ponto mínimo observado no intervalo</p>
+                        </div>
+
+                        <!-- Estações Agregadas e Amostras -->
+                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
+                            <div class="flex items-center justify-between text-athens-gray-500">
+                                <span class="text-xs font-bold uppercase tracking-wider">Amostras & Estações</span>
+                                <x-heroicon-o-signal class="w-4 h-4 text-emerald-500" />
+                            </div>
+                            <div class="mt-2 flex items-baseline gap-2">
+                                <span id="stat-amostras" class="text-2xl font-black text-blue-dianne-950">--</span>
+                                <span class="text-xs font-medium text-athens-gray-500">leituras</span>
+                            </div>
+                            <p id="stat-estacoes-ativas" class="text-[11px] text-athens-gray-500 mt-1">Agregando estações ativas</p>
+                        </div>
+                    </div>
+
+                    <!-- Área do Gráfico de Linhas -->
+                    <div class="p-6 relative">
+                        <!-- Loading Overlay -->
+                        <div id="chart-loading" class="absolute inset-0 bg-white/75 backdrop-blur-2xs flex items-center justify-center z-10 hidden">
+                            <div class="flex items-center gap-3 px-4 py-2.5 bg-white border border-athens-gray-200 rounded-xl shadow-lg">
+                                <svg class="animate-spin h-5 w-5 text-blue-dianne-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs font-bold text-blue-dianne-950">Calculando médias da localidade...</span>
+                            </div>
+                        </div>
+
+                        <!-- Canvas do Chart.js -->
+                        <div class="w-full h-84 relative">
+                            <canvas id="dashboard-chart"></canvas>
+                        </div>
+
+                        <!-- Estado Vazio (Sem Dados) -->
+                        <div id="chart-empty" class="hidden flex flex-col items-center justify-center py-16 text-center">
+                            <x-heroicon-o-chart-bar-square class="w-12 h-12 text-athens-gray-300 mb-3" />
+                            <h4 class="text-sm font-bold text-blue-dianne-950">Nenhuma leitura encontrada</h4>
+                            <p class="text-xs text-athens-gray-500 mt-1 max-w-sm">Não há telemetrias registradas para esta localidade no período selecionado.</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
+
+    @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                let chartInstance = null;
+                let currentTipo = 'cidade';
+                let currentMetrica = 'qualidade_ar';
+                let currentPeriodo = '24h';
+
+                const btnTipoCidade = document.getElementById('btn-tipo-cidade');
+                const btnTipoBairro = document.getElementById('btn-tipo-bairro');
+                const containerCidade = document.getElementById('container-select-cidade');
+                const containerBairro = document.getElementById('container-select-bairro');
+                const selectCidade = document.getElementById('select-cidade');
+                const selectBairro = document.getElementById('select-bairro');
+                const chartLoading = document.getElementById('chart-loading');
+                const chartCanvas = document.getElementById('dashboard-chart');
+                const chartEmpty = document.getElementById('chart-empty');
+
+                // Elementos dos Cards de Estatística
+                const statMedia = document.getElementById('stat-media');
+                const statMaximo = document.getElementById('stat-maximo');
+                const statMinimo = document.getElementById('stat-minimo');
+                const statAmostras = document.getElementById('stat-amostras');
+                const statUnidadeMedia = document.getElementById('stat-unidade-media');
+                const statUnidadeMax = document.getElementById('stat-unidade-max');
+                const statUnidadeMin = document.getElementById('stat-unidade-min');
+                const statClassificacao = document.getElementById('stat-classificacao');
+                const statEstacoesAtivas = document.getElementById('stat-estacoes-ativas');
+
+                // Alternância de Agrupamento: Cidade vs Bairro
+                btnTipoCidade.addEventListener('click', function () {
+                    currentTipo = 'cidade';
+                    btnTipoCidade.classList.add('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
+                    btnTipoCidade.classList.remove('text-athens-gray-600');
+                    btnTipoBairro.classList.remove('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
+                    btnTipoBairro.classList.add('text-athens-gray-600');
+
+                    containerCidade.classList.remove('hidden');
+                    containerBairro.classList.add('hidden');
+                    carregarDadosGrafico();
+                });
+
+                btnTipoBairro.addEventListener('click', function () {
+                    currentTipo = 'bairro';
+                    btnTipoBairro.classList.add('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
+                    btnTipoBairro.classList.remove('text-athens-gray-600');
+                    btnTipoCidade.classList.remove('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
+                    btnTipoCidade.classList.add('text-athens-gray-600');
+
+                    containerBairro.classList.remove('hidden');
+                    containerCidade.classList.add('hidden');
+                    carregarDadosGrafico();
+                });
+
+                // Seleção de Cidade ou Bairro
+                selectCidade.addEventListener('change', carregarDadosGrafico);
+                selectBairro.addEventListener('change', carregarDadosGrafico);
+
+                // Seleção de Período (24h, 7d, 30d)
+                document.querySelectorAll('.btn-periodo').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        document.querySelectorAll('.btn-periodo').forEach(b => {
+                            b.classList.remove('bg-white', 'text-blue-dianne-950', 'font-bold', 'shadow-sm');
+                            b.classList.add('text-athens-gray-600');
+                        });
+                        this.classList.add('bg-white', 'text-blue-dianne-950', 'font-bold', 'shadow-sm');
+                        this.classList.remove('text-athens-gray-600');
+
+                        currentPeriodo = this.dataset.periodo;
+                        carregarDadosGrafico();
+                    });
+                });
+
+                // Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2)
+                const metricasCores = {
+                    qualidade_ar: { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-900' },
+                    temperatura: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-900' },
+                    umidade: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-900' },
+                    poeira: { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-900' },
+                    co2: { border: 'border-stone-500', bg: 'bg-stone-100', text: 'text-stone-900' }
+                };
+
+                document.querySelectorAll('.btn-metrica').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        document.querySelectorAll('.btn-metrica').forEach(b => {
+                            const m = b.dataset.metrica;
+                            const estilo = metricasCores[m] || metricasCores.qualidade_ar;
+                            b.classList.remove(estilo.border, estilo.bg, estilo.text, 'shadow-sm', 'font-bold');
+                            b.classList.add('border-athens-gray-200', 'bg-white', 'text-athens-gray-700', 'font-semibold');
+                        });
+
+                        currentMetrica = this.dataset.metrica;
+                        const estiloAtivo = metricasCores[currentMetrica] || metricasCores.qualidade_ar;
+                        this.classList.remove('border-athens-gray-200', 'bg-white', 'text-athens-gray-700', 'font-semibold');
+                        this.classList.add(estiloAtivo.border, estiloAtivo.bg, estiloAtivo.text, 'shadow-sm', 'font-bold');
+
+                        carregarDadosGrafico();
+                    });
+                });
+
+                // Função de Carregamento AJAX dos Dados do Gráfico
+                function carregarDadosGrafico() {
+                    const localidadeId = currentTipo === 'cidade' ? selectCidade.value : selectBairro.value;
+
+                    chartLoading.classList.remove('hidden');
+
+                    const url = new URL('/api/dashboard/graficos', window.location.origin);
+                    url.searchParams.append('tipo_agrupamento', currentTipo);
+                    if (localidadeId) {
+                        url.searchParams.append('localidade_id', localidadeId);
+                    }
+                    url.searchParams.append('metrica', currentMetrica);
+                    url.searchParams.append('periodo', currentPeriodo);
+
+                    fetch(url)
+                        .then(res => res.json())
+                        .then(data => {
+                            chartLoading.classList.add('hidden');
+                            atualizarCardsEstatisticos(data);
+                            renderizarGrafico(data);
+                        })
+                        .catch(err => {
+                            chartLoading.classList.add('hidden');
+                            console.error('Erro ao buscar dados do gráfico:', err);
+                        });
+                }
+
+                // Atualização dos Cards de Média, Máximo e Mínimo
+                function atualizarCardsEstatisticos(data) {
+                    statMedia.textContent = data.media.toFixed(1);
+                    statMaximo.textContent = data.maximo.toFixed(1);
+                    statMinimo.textContent = data.minimo.toFixed(1);
+                    statAmostras.textContent = Number(data.total_leituras).toLocaleString('pt-BR');
+
+                    statUnidadeMedia.textContent = data.unidade;
+                    statUnidadeMax.textContent = data.unidade;
+                    statUnidadeMin.textContent = data.unidade;
+
+                    statClassificacao.textContent = data.status_classificacao;
+                    statClassificacao.className = `px-2 py-0.5 text-[11px] font-bold rounded-full border ${data.status_cor}`;
+
+                    statEstacoesAtivas.textContent = `${data.estacoes_ativas} estação(ões) ativa(s) em ${data.localidade}`;
+                }
+
+                // Renderização do Gráfico de Linhas com Chart.js
+                function renderizarGrafico(data) {
+                    if (!data.labels || data.labels.length === 0) {
+                        chartCanvas.classList.add('hidden');
+                        chartEmpty.classList.remove('hidden');
+                        if (chartInstance) {
+                            chartInstance.destroy();
+                            chartInstance = null;
+                        }
+                        return;
+                    }
+
+                    chartCanvas.classList.remove('hidden');
+                    chartEmpty.classList.add('hidden');
+
+                    const ctx = chartCanvas.getContext('2d');
+
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+
+                    // Criação do gradiente de preenchimento suave
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 320);
+                    gradient.addColorStop(0, data.bgCor || 'rgba(16, 185, 129, 0.25)');
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+
+                    chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: `${data.nome_metrica} (${data.unidade})`,
+                                data: data.valores,
+                                borderColor: data.cor,
+                                backgroundColor: gradient,
+                                borderWidth: 2.5,
+                                fill: true,
+                                tension: 0.35,
+                                pointBackgroundColor: '#ffffff',
+                                pointBorderColor: data.cor,
+                                pointBorderWidth: 2,
+                                pointRadius: data.labels.length > 30 ? 2 : 4,
+                                pointHoverRadius: 6,
+                                pointHoverBackgroundColor: data.cor,
+                                pointHoverBorderColor: '#ffffff',
+                                pointHoverBorderWidth: 2,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                intersect: false,
+                                mode: 'index',
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false,
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(15, 76, 92, 0.95)',
+                                    titleFont: { size: 12, weight: 'bold' },
+                                    bodyFont: { size: 13 },
+                                    padding: 10,
+                                    cornerRadius: 8,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function (context) {
+                                            return `${data.nome_metrica}: ${context.parsed.y} ${data.unidade}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false,
+                                    },
+                                    ticks: {
+                                        font: { size: 11 },
+                                        color: '#7b96b6',
+                                        maxRotation: 0,
+                                        autoSkip: true,
+                                        maxTicksLimit: 12
+                                    }
+                                },
+                                y: {
+                                    grid: {
+                                        color: '#edf1f5',
+                                    },
+                                    ticks: {
+                                        font: { size: 11 },
+                                        color: '#7b96b6',
+                                        callback: function (val) {
+                                            return `${val} ${data.unidade}`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Carregamento inicial do gráfico ao abrir a tela
+                carregarDadosGrafico();
+            });
+        </script>
+    @endpush
 </x-layouts.app>

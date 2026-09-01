@@ -1,9 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Models\Sensor;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EstacaoController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('home');
@@ -12,7 +12,7 @@ Route::get('/', function () {
 // Agrupamos rotas que apenas visitantes (não logados) podem acessar
 Route::middleware('guest')->group(function () {
 
-    // Rota GET para exibir o formulário. 
+    // Rota GET para exibir o formulário.
     // O name('login') é crucial aqui, pois usamos {{ route('login') }} no nosso HTML.
     Route::get('/login', [AuthController::class, 'create'])->name('login');
 
@@ -20,19 +20,14 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'store']);
 });
 
-
 // Rotas protegidas (apenas usuários autenticados)
 Route::middleware('auth')->group(function () {
 
-    Route::get('/dashboard', function () {
-        // 1. Busca os sensores criados pelo usuário logado
-        $sensores = Sensor::where('created_by', Auth::id())->get();
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // 2. Passa a variável $sensores para a view renderizar a tabela
-        return view('dashboard', [
-            'sensores' => $sensores
-        ]);
-    })->name('dashboard');
+    Route::get('/estacoes', [EstacaoController::class, 'index'])->name('estacoes.index');
+    Route::get('/estacoes/create', [EstacaoController::class, 'create'])->name('estacoes.create');
+    Route::post('/estacoes', [EstacaoController::class, 'store'])->name('estacoes.store');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 });
