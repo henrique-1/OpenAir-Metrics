@@ -29,3 +29,10 @@ Thumbs.db
 .mcp.json
 boost.json
 AGENTS.md
+
+# Arquivos de banco de dados SQLite locais
+/database/*.sqlite
+/database/*.sqlite-*
+
+# Arquivos brutos do OpenStreetMap
+/storage/app/osm/*.osm.pbf
