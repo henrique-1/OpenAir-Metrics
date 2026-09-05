@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\MalhaViaria;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -28,5 +29,13 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call(LocalidadesSeeder::class);
+
+        try {
+            if (MalhaViaria::doesntExist()) {
+                $this->call(MalhaViariaSeeder::class);
+            }
+        } catch (\Throwable) {
+            $this->call(MalhaViariaSeeder::class);
+        }
     }
 }

@@ -188,18 +188,53 @@ OpenAir-Metrics/
 ### 4.6 Banco de Dados e Modelagem Espacial
 
 - **`Estado`, `Cidade`, `Bairro`**: Estrutura relacional normalizada para localidades IBGE.
+- **`Patrimonio`**:
+    - Campos: `private_id`, `public_id` (UUIDv4), `mac_address` (unique), `numero_patrimonio`, `tipo_sugerido`, `status` (Disponível, Alocado, Instalado, Manutenção, Descartado), `data_aquisicao`, `observacoes`, `created_by`.
+    - Relacionamentos: `criador(): BelongsTo`, `estacao(): HasOne`.
 - **`Estacao`**:
-    - Campos: `private_id`, `public_id` (UUIDv4), `mac_address` (unique), `tipo_estacao` (enum), `bairro_id` (FK), `logradouro` (string), `numero` (string), `bairro_nome` (string), `cidade_nome` (string), `estado_uf` (string), `cep` (string), `endereco_completo` (text), `coordenadas` (POINT), `created_by` (FK).
+    - Campos: `private_id`, `public_id` (UUIDv4), `mac_address` (nullable unique), `patrimonio_id` (FK), `tipo_estacao` (enum), `status_instalacao` (Planejada, Em Instalação, Instalada, Inativa), `ordem_instalacao` (int), `matriz_pai_id` (FK), `estacao_origem_id` (FK), `distancia_origem_metros` (decimal), `data_instalacao` (datetime), `instalado_por` (FK), `bairro_id` (FK), `logradouro` (string), `numero` (string), `bairro_nome` (string), `cidade_nome` (string), `estado_uf` (string), `cep` (string), `endereco_completo` (text), `coordenadas` (POINT), `created_by` (FK).
     - Accessors e Mutators nos atributos `latitude` e `longitude` para conversão bidirecional de dados geométricos `POINT(lng lat)`.
     - Accessor `endereco` integrado com o banco de dados e `GeocodingService` para resolução de logradouro/número via OpenStreetMap Nominatim.
-    - Método estático `Estacao::menorDistanciaAte($lat, $lng)` para consultas espaciais de proximidade.
-    - Relacionamentos: `bairro(): BelongsTo`, `medicoes(): HasMany`.
+    - Métodos estáticos: `Estacao::menorDistanciaAte($lat, $lng)` e `Estacao::menorDistanciaAteMatriz($lat, $lng)`.
+    - Relacionamentos: `bairro(): BelongsTo`, `medicoes(): HasMany`, `patrimonio(): BelongsTo`, `matrizPai(): BelongsTo`, `estacaoOrigem(): BelongsTo`, `satelitesFilhas(): HasMany`, `instalador(): BelongsTo`.
 - **`Medicao`**:
     - Campos: `private_id`, `public_id` (UUIDv4), `estacao_id` (FK), `temperatura`, `umidade`, `co2`, `poeira`, `data_hora`.
     - Relacionamento: `estacao(): BelongsTo`.
     - Helper/Accessor `getIqaAttribute()` e `calcularIqa($poeira, $co2)`.
     - Factory correspondente: `MedicaoFactory`.
-- **`User`**: Relação `estacoes(): HasMany` adicionada.
+- **`User`**: Relações `estacoes(): HasMany` e `patrimonios(): HasMany` adicionadas.
+
+### 4.7 Módulos de Patrimônio, Planejamento e Instalação em Campo
+
+- **Gestão de Patrimônio (`/patrimonios`)**:
+    - Inventário físico de placas/sensores adquiridos.
+    - Cadastro individual e importação em lote (`storeBatch`) com normalização de formatos MAC e descarte automático de duplicados.
+    - Status de ciclo de vida (`Disponível`, `Instalado`, `Manutenção`).
+- **Planejador Automático de Malha de Sensores (`/estacoes/planejar`)**:
+    - O usuário seleciona dinamicamente a quantidade de satélites (através de slider contínuo, input numérico ou botões rápidos de 1 a 15) e marca a Estação Matriz no mapa Leaflet.
+    - O `PlanejamentoMalhaService` implementa uma **topologia em cascata multidirecional (árvore de corredores viários)**:
+        - Consulta vias públicas no OpenStreetMap via Overpass com **raio de busca dinâmico** (`$raioBuscaMetros = ($quantidadeSatelites * 200) + 200;`) e filtro estrito por regex (`[highway~"^(residential|tertiary|secondary|primary)$"]`).
+        - A partir da Matriz A (#1), projeta ramos em direções divergentes ao longo dos corredores de ruas do bairro (ex: Ramo 1 $\rightarrow$ B #2, B1 #3, B2 #4; Ramo 2 $\rightarrow$ C #5, C1 #6; Ramo 3 $\rightarrow$ D #7...).
+        - Cada salto avança continuamente no leito da via a uma distância de $130\text{m} \le d \le 195\text{m}$ ($\le 200\text{m}$), maximizando o alcance linear e cobrindo integralmente o bairro.
+        - Posiciona todos os nós estritamente sobre as ruas do OpenStreetMap e captura os nomes reais das vias (`logradouro`).
+    - Gera as estações com status `Planejada`, mantendo a integridade da árvore de saltos (`estacao_origem_id`) e a ordem sequencial de instalação.
+- **Roteiro e Ordem de Instalação em Campo (`/instalacoes`)**:
+    - Visão sequencial e responsiva para o técnico instalador em campo com links diretos para navegação no GPS (Google Maps / Waze).
+    - Regra estrita de emparelhamento: desbloqueia a instalação de cada satélite somente após a estação anterior (ou matriz) estar ativada.
+- **Motor Geoespacial Nativo MariaDB (`ST_Distance_Sphere`) & Malha Viária com Logradouro**:
+    - Reversão da arquitetura para utilizar o MariaDB nativo de forma unificada no banco principal, eliminando dependências compiladas externas (SpatiaLite) na hospedagem e otimizando a volumetria (~1.5 GB).
+    - Tabela `malha_viaria` estruturada com `id` (PK), `logradouro` (VARCHAR 256, indexado), `tipo_via` (VARCHAR 50, indexado) e `geometria` (LINESTRING). A migration cria a tabela sem o índice espacial inicial para permitir Bulk Inserts de alta velocidade.
+    - Model `MalhaViaria` operando diretamente na conexão padrão com `$fillable = ['logradouro', 'tipo_via', 'geometria']`.
+    - `MalhaViariaSeeder` com bulk insert veloz via `ogr2ogr -f "MySQL"` usando `-lco SPATIAL_INDEX=NO`, evitando gargalos severos de I/O por reconstrução de R-Tree durante a inserção de milhões de geometrias.
+    - Compilação do índice espacial pós-importação em memória via `DB::statement('ALTER TABLE malha_viaria ADD SPATIAL INDEX(geometria)')` logo após o término da carga do GDAL.
+    - `GeocodingService::buscarViasProximas` consultando o MariaDB com filtro ultra-rápido por Bounding Box indexada via `MBRIntersects(geometria, ST_GeomFromText(boxPolygon, 4326))`, seguido de projeção e cálculo geodésico milimétrico por segmento no PHP via Haversine, contornando a limitação do MariaDB (onde `ST_Distance_Sphere` não aceita `LINESTRING`) e retornando o `logradouro` diretamente na chave `tags.name` para uso nos roteamentos e planejamento de malha.
+    - `GeocodingService::obterDetalhesEndereco` corrigido para consultar estações próximas através da coluna espacial nativa `coordenadas` (`ST_Distance_Sphere(coordenadas, point) <= 10`), eliminando o erro de coluna inexistente `latitude`/`longitude` no MariaDB.
+    - Job assíncrono `ResolveReverseGeocodingJob` com `RateLimiter` (1 req/s) para resolução de detalhes faltantes (número predial e CEP) via Nominatim em segundo plano.
+    - **Algoritmo de Snap to Road e Exclusão de Rodovias (`GeocodingService::snapToRoad`)**:
+        - Eliminação definitiva de posicionamento de estações em rios ou pastos ("Rua Projetada"): qualquer ponto candidato é projetado ortogonalmente e discretizado sobre os eixos viários reais importados no banco de dados.
+        - Exclusão rigorosa de rodovias e vias expressas (`motorway`, `trunk`, `motorway_link`, `trunk_link`) em todas as consultas SQL do MariaDB, no fallback SQLite e nos loops de projeção geométrica.
+        - Garantia matemática do limite estrito de 200m: ao projetar e discretizar segmentos viários, o algoritmo descarta qualquer ponto que ultrapasse $200.0\text{m}$ em relação à estação pai (`origem`), selecionando o nó na via pública permitida que minimiza a distância até o alvo desejado mantendo a regra de proximidade intacta.
+        - Validação pós-processamento no `PlanejamentoMalhaService`: todas as estações geradas passam por checagem e alinhamento viário com preenchimento obrigatório de seus logradouros reais a partir da `malha_viaria`.
 
 ---
 

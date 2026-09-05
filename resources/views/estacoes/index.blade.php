@@ -29,11 +29,17 @@
                         <p class="text-sm text-athens-gray-600 mt-1">Gerencie a sua rede de sensores IoT (Estações Matrizes e Satélites).</p>
                     </div>
 
-                    <!-- Botão de Ação Primária -->
-                    <a href="{{ route('estacoes.create') }}" class="inline-flex items-center justify-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white font-semibold py-2.5 px-5 rounded-lg transition-all shadow-sm hover:shadow active:scale-98 text-sm cursor-pointer">
-                        <x-heroicon-o-plus class="w-5 h-5" />
-                        Cadastrar Nova Estação
-                    </a>
+                    <!-- Botões de Ação Primária -->
+                    <div class="flex items-center gap-2.5">
+                        <a href="{{ route('estacoes.planejar') }}" class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm hover:shadow active:scale-98 text-sm cursor-pointer">
+                            <x-heroicon-o-sparkles class="w-4 h-4" />
+                            Planejar Malha (Automático)
+                        </a>
+                        <a href="{{ route('estacoes.create') }}" class="inline-flex items-center justify-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm hover:shadow active:scale-98 text-sm cursor-pointer">
+                            <x-heroicon-o-plus class="w-4 h-4" />
+                            Cadastrar Nova Estação
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Cards de Resumo Rápido -->

@@ -268,7 +268,6 @@
     </div>
 
     @push('styles')
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         .custom-pin-pulse {
             position: relative;
@@ -295,7 +294,6 @@
     @endpush
 
     @push('scripts')
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             // Elementos do DOM

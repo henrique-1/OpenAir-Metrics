@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\GeocodingService;
 use Database\Factories\EstacaoFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,7 +35,15 @@ class Estacao extends Model
     protected $fillable = [
         'public_id',
         'mac_address',
+        'patrimonio_id',
         'tipo_estacao',
+        'status_instalacao',
+        'ordem_instalacao',
+        'matriz_pai_id',
+        'estacao_origem_id',
+        'distancia_origem_metros',
+        'data_instalacao',
+        'instalado_por',
         'bairro_id',
         'logradouro',
         'numero',
@@ -291,6 +300,71 @@ class Estacao extends Model
     {
         // O segundo parâmetro informa explicitamente qual é a chave estrangeira na tabela 'estacoes'
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Relacionamento: Item de patrimônio físico vinculado.
+     */
+    public function patrimonio(): BelongsTo
+    {
+        return $this->belongsTo(Patrimonio::class, 'patrimonio_id', 'private_id');
+    }
+
+    /**
+     * Relacionamento: Estação Matriz que coordena este cluster/malha.
+     */
+    public function matrizPai(): BelongsTo
+    {
+        return $this->belongsTo(Estacao::class, 'matriz_pai_id', 'private_id');
+    }
+
+    /**
+     * Relacionamento: Estação anterior da qual esta recebe sinal em topologia de rede.
+     */
+    public function estacaoOrigem(): BelongsTo
+    {
+        return $this->belongsTo(Estacao::class, 'estacao_origem_id', 'private_id');
+    }
+
+    /**
+     * Relacionamento: Estações Satélites que se conectam a esta.
+     */
+    public function satelitesFilhas(): HasMany
+    {
+        return $this->hasMany(Estacao::class, 'estacao_origem_id', 'private_id');
+    }
+
+    /**
+     * Relacionamento: Todas as Estações Satélites pertencentes a esta malha/cluster.
+     */
+    public function satelitesMalha(): HasMany
+    {
+        return $this->hasMany(Estacao::class, 'matriz_pai_id', 'private_id')
+            ->where('tipo_estacao', 'Estação Satélite');
+    }
+
+    /**
+     * Escopo para carregar coordenadas de forma compatível com MySQL/MariaDB.
+     */
+    public function scopeWithCoordinates(Builder $query): Builder
+    {
+        $driver = $query->getConnection()->getDriverName();
+        if ($driver === 'mysql' || $driver === 'mariadb') {
+            return $query->select('estacoes.*')
+                ->selectRaw('ST_AsText(coordenadas) as coordenadas_wkt')
+                ->selectRaw('ST_X(coordenadas) as st_longitude')
+                ->selectRaw('ST_Y(coordenadas) as st_latitude');
+        }
+
+        return $query;
+    }
+
+    /**
+     * Relacionamento: Usuário/técnico que realizou a instalação em campo.
+     */
+    public function instalador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'instalado_por');
     }
 
     /**

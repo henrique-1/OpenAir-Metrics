@@ -25,6 +25,14 @@
             <x-heroicon-o-signal class="w-5 h-5 {{ $active === 'estacoes' ? 'text-blue-dianne-600' : 'text-athens-gray-500' }}" />
             Minhas Estações
         </a>
+        <a href="{{ route('patrimonios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'patrimonios' ? 'bg-blue-dianne-50 text-blue-dianne-950 font-bold border border-blue-dianne-200 shadow-sm' : 'text-athens-gray-600 hover:bg-athens-gray-100 hover:text-blue-dianne-900 font-medium' }}">
+            <x-heroicon-o-server-stack class="w-5 h-5 {{ $active === 'patrimonios' ? 'text-blue-dianne-600' : 'text-athens-gray-500' }}" />
+            Patrimônio
+        </a>
+        <a href="{{ route('instalacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'instalacoes' ? 'bg-blue-dianne-50 text-blue-dianne-950 font-bold border border-blue-dianne-200 shadow-sm' : 'text-athens-gray-600 hover:bg-athens-gray-100 hover:text-blue-dianne-900 font-medium' }}">
+            <x-heroicon-o-clipboard-document-check class="w-5 h-5 {{ $active === 'instalacoes' ? 'text-blue-dianne-600' : 'text-athens-gray-500' }}" />
+            Ordens de Instalação
+        </a>
         <a href="#" class="flex items-center gap-3 text-athens-gray-600 hover:bg-athens-gray-100 hover:text-blue-dianne-900 px-3 py-2.5 rounded-lg font-medium transition-colors">
             <x-heroicon-o-bell-alert class="w-5 h-5 text-athens-gray-500" />
             Gerenciar Alertas

@@ -36,13 +36,29 @@ class LocalidadeController extends Controller
     }
 
     /**
+     * Lista as cidades a partir da sigla UF ou ID do estado.
+     */
+    public function cidadesPorUf(string $uf): JsonResponse
+    {
+        $estado = is_numeric($uf) ? Estado::find($uf) : Estado::where('uf', strtoupper($uf))->first();
+
+        if (! $estado) {
+            return response()->json([]);
+        }
+
+        $cidades = $estado->cidades()->orderBy('nome')->get(['id', 'nome']);
+
+        return response()->json($cidades);
+    }
+
+    /**
      * Lista os bairros de uma determinada cidade.
-     * Sempre realiza o cruzamento entre os dados existentes no banco de dados
-     * e os dados retornados pela API Overpass Turbo, cadastrando apenas os bairros inéditos.
      */
     public function bairros(Cidade $cidade): JsonResponse
     {
-        $this->importarBairrosOverpass($cidade);
+        if ($cidade->bairros()->doesntExist()) {
+            $this->importarBairrosOverpass($cidade);
+        }
 
         $bairros = $cidade->bairros()->orderBy('nome')->get(['id', 'nome']);
 
