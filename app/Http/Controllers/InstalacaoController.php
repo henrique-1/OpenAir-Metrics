@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Estacao;
 use App\Models\Patrimonio;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,22 +16,69 @@ class InstalacaoController extends Controller
     /**
      * Lista todas as ordens de instalação / malhas planejadas no sistema.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
+        $busca = trim((string) $request->input('busca'));
+        $status = $request->input('status');
+        $sort = (string) $request->input('sort', 'created_at');
+        $direction = strtolower((string) $request->input('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['created_at', 'ordem_instalacao', 'status_instalacao', 'mac_address'];
+
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'created_at';
+        }
+
         // Agrupa as estações pelas Estações Matrizes
-        $matrizes = Estacao::where('tipo_estacao', 'Estação Matriz')
+        $query = Estacao::where('tipo_estacao', 'Estação Matriz')
             ->with(['bairro.cidade.estado', 'patrimonio'])
             ->withCount([
                 'satelitesMalha as total_satelites',
-                'satelitesMalha as instaladas_satelites' => function ($query) {
-                    $query->where('status_instalacao', 'Instalada');
+                'satelitesMalha as instaladas_satelites' => function ($q) {
+                    $q->where('status_instalacao', 'Instalada');
                 },
-            ])
-            ->latest('created_at')
-            ->paginate(10);
+            ]);
+
+        // Jurisdição municipal: se o usuário tiver cidade vinculada, restringe à sua jurisdição
+        $user = Auth::user();
+        if ($user && $user->cidade_id) {
+            $query->whereHas('bairro', function ($bairroQuery) use ($user) {
+                $bairroQuery->where('cidade_id', $user->cidade_id);
+            });
+        }
+
+        // Filtro de busca
+        if ($busca !== '') {
+            $query->where(function ($q) use ($busca) {
+                $q->where('mac_address', 'like', "%{$busca}%")
+                    ->orWhere('logradouro', 'like', "%{$busca}%")
+                    ->orWhere('bairro_nome', 'like', "%{$busca}%")
+                    ->orWhere('cidade_nome', 'like', "%{$busca}%")
+                    ->orWhereHas('bairro', function ($bQ) use ($busca) {
+                        $bQ->where('nome', 'like', "%{$busca}%");
+                    });
+            });
+        }
+
+        // Filtro por status
+        if ($status === 'Instalada') {
+            $query->where('status_instalacao', 'Instalada');
+        } elseif ($status === 'Pendente') {
+            $query->where(function ($q) {
+                $q->where('status_instalacao', '!=', 'Instalada')
+                    ->orWhereNull('status_instalacao');
+            });
+        }
+
+        $matrizes = $query->orderBy($sort, $direction)
+            ->paginate(10)
+            ->withQueryString();
 
         return view('instalacoes.index', [
             'matrizes' => $matrizes,
+            'busca' => $busca,
+            'status' => $status,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -39,9 +87,14 @@ class InstalacaoController extends Controller
      */
     public function show(string $public_id): View
     {
+        $user = Auth::user();
         $matriz = Estacao::withCoordinates()->where('public_id', $public_id)->firstOrFail();
 
-        // Busca todas as estações desta malha em ordem sequencial de instalação
+        if ($user && $user->cidade_id && $matriz->bairro?->cidade_id && $matriz->bairro->cidade_id !== $user->cidade_id) {
+            abort(403, 'Acesso restrito ao município da sua jurisdição.');
+        }
+
+        // Busca todas as estações desta malha e reordena em cascata topológica
         $estacoes = Estacao::withCoordinates()
             ->where(function ($q) use ($matriz) {
                 $q->where('private_id', $matriz->private_id)
@@ -51,10 +104,17 @@ class InstalacaoController extends Controller
             ->orderByRaw('COALESCE(ordem_instalacao, 1) ASC')
             ->get();
 
-        $patrimoniosDisponiveis = Patrimonio::where('status', 'Disponível')
+        $estacoes = Estacao::ordenarEmCascata($estacoes);
+
+        $patrimoniosQuery = Patrimonio::where('status', 'Disponível');
+        if ($user && $user->cidade_id) {
+            $patrimoniosQuery->where('cidade_id', $user->cidade_id);
+        }
+
+        $patrimoniosDisponiveis = $patrimoniosQuery
             ->orderBy('numero_patrimonio')
             ->orderBy('mac_address')
-            ->get(['private_id', 'public_id', 'mac_address', 'numero_patrimonio', 'tipo_sugerido']);
+            ->get(['private_id', 'public_id', 'mac_address', 'numero_patrimonio']);
 
         return view('instalacoes.show', [
             'matriz' => $matriz,
@@ -68,7 +128,23 @@ class InstalacaoController extends Controller
      */
     public function vincularMac(Request $request, string $public_id): JsonResponse
     {
+        $user = Auth::user();
+        if (! $user?->isInstalador()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Acesso não autorizado. Apenas técnicos com perfil de Instalador podem registrar estações em campo.',
+            ], 403);
+        }
+
         $estacao = Estacao::where('public_id', $public_id)->firstOrFail();
+
+        // Jurisdição municipal: se o instalador possui cidade vinculada, bloqueia tentativa em estação de outro município
+        if ($user->cidade_id && $estacao->bairro?->cidade_id && $estacao->bairro->cidade_id !== $user->cidade_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Acesso negado. A estação pertence a outro município fora da sua jurisdição.',
+            ], 403);
+        }
 
         $request->validate([
             'mac_address' => ['nullable', 'string'],
@@ -131,15 +207,22 @@ class InstalacaoController extends Controller
             $patrimonio = Patrimonio::where('mac_address', $macInformado)->first();
         }
 
+        if ($user->cidade_id && $patrimonio && $patrimonio->cidade_id && $patrimonio->cidade_id !== $user->cidade_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Este equipamento pertence ao patrimônio de outro município fora da sua jurisdição.',
+            ], 422);
+        }
+
         DB::beginTransaction();
 
         try {
             if (! $patrimonio) {
                 // Se não existir no estoque, cria novo registro automaticamente
                 $patrimonio = Patrimonio::create([
+                    'cidade_id' => $estacao->bairro?->cidade_id ?? Auth::user()?->cidade_id,
                     'numero_patrimonio' => $patrimonioInformado ?: null,
                     'mac_address' => $macInformado ?: null,
-                    'tipo_sugerido' => $estacao->tipo_estacao,
                     'status' => 'Instalado',
                     'data_aquisicao' => now()->toDateString(),
                     'observacoes' => 'Cadastrado automaticamente durante a instalação em campo.',
@@ -183,7 +266,7 @@ class InstalacaoController extends Controller
             DB::commit();
 
             $identificadorSucesso = $patrimonio->numero_patrimonio
-                ? "Patrimônio #{$patrimonio->numero_patrimonio}" . ($macFinal ? " (MAC: {$macFinal})" : '')
+                ? "Patrimônio #{$patrimonio->numero_patrimonio}".($macFinal ? " (MAC: {$macFinal})" : '')
                 : "MAC {$macFinal}";
 
             return response()->json([
@@ -194,7 +277,7 @@ class InstalacaoController extends Controller
                     'mac_address' => $estacao->mac_address,
                     'numero_patrimonio' => $patrimonio->numero_patrimonio,
                     'status_instalacao' => $estacao->status_instalacao,
-                    'data_instalacao' => $estacao->data_instalacao?->format('d/m/Y H:i'),
+                    'data_instalacao' => $estacao->data_instalacao ? Carbon::parse($estacao->data_instalacao)->format('d/m/Y H:i') : null,
                     'instalador_nome' => Auth::user()->name,
                 ],
             ]);
@@ -203,7 +286,7 @@ class InstalacaoController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro interno ao registrar instalação: ' . $e->getMessage(),
+                'message' => 'Erro interno ao registrar instalação: '.$e->getMessage(),
             ], 500);
         }
     }

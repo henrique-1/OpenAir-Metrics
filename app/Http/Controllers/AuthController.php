@@ -31,6 +31,8 @@ class AuthController extends Controller
         // Lembre-me checkbox
         $remember = $request->boolean('remember');
 
+        $credentials['ativo'] = true;
+
         // 2. Tentativa de autenticação
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
@@ -41,7 +43,7 @@ class AuthController extends Controller
 
         // 3. Em caso de falha, retorna para a tela de login com erro
         return back()->withErrors([
-            'email' => 'As credenciais informadas não correspondem aos nossos registros.',
+            'email' => 'As credenciais informadas não correspondem aos nossos registros ou a conta está desativada.',
         ])->onlyInput('email');
     }
 

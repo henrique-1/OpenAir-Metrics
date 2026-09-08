@@ -9,6 +9,7 @@ use App\Models\Medicao;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -18,27 +19,35 @@ class DashboardController extends Controller
      */
     public function index(): View
     {
-        $totalEstacoes = Estacao::count();
-        $totalLeituras = Medicao::count();
+        $user = Auth::user();
+
+        $estacaoQuery = Estacao::query();
+        $medicaoQuery = Medicao::query();
+        $cidadesQuery = Cidade::whereHas('bairros.estacoes')->with('estado')->orderBy('nome');
+        $bairrosQuery = Bairro::whereHas('estacoes')->with(['cidade.estado'])->orderBy('nome');
+
+        if ($user && $user->cidade_id) {
+            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+            $cidadesQuery->where('id', $user->cidade_id);
+            $bairrosQuery->where('cidade_id', $user->cidade_id);
+        }
+
+        $totalEstacoes = $estacaoQuery->count();
+        $totalLeituras = (clone $medicaoQuery)->count();
 
         // Alertas reais computados a partir das medições
-        $alertasIqa = Medicao::where('poeira', '>', 50)->orWhere('co2', '>', 1000)->count();
-        $alertasTemp = Medicao::where('temperatura', '>', 35)->orWhere('temperatura', '<', 10)->count();
-        $alertasUmidade = Medicao::where('umidade', '<', 30)->orWhere('umidade', '>', 85)->count();
-        $alertasCo2 = Medicao::where('co2', '>', 1000)->count();
-        $alertasPm = Medicao::where('poeira', '>', 50)->count();
+        $alertasIqa = (clone $medicaoQuery)->where(fn ($q) => $q->where('poeira', '>', 50)->orWhere('co2', '>', 1000))->count();
+        $alertasTemp = (clone $medicaoQuery)->where(fn ($q) => $q->where('temperatura', '>', 35)->orWhere('temperatura', '<', 10))->count();
+        $alertasUmidade = (clone $medicaoQuery)->where(fn ($q) => $q->where('umidade', '<', 30)->orWhere('umidade', '>', 85))->count();
+        $alertasCo2 = (clone $medicaoQuery)->where('co2', '>', 1000)->count();
+        $alertasPm = (clone $medicaoQuery)->where('poeira', '>', 50)->count();
 
         // Cidades que possuem estações cadastradas
-        $cidades = Cidade::whereHas('bairros.estacoes')
-            ->with('estado')
-            ->orderBy('nome')
-            ->get();
+        $cidades = $cidadesQuery->get();
 
         // Bairros que possuem estações cadastradas
-        $bairros = Bairro::whereHas('estacoes')
-            ->with(['cidade.estado'])
-            ->orderBy('nome')
-            ->get();
+        $bairros = $bairrosQuery->get();
 
         return view('dashboard', [
             'totalEstacoes' => $totalEstacoes,
@@ -58,6 +67,7 @@ class DashboardController extends Controller
      */
     public function dadosGrafico(Request $request): JsonResponse
     {
+        $user = Auth::user();
         $tipoAgrupamento = $request->input('tipo_agrupamento', 'cidade'); // 'cidade' ou 'bairro'
         $localidadeId = $request->input('localidade_id');
         $metrica = $request->input('metrica', 'qualidade_ar'); // 'qualidade_ar', 'temperatura', 'umidade', 'poeira', 'co2'
@@ -67,21 +77,37 @@ class DashboardController extends Controller
         $localidadeNome = 'Geral';
         $estacoesQuery = Estacao::query();
 
+        if ($user && $user->cidade_id) {
+            $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+        }
+
         if ($tipoAgrupamento === 'bairro' && $localidadeId) {
-            $bairro = Bairro::with('cidade.estado')->find($localidadeId);
+            $bairroQuery = Bairro::with('cidade.estado');
+            if ($user && $user->cidade_id) {
+                $bairroQuery->where('cidade_id', $user->cidade_id);
+            }
+            $bairro = $bairroQuery->find($localidadeId);
             if ($bairro) {
                 $localidadeNome = "{$bairro->nome} ({$bairro->cidade?->nome} - {$bairro->cidade?->estado?->uf})";
                 $estacoesQuery->where('bairro_id', $bairro->id);
             }
         } elseif ($localidadeId) {
-            $cidade = Cidade::with('estado')->find($localidadeId);
+            $cidadeQuery = Cidade::with('estado');
+            if ($user && $user->cidade_id) {
+                $cidadeQuery->where('id', $user->cidade_id);
+            }
+            $cidade = $cidadeQuery->find($localidadeId);
             if ($cidade) {
                 $localidadeNome = "{$cidade->nome} - {$cidade->estado?->uf}";
                 $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidade->id));
             }
         } else {
             // Se nenhuma localidade foi informada, seleciona a primeira cidade disponível com estações
-            $primeiraCidade = Cidade::whereHas('bairros.estacoes')->with('estado')->first();
+            $primeiraCidadeQuery = Cidade::whereHas('bairros.estacoes')->with('estado');
+            if ($user && $user->cidade_id) {
+                $primeiraCidadeQuery->where('id', $user->cidade_id);
+            }
+            $primeiraCidade = $primeiraCidadeQuery->first();
             if ($primeiraCidade) {
                 $localidadeNome = "{$primeiraCidade->nome} - {$primeiraCidade->estado?->uf}";
                 $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $primeiraCidade->id));

@@ -40,6 +40,7 @@ test('usuario autenticado pode visualizar o dashboard com painel analitico', fun
 });
 
 test('api de graficos do dashboard calcula media, maximo e minimo por cidade', function () {
+    $user = User::factory()->create();
     $estado = Estado::factory()->create();
     $cidade = Cidade::factory()->create(['estado_id' => $estado->id]);
     $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
@@ -63,7 +64,7 @@ test('api de graficos do dashboard calcula media, maximo e minimo por cidade', f
         'data_hora' => now()->subHour(),
     ]);
 
-    $response = $this->getJson(route('api.dashboard.graficos', [
+    $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
         'tipo_agrupamento' => 'cidade',
         'localidade_id' => $cidade->id,
         'metrica' => 'temperatura',
@@ -83,6 +84,7 @@ test('api de graficos do dashboard calcula media, maximo e minimo por cidade', f
 });
 
 test('api de graficos do dashboard calcula metricas por bairro', function () {
+    $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
     $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
 
@@ -97,7 +99,7 @@ test('api de graficos do dashboard calcula metricas por bairro', function () {
         'data_hora' => now()->subHour(),
     ]);
 
-    $response = $this->getJson(route('api.dashboard.graficos', [
+    $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
         'tipo_agrupamento' => 'bairro',
         'localidade_id' => $bairro->id,
         'metrica' => 'umidade',
@@ -116,6 +118,7 @@ test('api de graficos do dashboard calcula metricas por bairro', function () {
 });
 
 test('api de graficos calcula indice de qualidade do ar (IQA)', function () {
+    $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
     $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
 
@@ -126,7 +129,7 @@ test('api de graficos calcula indice de qualidade do ar (IQA)', function () {
         'data_hora' => now()->subHours(1),
     ]);
 
-    $response = $this->getJson(route('api.dashboard.graficos', [
+    $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
         'tipo_agrupamento' => 'bairro',
         'localidade_id' => $bairro->id,
         'metrica' => 'qualidade_ar',
@@ -143,9 +146,10 @@ test('api de graficos calcula indice de qualidade do ar (IQA)', function () {
 });
 
 test('api de graficos retorna estado vazio elegante quando nao ha dados', function () {
+    $user = User::factory()->create();
     $cidade = Cidade::factory()->create();
 
-    $response = $this->getJson(route('api.dashboard.graficos', [
+    $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
         'tipo_agrupamento' => 'cidade',
         'localidade_id' => $cidade->id,
         'metrica' => 'co2',
@@ -160,4 +164,34 @@ test('api de graficos retorna estado vazio elegante quando nao ha dados', functi
         'labels' => [],
         'valores' => [],
     ]);
+});
+
+test('visitante nao autenticado nao pode acessar rota de graficos do dashboard', function () {
+    $response = $this->getJson(route('dashboard.graficos'));
+
+    $response->assertRedirect(route('login'));
+});
+
+test('dashboard escopa contadores e localidades pela jurisdicao municipal do usuario', function () {
+    $cidade1 = Cidade::factory()->create(['nome' => 'Campinas']);
+    $cidade2 = Cidade::factory()->create(['nome' => 'Santos']);
+
+    $bairro1 = Bairro::factory()->create(['cidade_id' => $cidade1->id]);
+    $bairro2 = Bairro::factory()->create(['cidade_id' => $cidade2->id]);
+
+    $estacao1 = Estacao::factory()->create(['bairro_id' => $bairro1->id]);
+    $estacao2 = Estacao::factory()->create(['bairro_id' => $bairro2->id]);
+
+    Medicao::factory()->create(['estacao_id' => $estacao1->private_id]);
+    Medicao::factory()->create(['estacao_id' => $estacao2->private_id]);
+
+    $userCampinas = User::factory()->create(['cidade_id' => $cidade1->id]);
+
+    $response = $this->actingAs($userCampinas)->get(route('dashboard'));
+
+    $response->assertOk();
+    $response->assertViewHas('totalEstacoes', 1);
+    $response->assertViewHas('totalLeituras', 1);
+    $response->assertSee('Campinas');
+    $response->assertDontSee('Santos');
 });

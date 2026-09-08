@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Bairro;
 use App\Models\Estacao;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
@@ -47,6 +48,11 @@ class StoreEstacaoRequest extends FormRequest
                 'required',
                 'in:Estação Matriz,Estação Satélite',
             ],
+            'estacao_origem_id' => [
+                'nullable',
+                'integer',
+                'exists:estacoes,private_id',
+            ],
             'bairro_id' => [
                 'required',
                 'integer',
@@ -78,22 +84,54 @@ class StoreEstacaoRequest extends FormRequest
                     return;
                 }
 
+                $user = $this->user();
+                $bairroId = (int) $this->input('bairro_id');
+
+                // Validação de Jurisdição Municipal
+                if ($user && $user->cidade_id) {
+                    $bairro = Bairro::find($bairroId);
+                    if (! $bairro || $bairro->cidade_id !== $user->cidade_id) {
+                        $validator->errors()->add(
+                            'bairro_id',
+                            'Você só tem permissão para cadastrar estações na cidade de '.($user->cidade?->nome ?? 'sua jurisdição municipal').'.'
+                        );
+
+                        return;
+                    }
+                }
+
                 $tipo = $this->input('tipo_estacao');
                 $lat = (float) $this->input('latitude');
                 $lng = (float) $this->input('longitude');
+                $origemId = $this->input('estacao_origem_id');
 
                 if ($tipo === 'Estação Satélite') {
-                    $menorDistancia = Estacao::menorDistanciaAteMatriz($lat, $lng);
+                    if ($origemId) {
+                        $origem = Estacao::find($origemId);
+                        if ($origem && $origem->latitude !== null && $origem->longitude !== null) {
+                            $dist = Estacao::calcularDistanciaHaversine($lat, $lng, (float) $origem->latitude, (float) $origem->longitude);
+                            if ($dist > 200.0) {
+                                $validator->errors()->add(
+                                    'latitude',
+                                    'A Estação Satélite deve estar a no máximo 200 metros da estação de origem selecionada. Distância atual: '.round($dist, 1).' metros.'
+                                );
+
+                                return;
+                            }
+                        }
+                    }
+
+                    $menorDistancia = Estacao::menorDistanciaAte($lat, $lng);
 
                     if ($menorDistancia === null) {
                         $validator->errors()->add(
                             'tipo_estacao',
-                            'Não é possível cadastrar uma Estação Satélite sem antes ter ao menos uma Estação Matriz cadastrada no sistema.'
+                            'Não é possível cadastrar uma Estação Satélite sem antes ter ao menos uma estação cadastrada no sistema.'
                         );
                     } elseif ($menorDistancia > 200.0) {
                         $validator->errors()->add(
                             'latitude',
-                            'Estações do tipo Satélite devem estar localizadas a no máximo 200 metros de uma Estação Matriz cadastrada. Distância atual: '.round($menorDistancia, 1).' metros.'
+                            'Estações do tipo Satélite devem estar localizadas a no máximo 200 metros de uma estação já cadastrada. Distância atual: '.round($menorDistancia, 1).' metros.'
                         );
                     }
                 }

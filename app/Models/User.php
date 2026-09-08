@@ -7,11 +7,25 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable([
+    'name',
+    'email',
+    'password',
+    'nivel',
+    'ativo',
+    'cidade_id',
+    'logradouro',
+    'numero',
+    'complemento',
+    'bairro',
+    'estado',
+    'cep',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -28,7 +42,16 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'ativo' => 'boolean',
         ];
+    }
+
+    /**
+     * Relacionamento: Cidade de atuação do usuário/administrador.
+     */
+    public function cidade(): BelongsTo
+    {
+        return $this->belongsTo(Cidade::class, 'cidade_id');
     }
 
     /**
@@ -37,5 +60,40 @@ class User extends Authenticatable
     public function estacoes(): HasMany
     {
         return $this->hasMany(Estacao::class, 'created_by');
+    }
+
+    public function isAdministrador(): bool
+    {
+        return $this->nivel === 'administrador';
+    }
+
+    public function isCadastrador(): bool
+    {
+        return $this->nivel === 'cadastrador' || $this->nivel === 'planejador';
+    }
+
+    public function isPlanejador(): bool
+    {
+        return $this->nivel === 'cadastrador' || $this->nivel === 'planejador';
+    }
+
+    public function isPlanejadorTecnico(): bool
+    {
+        return $this->isPlanejador();
+    }
+
+    public function isInstalador(): bool
+    {
+        return $this->nivel === 'instalador';
+    }
+
+    public function getNivelLabelAttribute(): string
+    {
+        return match ($this->nivel) {
+            'administrador' => 'Administrador',
+            'cadastrador' => 'Planejador Técnico',
+            'instalador' => 'Instalador',
+            default => ucfirst($this->nivel ?? 'Usuário'),
+        };
     }
 }

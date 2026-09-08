@@ -25,10 +25,44 @@ class PlanejamentoController extends Controller
      */
     public function create(): View
     {
+        $user = Auth::user();
+        if ($user && $user->cidade_id) {
+            $user->load('cidade.estado');
+        }
+
+        $cidade = $user?->cidade;
         $estados = Estado::orderBy('nome')->get();
+
+        $query = Estacao::withCoordinates()->with(['bairro.cidade.estado', 'estacaoOrigem']);
+        if ($cidade) {
+            $query->whereHas('bairro.cidade', fn ($q) => $q->where('id', $cidade->id));
+        }
+
+        $estacoesExistentes = $query->get()
+            ->map(function (Estacao $estacao) {
+                return [
+                    'id' => $estacao->private_id,
+                    'public_id' => $estacao->public_id,
+                    'mac_address' => $estacao->mac_address,
+                    'tipo_estacao' => $estacao->tipo_estacao,
+                    'estacao_origem_id' => $estacao->estacao_origem_id,
+                    'matriz_pai_id' => $estacao->matriz_pai_id,
+                    'origem_latitude' => $estacao->estacaoOrigem?->latitude !== null ? (float) $estacao->estacaoOrigem->latitude : null,
+                    'origem_longitude' => $estacao->estacaoOrigem?->longitude !== null ? (float) $estacao->estacaoOrigem->longitude : null,
+                    'latitude' => $estacao->latitude !== null ? (float) $estacao->latitude : null,
+                    'longitude' => $estacao->longitude !== null ? (float) $estacao->longitude : null,
+                    'bairro' => $estacao->bairro_nome ?? $estacao->bairro?->nome,
+                    'cidade' => $estacao->cidade_nome ?? $estacao->bairro?->cidade?->nome,
+                    'uf' => $estacao->estado_uf ?? $estacao->bairro?->cidade?->estado?->uf,
+                    'endereco' => $estacao->endereco,
+                ];
+            });
 
         return view('estacoes.planejar', [
             'estados' => $estados,
+            'estacoesExistentes' => $estacoesExistentes,
+            'cidade' => $cidade,
+            'user' => $user,
         ]);
     }
 
@@ -44,10 +78,16 @@ class PlanejamentoController extends Controller
             'cidade_id' => ['nullable', 'integer'],
         ]);
 
+        $user = Auth::user();
         $lat = (float) $request->input('latitude');
         $lng = (float) $request->input('longitude');
         $quantidade = (int) $request->input('quantidade_satelites');
-        $cidadeId = $request->input('cidade_id') ? (int) $request->input('cidade_id') : null;
+
+        if ($user && $user->cidade_id) {
+            $cidadeId = $user->cidade_id;
+        } else {
+            $cidadeId = $request->input('cidade_id') ? (int) $request->input('cidade_id') : null;
+        }
 
         $malha = $this->planejamentoService->calcularMalha($lat, $lng, $quantidade, $cidadeId);
 
@@ -92,6 +132,11 @@ class PlanejamentoController extends Controller
      */
     public function salvar(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+        if ($user && $user->cidade_id && $request->filled('cidade_id') && (int) $user->cidade_id !== (int) $request->input('cidade_id')) {
+            abort(403, 'Você só tem permissão para planejar e salvar malhas na sua cidade de jurisdição municipal.');
+        }
+
         if (is_string($request->input('matriz'))) {
             $decodedMatriz = json_decode($request->input('matriz'), true);
             if (is_array($decodedMatriz)) {
@@ -116,8 +161,14 @@ class PlanejamentoController extends Controller
             'satelites.*.longitude' => ['required', 'numeric'],
         ]);
 
-        $userId = Auth::id();
+        $user = Auth::user();
+        $userId = $user?->id;
         $cidadeId = (int) $request->input('cidade_id');
+
+        if ($user && $user->cidade_id && (int) $user->cidade_id !== $cidadeId) {
+            abort(403, 'Você só tem permissão para planejar e salvar malhas na sua cidade de jurisdição municipal.');
+        }
+
         $cidade = Cidade::with('estado')->findOrFail($cidadeId);
 
         $matrizData = $request->input('matriz');
@@ -198,6 +249,12 @@ class PlanejamentoController extends Controller
                     'estacao_origem_id' => $estacaoOrigem->private_id,
                 ]);
             }
+
+            // 3ª passagem: ordenação em cascata da malha para normalizar a ordem sequencial de instalação
+            $todasEstacoes = Estacao::where('private_id', $matriz->private_id)
+                ->orWhere('matriz_pai_id', $matriz->private_id)
+                ->get();
+            Estacao::ordenarEmCascata($todasEstacoes);
 
             DB::commit();
 

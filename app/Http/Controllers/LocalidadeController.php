@@ -9,6 +9,7 @@ use App\Models\Estado;
 use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -178,8 +179,15 @@ OVERPASS;
      */
     public function coordenadas(): JsonResponse
     {
+        $user = Auth::user();
         $driver = DB::connection()->getDriverName();
-        $query = Estacao::with(['bairro.cidade.estado']);
+        $query = Estacao::with(['bairro.cidade.estado', 'estacaoOrigem']);
+
+        if ($user && $user->cidade_id) {
+            $query->whereHas('bairro.cidade', function ($q) use ($user) {
+                $q->where('id', $user->cidade_id);
+            });
+        }
 
         if ($driver === 'mysql' || $driver === 'mariadb') {
             $query->select('estacoes.*')
@@ -197,6 +205,10 @@ OVERPASS;
                 'public_id' => $estacao->public_id,
                 'mac_address' => $estacao->mac_address,
                 'tipo_estacao' => $estacao->tipo_estacao,
+                'estacao_origem_id' => $estacao->estacao_origem_id,
+                'matriz_pai_id' => $estacao->matriz_pai_id,
+                'origem_latitude' => $estacao->estacaoOrigem?->latitude !== null ? (float) $estacao->estacaoOrigem->latitude : null,
+                'origem_longitude' => $estacao->estacaoOrigem?->longitude !== null ? (float) $estacao->estacaoOrigem->longitude : null,
                 'latitude' => $lat !== null ? (float) $lat : null,
                 'longitude' => $lng !== null ? (float) $lng : null,
                 'bairro' => $estacao->bairro_nome ?? $estacao->bairro?->nome,
@@ -210,27 +222,70 @@ OVERPASS;
     }
 
     /**
-     * Busca o endereço correspondente a uma coordenada geográfica (Reverse Geocoding).
+     * Busca o endereço correspondente a uma coordenada geográfica (Reverse Geocoding) via Nominatim,
+     * e cadastra o bairro no banco de dados para a cidade informada caso ainda não exista.
      */
     public function reverse(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
+            'cidade_id' => ['nullable', 'exists:cidades,id'],
         ]);
 
         $lat = (float) $validated['lat'];
         $lng = (float) $validated['lng'];
+        $cidadeId = isset($validated['cidade_id']) ? (int) $validated['cidade_id'] : null;
 
-        $detalhes = GeocodingService::obterDetalhesEndereco($lat, $lng);
+        // Busca síncrona via Nominatim / cache
+        $detalhes = GeocodingService::obterDetalhesEndereco($lat, $lng, sync: true);
+
+        // Resolve Estado e Cidade
+        $estadoModel = null;
+        $cidadeModel = null;
+        if (! empty($detalhes['estado_uf'])) {
+            $estadoModel = Estado::where('uf', strtoupper(trim((string) $detalhes['estado_uf'])))->first();
+        }
+
+        if ($cidadeId) {
+            $cidadeModel = Cidade::with('estado')->find($cidadeId);
+            if ($cidadeModel && ! $estadoModel) {
+                $estadoModel = $cidadeModel->estado;
+            }
+        } elseif (! empty($detalhes['cidade'])) {
+            $cidadeQuery = Cidade::where('nome', 'LIKE', trim((string) $detalhes['cidade']));
+            if ($estadoModel) {
+                $cidadeQuery->where('estado_id', $estadoModel->id);
+            }
+            $cidadeModel = $cidadeQuery->first();
+            $cidadeId = $cidadeModel?->id;
+            if ($cidadeModel && ! $estadoModel) {
+                $estadoModel = $cidadeModel->estado;
+            }
+        }
+
+        // Se encontrou o bairro via Nominatim, garante cadastro no banco se ainda não estiver cadastrado
+        $bairroModel = null;
+        $bairroNome = ! empty($detalhes['bairro']) ? trim((string) $detalhes['bairro']) : null;
+
+        if ($bairroNome && $cidadeId) {
+            $bairroModel = Bairro::firstOrCreate([
+                'cidade_id' => $cidadeId,
+                'nome' => $bairroNome,
+            ]);
+        }
 
         return response()->json([
             'endereco' => $detalhes['endereco_formatado'] ?? null,
             'logradouro' => $detalhes['logradouro'] ?? null,
             'numero' => $detalhes['numero'] ?? null,
-            'bairro' => $detalhes['bairro'] ?? null,
-            'cidade' => $detalhes['cidade'] ?? null,
-            'estado_uf' => $detalhes['estado_uf'] ?? null,
+            'bairro' => $bairroNome ?? ($bairroModel?->nome),
+            'bairro_id' => $bairroModel?->id,
+            'cidade' => $cidadeModel?->nome ?? $detalhes['cidade'] ?? null,
+            'cidade_id' => $cidadeId,
+            'estado_id' => $estadoModel?->id,
+            'estado_nome' => $estadoModel?->nome,
+            'estado_uf' => $estadoModel?->uf ?? $detalhes['estado_uf'] ?? null,
             'cep' => $detalhes['cep'] ?? null,
             'endereco_completo' => $detalhes['endereco_completo'] ?? null,
             'latitude' => $lat,

@@ -1,18 +1,18 @@
 <x-layouts.app title="Dashboard - OpenAir Metrics">
-    <!-- Container que ocupa o espaço livre abaixo do Header absoluto (pt-20) -->
-    <div class="flex h-full w-full bg-athens-gray-50">        
+    <!-- Container principal responsivo -->
+    <div class="flex flex-col md:flex-row h-full w-full bg-athens-gray-50 dark:bg-athens-gray-950 transition-colors duration-200">        
         <!-- Barra de Navegação Lateral (Sidebar) -->
         <x-sidebar active="dashboard" />
 
         <!-- Área de Conteúdo Principal -->
-        <main class="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main class="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 lg:p-8">
             <div class="max-w-7xl mx-auto space-y-8">
                 
                 <!-- Título da Página -->
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-blue-dianne-950 tracking-tight">Painel Analítico de Monitoramento</h1>
-                        <p class="text-sm text-athens-gray-600 mt-1">Acompanhe as métricas e médias históricas de qualidade do ar por cidade ou bairro.</p>
+                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">Painel Analítico de Monitoramento</h1>
+                        <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">Acompanhe as métricas e médias históricas de qualidade do ar por cidade ou bairro.</p>
                     </div>
                     <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm self-start sm:self-auto">
                         <x-heroicon-o-plus class="w-4 h-4" />
@@ -24,74 +24,74 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     
                     <!-- Sensores Ativos -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-emerald-50 rounded-lg text-emerald-500">
+                    <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                        <div class="p-3 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg text-emerald-500">
                             <x-heroicon-o-cpu-chip class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Estações Ativas</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $totalEstacoes }}</p>
+                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Estações Ativas</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $totalEstacoes }}</p>
                         </div>
                     </div>
 
                     <!-- Leituras -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-dodger-blue-50 rounded-lg text-dodger-blue-500">
+                    <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                        <div class="p-3 bg-dodger-blue-50 dark:bg-dodger-blue-950/50 rounded-lg text-dodger-blue-500">
                             <x-heroicon-o-chart-bar class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Total de Leituras</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">{{ number_format($totalLeituras, 0, ',', '.') }}</p>
+                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Total de Leituras</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($totalLeituras, 0, ',', '.') }}</p>
                         </div>
                     </div>
                     
                     <!-- Alertas IQA -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-purple-50 rounded-lg text-purple-500">
+                    <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                        <div class="p-3 bg-ebony-clay-50 dark:bg-ebony-clay-950/50 rounded-lg text-ebony-clay-600 dark:text-ebony-clay-400">
                             <x-heroicon-o-globe-americas class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Qualidade (IQA)</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $alertasIqa }}</p>
+                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Qualidade (IQA)</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $alertasIqa }}</p>
                         </div>
                     </div>
 
                     <!-- Alertas de PM -->
-                    <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 flex items-center gap-4">
-                        <div class="p-3 bg-cinnabar-50 rounded-lg text-cinnabar-500">
+                    <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                        <div class="p-3 bg-cinnabar-50 dark:bg-cinnabar-950/50 rounded-lg text-cinnabar-500">
                             <x-heroicon-o-shield-exclamation class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 uppercase tracking-wide">Alertas Particulado</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950">{{ $alertasPm }}</p>
+                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Particulado</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $alertasPm }}</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Painel Principal de Gráficos Analíticos -->
-                <div class="bg-white rounded-2xl shadow-sm border border-athens-gray-200 overflow-hidden">
+                <div class="bg-white dark:bg-athens-gray-900 rounded-2xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 overflow-hidden transition-colors">
                     
                     <!-- Header do Painel com Filtros de Agrupamento -->
-                    <div class="p-6 border-b border-athens-gray-200 bg-white">
+                    <div class="p-6 border-b border-athens-gray-200 dark:border-athens-gray-800 bg-white dark:bg-athens-gray-900">
                         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                             
                             <!-- Controles de Localidade (Cidade vs Bairro) -->
                             <div class="flex flex-wrap items-center gap-3">
-                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Agrupar por:</span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Agrupar por:</span>
                                 
                                 <!-- Toggle Cidade / Bairro -->
-                                <div class="inline-flex p-1 bg-athens-gray-100 rounded-lg border border-athens-gray-200 text-xs font-semibold">
-                                    <button type="button" id="btn-tipo-cidade" class="px-3 py-1.5 rounded-md transition-all bg-white text-blue-dianne-950 shadow-sm font-bold">
+                                <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-semibold">
+                                    <button type="button" id="btn-tipo-cidade" class="px-3 py-1.5 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white shadow-sm font-bold">
                                         Cidade
                                     </button>
-                                    <button type="button" id="btn-tipo-bairro" class="px-3 py-1.5 rounded-md transition-all text-athens-gray-600 hover:text-blue-dianne-950">
+                                    <button type="button" id="btn-tipo-bairro" class="px-3 py-1.5 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white">
                                         Bairro
                                     </button>
                                 </div>
 
                                 <!-- Select de Cidade -->
                                 <div id="container-select-cidade" class="min-w-[220px]">
-                                    <select id="select-cidade" class="w-full text-xs font-medium bg-athens-gray-50 border border-athens-gray-300 rounded-lg px-3 py-2 text-blue-dianne-950 focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
+                                    <select id="select-cidade" class="w-full text-xs font-medium bg-athens-gray-50 dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg px-3 py-2 text-blue-dianne-950 dark:text-white focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
                                         @forelse ($cidades as $cidade)
                                             <option value="{{ $cidade->id }}">{{ $cidade->nome }} - {{ $cidade->estado?->uf }}</option>
                                         @empty
@@ -102,7 +102,7 @@
 
                                 <!-- Select de Bairro (Oculto inicialmente) -->
                                 <div id="container-select-bairro" class="min-w-[240px] hidden">
-                                    <select id="select-bairro" class="w-full text-xs font-medium bg-athens-gray-50 border border-athens-gray-300 rounded-lg px-3 py-2 text-blue-dianne-950 focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
+                                    <select id="select-bairro" class="w-full text-xs font-medium bg-athens-gray-50 dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg px-3 py-2 text-blue-dianne-950 dark:text-white focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
                                         @forelse ($bairros as $bairro)
                                             <option value="{{ $bairro->id }}">{{ $bairro->nome }} ({{ $bairro->cidade?->nome }} - {{ $bairro->cidade?->estado?->uf }})</option>
                                         @empty
@@ -114,117 +114,117 @@
 
                             <!-- Filtro de Período -->
                             <div class="flex items-center gap-2 self-start lg:self-auto">
-                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Período:</span>
-                                <div class="inline-flex p-1 bg-athens-gray-100 rounded-lg border border-athens-gray-200 text-xs font-medium">
-                                    <button type="button" data-periodo="24h" class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white text-blue-dianne-950 font-bold shadow-sm">24 Horas</button>
-                                    <button type="button" data-periodo="7d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 hover:text-blue-dianne-950">7 Dias</button>
-                                    <button type="button" data-periodo="30d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 hover:text-blue-dianne-950">30 Dias</button>
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Período:</span>
+                                <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-medium">
+                                    <button type="button" data-periodo="24h" class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm">24 Horas</button>
+                                    <button type="button" data-periodo="7d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white">7 Dias</button>
+                                    <button type="button" data-periodo="30d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white">30 Dias</button>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Abas de Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2) -->
-                        <div class="mt-6 flex flex-wrap gap-2 border-t border-athens-gray-100 pt-5">
+                        <div class="mt-6 flex flex-wrap gap-2 border-t border-athens-gray-100 dark:border-athens-gray-800 pt-5">
                             <!-- Qualidade do Ar (IQA) -->
-                            <button type="button" data-metrica="qualidade_ar" class="btn-metrica active flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm">
+                            <button type="button" data-metrica="qualidade_ar" class="btn-metrica active flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 shadow-sm">
                                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                                 Qualidade do Ar (IQA)
                             </button>
 
                             <!-- Temperatura -->
-                            <button type="button" data-metrica="temperatura" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
-                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            <button type="button" data-metrica="temperatura" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                                <span class="w-2.5 h-2.5 rounded-full bg-tahiti-gold-500"></span>
                                 Temperatura (°C)
                             </button>
 
                             <!-- Umidade Relativa -->
-                            <button type="button" data-metrica="umidade" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
-                                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                            <button type="button" data-metrica="umidade" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                                <span class="w-2.5 h-2.5 rounded-full bg-dodger-blue-500"></span>
                                 Umidade Relativa (%)
                             </button>
 
                             <!-- Material Particulado -->
-                            <button type="button" data-metrica="poeira" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
-                                <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                            <button type="button" data-metrica="poeira" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                                <span class="w-2.5 h-2.5 rounded-full bg-cinnabar-500"></span>
                                 Material Particulado (µg/m³)
                             </button>
 
                             <!-- CO2 -->
-                            <button type="button" data-metrica="co2" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 bg-white text-athens-gray-700 hover:bg-athens-gray-50">
-                                <span class="w-2.5 h-2.5 rounded-full bg-stone-600"></span>
+                            <button type="button" data-metrica="co2" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                                <span class="w-2.5 h-2.5 rounded-full bg-athens-gray-700"></span>
                                 Dióxido de Carbono (CO₂)
                             </button>
                         </div>
                     </div>
 
                     <!-- Cards de Estatísticas em Tempo Real (Média, Máximo, Mínimo e Amostras) -->
-                    <div class="p-6 bg-athens-gray-50/50 border-b border-athens-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="p-6 bg-athens-gray-50/50 dark:bg-athens-gray-950/50 border-b border-athens-gray-200 dark:border-athens-gray-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         
                         <!-- Média -->
-                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
+                        <div class="bg-white dark:bg-athens-gray-900 p-4 rounded-xl border border-athens-gray-200 dark:border-athens-gray-800 shadow-2xs">
                             <div class="flex items-center justify-between">
-                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Média Calculada</span>
-                                <span id="stat-classificacao" class="px-2 py-0.5 text-[11px] font-bold rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Média Calculada</span>
+                                <span id="stat-classificacao" class="px-2 py-0.5 text-[11px] font-bold rounded-full border bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
                                     Normal
                                 </span>
                             </div>
                             <div class="mt-2 flex items-baseline gap-1.5">
-                                <span id="stat-media" class="text-2xl font-black text-blue-dianne-950">--</span>
-                                <span id="stat-unidade-media" class="text-xs font-bold text-athens-gray-500">IQA</span>
+                                <span id="stat-media" class="text-2xl font-black text-blue-dianne-950 dark:text-white">--</span>
+                                <span id="stat-unidade-media" class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400">IQA</span>
                             </div>
-                            <p class="text-[11px] text-athens-gray-500 mt-1">Média ponderada do período selecionado</p>
+                            <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Média ponderada do período selecionado</p>
                         </div>
 
                         <!-- Valor Máximo -->
-                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
+                        <div class="bg-white dark:bg-athens-gray-900 p-4 rounded-xl border border-athens-gray-200 dark:border-athens-gray-800 shadow-2xs">
                             <div class="flex items-center justify-between text-cinnabar-600">
-                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Valor Máximo</span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Valor Máximo</span>
                                 <x-heroicon-m-arrow-trending-up class="w-4 h-4 text-cinnabar-500" />
                             </div>
                             <div class="mt-2 flex items-baseline gap-1.5">
-                                <span id="stat-maximo" class="text-2xl font-black text-cinnabar-600">--</span>
-                                <span id="stat-unidade-max" class="text-xs font-bold text-athens-gray-500">IQA</span>
+                                <span id="stat-maximo" class="text-2xl font-black text-cinnabar-600 dark:text-cinnabar-400">--</span>
+                                <span id="stat-unidade-max" class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400">IQA</span>
                             </div>
-                            <p class="text-[11px] text-athens-gray-500 mt-1">Pico máximo registrado na localidade</p>
+                            <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Pico máximo registrado na localidade</p>
                         </div>
 
                         <!-- Valor Mínimo -->
-                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
-                            <div class="flex items-center justify-between text-blue-600">
-                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500">Valor Mínimo</span>
-                                <x-heroicon-m-arrow-trending-down class="w-4 h-4 text-blue-500" />
+                        <div class="bg-white dark:bg-athens-gray-900 p-4 rounded-xl border border-athens-gray-200 dark:border-athens-gray-800 shadow-2xs">
+                            <div class="flex items-center justify-between text-dodger-blue-600">
+                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Valor Mínimo</span>
+                                <x-heroicon-m-arrow-trending-down class="w-4 h-4 text-dodger-blue-500" />
                             </div>
                             <div class="mt-2 flex items-baseline gap-1.5">
-                                <span id="stat-minimo" class="text-2xl font-black text-blue-600">--</span>
-                                <span id="stat-unidade-min" class="text-xs font-bold text-athens-gray-500">IQA</span>
+                                <span id="stat-minimo" class="text-2xl font-black text-dodger-blue-600 dark:text-dodger-blue-400">--</span>
+                                <span id="stat-unidade-min" class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400">IQA</span>
                             </div>
-                            <p class="text-[11px] text-athens-gray-500 mt-1">Ponto mínimo observado no intervalo</p>
+                            <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Ponto mínimo observado no intervalo</p>
                         </div>
 
                         <!-- Estações Agregadas e Amostras -->
-                        <div class="bg-white p-4 rounded-xl border border-athens-gray-200 shadow-2xs">
-                            <div class="flex items-center justify-between text-athens-gray-500">
+                        <div class="bg-white dark:bg-athens-gray-900 p-4 rounded-xl border border-athens-gray-200 dark:border-athens-gray-800 shadow-2xs">
+                            <div class="flex items-center justify-between text-athens-gray-500 dark:text-athens-gray-400">
                                 <span class="text-xs font-bold uppercase tracking-wider">Amostras & Estações</span>
                                 <x-heroicon-o-signal class="w-4 h-4 text-emerald-500" />
                             </div>
                             <div class="mt-2 flex items-baseline gap-2">
-                                <span id="stat-amostras" class="text-2xl font-black text-blue-dianne-950">--</span>
-                                <span class="text-xs font-medium text-athens-gray-500">leituras</span>
+                                <span id="stat-amostras" class="text-2xl font-black text-blue-dianne-950 dark:text-white">--</span>
+                                <span class="text-xs font-medium text-athens-gray-500 dark:text-athens-gray-400">leituras</span>
                             </div>
-                            <p id="stat-estacoes-ativas" class="text-[11px] text-athens-gray-500 mt-1">Agregando estações ativas</p>
+                            <p id="stat-estacoes-ativas" class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Agregando estações ativas</p>
                         </div>
                     </div>
 
                     <!-- Área do Gráfico de Linhas -->
                     <div class="p-6 relative">
                         <!-- Loading Overlay -->
-                        <div id="chart-loading" class="absolute inset-0 bg-white/75 backdrop-blur-2xs flex items-center justify-center z-10 hidden">
-                            <div class="flex items-center gap-3 px-4 py-2.5 bg-white border border-athens-gray-200 rounded-xl shadow-lg">
+                        <div id="chart-loading" class="absolute inset-0 bg-white/75 dark:bg-athens-gray-950/75 backdrop-blur-2xs flex items-center justify-center z-10 hidden">
+                            <div class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-athens-gray-800 border border-athens-gray-200 dark:border-athens-gray-700 rounded-xl shadow-lg">
                                 <svg class="animate-spin h-5 w-5 text-blue-dianne-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                <span class="text-xs font-bold text-blue-dianne-950">Calculando médias da localidade...</span>
+                                <span class="text-xs font-bold text-blue-dianne-950 dark:text-white">Calculando médias da localidade...</span>
                             </div>
                         </div>
 
@@ -235,9 +235,9 @@
 
                         <!-- Estado Vazio (Sem Dados) -->
                         <div id="chart-empty" class="hidden flex flex-col items-center justify-center py-16 text-center">
-                            <x-heroicon-o-chart-bar-square class="w-12 h-12 text-athens-gray-300 mb-3" />
-                            <h4 class="text-sm font-bold text-blue-dianne-950">Nenhuma leitura encontrada</h4>
-                            <p class="text-xs text-athens-gray-500 mt-1 max-w-sm">Não há telemetrias registradas para esta localidade no período selecionado.</p>
+                            <x-heroicon-o-chart-bar-square class="w-12 h-12 text-athens-gray-300 dark:text-athens-gray-600 mb-3" />
+                            <h4 class="text-sm font-bold text-blue-dianne-950 dark:text-white">Nenhuma leitura encontrada</h4>
+                            <p class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mt-1 max-w-sm">Não há telemetrias registradas para esta localidade no período selecionado.</p>
                         </div>
                     </div>
                 </div>
@@ -322,10 +322,10 @@
                 // Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2)
                 const metricasCores = {
                     qualidade_ar: { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-900' },
-                    temperatura: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-900' },
-                    umidade: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-900' },
-                    poeira: { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-900' },
-                    co2: { border: 'border-stone-500', bg: 'bg-stone-100', text: 'text-stone-900' }
+                    temperatura: { border: 'border-tahiti-gold-500', bg: 'bg-tahiti-gold-50', text: 'text-tahiti-gold-900' },
+                    umidade: { border: 'border-dodger-blue-500', bg: 'bg-dodger-blue-50', text: 'text-dodger-blue-900' },
+                    poeira: { border: 'border-cinnabar-500', bg: 'bg-cinnabar-50', text: 'text-cinnabar-900' },
+                    co2: { border: 'border-athens-gray-500', bg: 'bg-athens-gray-100', text: 'text-athens-gray-900' }
                 };
 
                 document.querySelectorAll('.btn-metrica').forEach(btn => {
@@ -352,7 +352,7 @@
 
                     chartLoading.classList.remove('hidden');
 
-                    const url = new URL('/api/dashboard/graficos', window.location.origin);
+                    const url = new URL('{{ route('dashboard.graficos') }}', window.location.origin);
                     url.searchParams.append('tipo_agrupamento', currentTipo);
                     if (localidadeId) {
                         url.searchParams.append('localidade_id', localidadeId);
@@ -390,8 +390,12 @@
                     statEstacoesAtivas.textContent = `${data.estacoes_ativas} estação(ões) ativa(s) em ${data.localidade}`;
                 }
 
+                let ultimoDadoCarregado = null;
+
                 // Renderização do Gráfico de Linhas com Chart.js
                 function renderizarGrafico(data) {
+                    ultimoDadoCarregado = data;
+
                     if (!data.labels || data.labels.length === 0) {
                         chartCanvas.classList.add('hidden');
                         chartEmpty.classList.remove('hidden');
@@ -411,10 +415,14 @@
                         chartInstance.destroy();
                     }
 
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const gridColor = isDark ? '#233246' : '#edf1f5';
+                    const tickColor = isDark ? '#99afc7' : '#7b96b6';
+
                     // Criação do gradiente de preenchimento suave
                     const gradient = ctx.createLinearGradient(0, 0, 0, 320);
                     gradient.addColorStop(0, data.bgCor || 'rgba(16, 185, 129, 0.25)');
-                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+                    gradient.addColorStop(1, isDark ? 'rgba(17, 24, 39, 0.0)' : 'rgba(255, 255, 255, 0.0)');
 
                     chartInstance = new Chart(ctx, {
                         type: 'line',
@@ -428,13 +436,13 @@
                                 borderWidth: 2.5,
                                 fill: true,
                                 tension: 0.35,
-                                pointBackgroundColor: '#ffffff',
+                                pointBackgroundColor: isDark ? '#111827' : '#ffffff',
                                 pointBorderColor: data.cor,
                                 pointBorderWidth: 2,
                                 pointRadius: data.labels.length > 30 ? 2 : 4,
                                 pointHoverRadius: 6,
                                 pointHoverBackgroundColor: data.cor,
-                                pointHoverBorderColor: '#ffffff',
+                                pointHoverBorderColor: isDark ? '#111827' : '#ffffff',
                                 pointHoverBorderWidth: 2,
                             }]
                         },
@@ -450,7 +458,7 @@
                                     display: false,
                                 },
                                 tooltip: {
-                                    backgroundColor: 'rgba(15, 76, 92, 0.95)',
+                                    backgroundColor: isDark ? 'rgba(4, 57, 72, 0.95)' : 'rgba(15, 76, 92, 0.95)',
                                     titleFont: { size: 12, weight: 'bold' },
                                     bodyFont: { size: 13 },
                                     padding: 10,
@@ -470,7 +478,7 @@
                                     },
                                     ticks: {
                                         font: { size: 11 },
-                                        color: '#7b96b6',
+                                        color: tickColor,
                                         maxRotation: 0,
                                         autoSkip: true,
                                         maxTicksLimit: 12
@@ -478,11 +486,11 @@
                                 },
                                 y: {
                                     grid: {
-                                        color: '#edf1f5',
+                                        color: gridColor,
                                     },
                                     ticks: {
                                         font: { size: 11 },
-                                        color: '#7b96b6',
+                                        color: tickColor,
                                         callback: function (val) {
                                             return `${val} ${data.unidade}`;
                                         }
@@ -492,6 +500,12 @@
                         }
                     });
                 }
+
+                window.addEventListener('themechanged', function () {
+                    if (ultimoDadoCarregado) {
+                        renderizarGrafico(ultimoDadoCarregado);
+                    }
+                });
 
                 // Carregamento inicial do gráfico ao abrir a tela
                 carregarDadosGrafico();

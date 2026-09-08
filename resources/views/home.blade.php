@@ -66,7 +66,7 @@
                     <input type="radio" name="mapLayer" value="pm" class="hidden">
                     <div class="p-3 border border-athens-gray-200 rounded-lg hover:bg-athens-gray-50 transition-colors">
                         <div class="flex items-center gap-3">
-                            <x-heroicon-o-shield-exclamation class="w-6 h-6 rounded-full text-purple-500 shadow-sm" />
+                            <x-heroicon-o-shield-exclamation class="w-6 h-6 rounded-full text-spindle-500 shadow-sm" />
                             <span class="font-medium text-athens-gray-800 text-sm">Material Particulado</span>
                         </div>
                     </div>
@@ -75,7 +75,7 @@
                     <input type="radio" name="mapLayer" value="co2" class="hidden">
                     <div class="p-3 border border-athens-gray-200 rounded-lg hover:bg-athens-gray-50 transition-colors">
                         <div class="flex items-center gap-3">
-                            <x-heroicon-o-building-office-2 class="w-6 h-6 rounded-full text-stone-700 shadow-sm" />
+                            <x-heroicon-o-building-office-2 class="w-6 h-6 rounded-full text-athens-gray-700 shadow-sm" />
                             <span class="font-medium text-athens-gray-800 text-sm">Dióxido de Carbono (CO₂)</span>
                         </div>
                     </div>
@@ -540,7 +540,7 @@
                                     ${statusHtml}
                                     
                                     <!-- Botão Fechar (X superior) -->
-                                    <button onclick="removeClickMarker()" class="absolute -top-2.5 -right-2 bg-[#5c5d5f] rounded-full w-[26px] h-[26px] flex items-center justify-center border-2 border-[#4a4b4d] shadow hover:bg-gray-400 transition cursor-pointer z-30">
+                                    <button onclick="removeClickMarker()" class="absolute -top-2.5 -right-2 bg-[#5c5d5f] rounded-full w-[26px] h-[26px] flex items-center justify-center border-2 border-[#4a4b4d] shadow hover:bg-athens-gray-400 transition cursor-pointer z-30">
                                         <x-heroicon-o-x-mark class="w-4 h-4 text-white stroke-2" />
                                     </button>
                                     

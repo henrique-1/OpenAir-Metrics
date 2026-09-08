@@ -24,7 +24,6 @@ class PatrimonioFactory extends Factory
             'public_id' => fake()->uuid(),
             'mac_address' => strtoupper(fake()->unique()->macAddress()),
             'numero_patrimonio' => 'PAT-'.fake()->unique()->numberBetween(1000, 9999),
-            'tipo_sugerido' => fake()->randomElement(['Indefinido', 'Estação Matriz', 'Estação Satélite']),
             'status' => 'Disponível',
             'data_aquisicao' => fake()->dateTimeBetween('-6 months', 'now'),
             'observacoes' => fake()->optional()->sentence(),

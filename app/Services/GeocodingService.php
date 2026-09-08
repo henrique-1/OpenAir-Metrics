@@ -7,6 +7,7 @@ use App\Models\Estacao;
 use App\Models\MalhaViaria;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GeocodingService
@@ -438,7 +439,7 @@ class GeocodingService
      *     endereco_formatado: ?string
      * }|null
      */
-    public static function obterDetalhesEndereco(float $lat, float $lng, ?int $estacaoId = null, bool $dispatchJobIfMissing = true): ?array
+    public static function obterDetalhesEndereco(float $lat, float $lng, ?int $estacaoId = null, bool $dispatchJobIfMissing = true, bool $sync = false): ?array
     {
         $roundLat = round($lat, 6);
         $roundLng = round($lng, 6);
@@ -503,8 +504,14 @@ class GeocodingService
             'endereco_formatado' => $nomeRuaLocal,
         ];
 
-        // 4. Despacha Job assíncrono para resolução precisa de número e CEP no Nominatim via fila com RateLimiter
-        if ($dispatchJobIfMissing) {
+        // 4. Se $sync = true, busca diretamente no Nominatim
+        if ($sync) {
+            $detalhesNominatim = self::consultarNominatim($lat, $lng);
+            if ($detalhesNominatim) {
+                return $detalhesNominatim;
+            }
+        } elseif ($dispatchJobIfMissing) {
+            // Despacha Job assíncrono para resolução precisa no Nominatim via fila com RateLimiter
             ResolveReverseGeocodingJob::dispatch($lat, $lng, $estacaoId);
 
             $cachedAfterJob = Cache::get($cacheKey);
@@ -514,6 +521,97 @@ class GeocodingService
         }
 
         return $detalhesPreliminares;
+    }
+
+    /**
+     * Consulta a API do OpenStreetMap Nominatim diretamente de forma síncrona.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function consultarNominatim(float $lat, float $lng): ?array
+    {
+        $roundLat = round($lat, 6);
+        $roundLng = round($lng, 6);
+        $cacheKey = "geocoding_details_{$roundLat}_{$roundLng}";
+
+        try {
+            $url = 'https://nominatim.openstreetmap.org/reverse';
+            $response = Http::timeout(5)
+                ->withUserAgent('OpenAir_Metrics/1.0 (contato.henrique.bissoli@gmail.com)')
+                ->get($url, [
+                    'format' => 'json',
+                    'lat' => $roundLat,
+                    'lon' => $roundLng,
+                    'zoom' => 18,
+                    'addressdetails' => 1,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $address = $data['address'] ?? [];
+
+                $logradouro = $address['road']
+                    ?? $address['pedestrian']
+                    ?? $address['street']
+                    ?? $address['footway']
+                    ?? $address['avenue']
+                    ?? $address['path']
+                    ?? null;
+
+                $numero = $address['house_number'] ?? null;
+
+                $bairro = $address['suburb']
+                    ?? $address['neighbourhood']
+                    ?? $address['city_district']
+                    ?? $address['quarter']
+                    ?? $address['residential']
+                    ?? $address['subdivision']
+                    ?? null;
+
+                $cidade = $address['city']
+                    ?? $address['town']
+                    ?? $address['municipality']
+                    ?? $address['village']
+                    ?? $address['county']
+                    ?? null;
+
+                $estadoUf = null;
+                if (! empty($address['ISO3166-2-lvl4'])) {
+                    $estadoUf = str_replace('BR-', '', (string) $address['ISO3166-2-lvl4']);
+                } elseif (! empty($address['state_code'])) {
+                    $estadoUf = $address['state_code'];
+                } elseif (! empty($address['state'])) {
+                    $estadoUf = $address['state'];
+                }
+
+                $cep = $address['postcode'] ?? null;
+                $enderecoCompleto = $data['display_name'] ?? null;
+                $enderecoFormatado = $logradouro
+                    ? ($numero ? "{$logradouro}, {$numero}" : $logradouro)
+                    : ($data['name'] ?? ($enderecoCompleto ? explode(',', $enderecoCompleto)[0] : null));
+
+                $detalhes = [
+                    'logradouro' => $logradouro,
+                    'numero' => $numero,
+                    'bairro' => $bairro,
+                    'bairro_nome' => $bairro,
+                    'cidade' => $cidade,
+                    'cidade_nome' => $cidade,
+                    'estado_uf' => $estadoUf,
+                    'cep' => $cep,
+                    'endereco_completo' => $enderecoCompleto,
+                    'endereco_formatado' => $enderecoFormatado,
+                ];
+
+                Cache::put($cacheKey, $detalhes, now()->addDays(30));
+
+                return $detalhes;
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Erro ao consultar Nominatim para ({$roundLat}, {$roundLng}): ".$e->getMessage());
+        }
+
+        return null;
     }
 
     /**

@@ -3,14 +3,12 @@
 namespace App\Jobs;
 
 use App\Models\Estacao;
+use App\Services\GeocodingService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 
 class ResolveReverseGeocodingJob implements ShouldQueue
@@ -59,103 +57,25 @@ class ResolveReverseGeocodingJob implements ShouldQueue
      */
     protected function processGeocoding(): void
     {
-        $roundLat = round($this->latitude, 6);
-        $roundLng = round($this->longitude, 6);
-        $cacheKey = "geocoding_details_{$roundLat}_{$roundLng}";
+        $detalhes = GeocodingService::consultarNominatim($this->latitude, $this->longitude);
 
-        try {
-            $url = 'https://nominatim.openstreetmap.org/reverse';
-            $response = Http::timeout(5)
-                ->withUserAgent('OpenAir_Metrics/1.0 (contato.henrique.bissoli@gmail.com)')
-                ->get($url, [
-                    'format' => 'json',
-                    'lat' => $roundLat,
-                    'lon' => $roundLng,
-                    'zoom' => 18,
-                    'addressdetails' => 1,
-                ]);
+        if ($detalhes && $this->estacaoId) {
+            $estacao = Estacao::find($this->estacaoId);
+            if ($estacao) {
+                $updateData = array_filter([
+                    'logradouro' => $detalhes['logradouro'] ?? null,
+                    'numero' => $detalhes['numero'] ?? null,
+                    'bairro_nome' => $detalhes['bairro_nome'] ?? $detalhes['bairro'] ?? null,
+                    'cidade_nome' => $detalhes['cidade_nome'] ?? $detalhes['cidade'] ?? null,
+                    'estado_uf' => $detalhes['estado_uf'] ?? null,
+                    'cep' => $detalhes['cep'] ?? null,
+                    'endereco_completo' => $detalhes['endereco_completo'] ?? null,
+                ], fn ($v) => ! is_null($v));
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $address = $data['address'] ?? [];
-
-                $logradouro = $address['road']
-                    ?? $address['pedestrian']
-                    ?? $address['street']
-                    ?? $address['footway']
-                    ?? $address['avenue']
-                    ?? $address['path']
-                    ?? null;
-
-                $numero = $address['house_number'] ?? null;
-
-                $bairro = $address['suburb']
-                    ?? $address['neighbourhood']
-                    ?? $address['city_district']
-                    ?? $address['quarter']
-                    ?? $address['residential']
-                    ?? null;
-
-                $cidade = $address['city']
-                    ?? $address['town']
-                    ?? $address['municipality']
-                    ?? $address['village']
-                    ?? $address['county']
-                    ?? null;
-
-                $estadoUf = null;
-                if (! empty($address['ISO3166-2-lvl4'])) {
-                    $estadoUf = str_replace('BR-', '', (string) $address['ISO3166-2-lvl4']);
-                } elseif (! empty($address['state_code'])) {
-                    $estadoUf = $address['state_code'];
-                } elseif (! empty($address['state'])) {
-                    $estadoUf = $address['state'];
+                if (! empty($updateData)) {
+                    $estacao->update($updateData);
                 }
-
-                $cep = $address['postcode'] ?? null;
-                $enderecoCompleto = $data['display_name'] ?? null;
-                $enderecoFormatado = $logradouro
-                    ? ($numero ? "{$logradouro}, {$numero}" : $logradouro)
-                    : ($data['name'] ?? ($enderecoCompleto ? explode(',', $enderecoCompleto)[0] : null));
-
-                $detalhes = [
-                    'logradouro' => $logradouro,
-                    'numero' => $numero,
-                    'bairro' => $bairro,
-                    'bairro_nome' => $bairro,
-                    'cidade' => $cidade,
-                    'cidade_nome' => $cidade,
-                    'estado_uf' => $estadoUf,
-                    'cep' => $cep,
-                    'endereco_completo' => $enderecoCompleto,
-                    'endereco_formatado' => $enderecoFormatado,
-                ];
-
-                Cache::put($cacheKey, $detalhes, now()->addDays(30));
-
-                if ($this->estacaoId) {
-                    $estacao = Estacao::find($this->estacaoId);
-                    if ($estacao) {
-                        $updateData = array_filter([
-                            'logradouro' => $logradouro,
-                            'numero' => $numero,
-                            'bairro_nome' => $bairro,
-                            'cidade_nome' => $cidade,
-                            'estado_uf' => $estadoUf,
-                            'cep' => $cep,
-                            'endereco_completo' => $enderecoCompleto ?: ($logradouro ? "{$logradouro} - {$bairro}, {$cidade}" : null),
-                        ], fn ($v) => ! is_null($v));
-
-                        if (! empty($updateData)) {
-                            $estacao->update($updateData);
-                        }
-                    }
-                }
-            } else {
-                Log::warning("Falha na resposta do Nominatim para ({$roundLat}, {$roundLng}): ".$response->status());
             }
-        } catch (\Throwable $e) {
-            Log::warning("Exceção ao resolver geocodificação reversa para ({$roundLat}, {$roundLng}): ".$e->getMessage());
         }
     }
 }

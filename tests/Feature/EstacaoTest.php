@@ -63,27 +63,31 @@ test('usuario pode acessar formulario de criacao de estacao', function () {
     $response->assertOk();
     $response->assertSee('Cadastro de Nova Estação');
     $response->assertSee('São Paulo');
+    $response->assertSee('Snap to Road');
+    $response->assertSee('snap-to-road');
 });
 
-test('endpoints de api de localidade ibge retornam dados corretos em cascata', function () {
+test('endpoints de localidade ibge retornam dados corretos em cascata', function () {
+    $user = User::factory()->create();
     $estado = Estado::factory()->create(['nome' => 'São Paulo', 'uf' => 'SP']);
     $cidade = Cidade::factory()->create(['estado_id' => $estado->id, 'nome' => 'Campinas']);
     $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id, 'nome' => 'Cambuí']);
 
     // 1. Estados
-    $resEstados = $this->getJson(route('api.estados'));
+    $resEstados = $this->actingAs($user)->getJson(route('localidades.estados'));
     $resEstados->assertOk()->assertJsonFragment(['uf' => 'SP', 'nome' => 'São Paulo']);
 
     // 2. Cidades do estado
-    $resCidades = $this->getJson(route('api.estados.cidades', $estado));
+    $resCidades = $this->actingAs($user)->getJson(route('localidades.estados.cidades', $estado));
     $resCidades->assertOk()->assertJsonFragment(['nome' => 'Campinas']);
 
     // 3. Bairros da cidade
-    $resBairros = $this->getJson(route('api.cidades.bairros', $cidade));
+    $resBairros = $this->actingAs($user)->getJson(route('localidades.cidades.bairros', $cidade));
     $resBairros->assertOk()->assertJsonFragment(['nome' => 'Cambuí']);
 });
 
 test('endpoint de bairros consulta overpass api e cadastra bairros automaticamente', function () {
+    $user = User::factory()->create();
     Http::fake([
         '*interpreter*' => Http::response([
             'elements' => [
@@ -99,7 +103,7 @@ test('endpoint de bairros consulta overpass api e cadastra bairros automaticamen
 
     expect($cidade->bairros()->count())->toBe(0);
 
-    $response = $this->getJson(route('api.cidades.bairros', $cidade));
+    $response = $this->actingAs($user)->getJson(route('localidades.cidades.bairros', $cidade));
 
     $response->assertOk();
     $response->assertJsonFragment(['nome' => 'Jardim Aeroporto']);
@@ -114,6 +118,7 @@ test('endpoint de bairros consulta overpass api e cadastra bairros automaticamen
 });
 
 test('endpoint de bairros realiza failover entre espelhos caso o primeiro falhe com erro 504', function () {
+    $user = User::factory()->create();
     Http::fake([
         'https://overpass-api.de/api/interpreter*' => Http::response('Gateway Timeout', 504),
         'https://overpass.kumi.systems/api/interpreter*' => Http::response([
@@ -126,7 +131,7 @@ test('endpoint de bairros realiza failover entre espelhos caso o primeiro falhe 
     $estado = Estado::factory()->create(['nome' => 'São Paulo', 'uf' => 'SP']);
     $cidade = Cidade::factory()->create(['estado_id' => $estado->id, 'nome' => 'Águas da Prata']);
 
-    $response = $this->getJson(route('api.cidades.bairros', $cidade));
+    $response = $this->actingAs($user)->getJson(route('localidades.cidades.bairros', $cidade));
 
     $response->assertOk();
     $response->assertJsonFragment(['nome' => 'Cascatinha']);
@@ -137,6 +142,7 @@ test('endpoint de bairros realiza failover entre espelhos caso o primeiro falhe 
 });
 
 test('endpoint de coordenadas retorna todas as estacoes para o mapa', function () {
+    $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
     $estacao = Estacao::factory()->create([
         'bairro_id' => $bairro->id,
@@ -146,7 +152,7 @@ test('endpoint de coordenadas retorna todas as estacoes para o mapa', function (
         'longitude' => -46.63330,
     ]);
 
-    $response = $this->getJson(route('api.estacoes.coordenadas'));
+    $response = $this->actingAs($user)->getJson(route('estacoes.coordenadas'));
 
     $response->assertOk();
     $response->assertJsonFragment([
@@ -250,18 +256,41 @@ test('nao pode cadastrar uma estacao satelite a mais de 200 metros de distancia'
     ]);
 });
 
-test('nao pode cadastrar uma estacao satelite se nao houver nenhuma estacao matriz cadastrada', function () {
+test('nao pode cadastrar uma estacao satelite se nao houver nenhuma estacao cadastrada no sistema', function () {
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
 
-    // Existe apenas uma estação satélite no sistema
-    Estacao::factory()->create([
+    // Nenhuma estação existente no sistema
+    expect(Estacao::count())->toBe(0);
+
+    $payload = [
+        'mac_address' => 'AA:AA:AA:AA:AA:AA',
+        'tipo_estacao' => 'Estação Satélite',
+        'bairro_id' => $bairro->id,
+        'latitude' => -23.550520,
+        'longitude' => -46.633308,
+    ];
+
+    $response = $this->actingAs($user)->post(route('estacoes.store'), $payload);
+
+    $response->assertSessionHasErrors(['tipo_estacao']);
+    $this->assertDatabaseMissing('estacoes', [
+        'mac_address' => 'AA:AA:AA:AA:AA:AA',
+    ]);
+});
+
+test('pode cadastrar uma estacao satelite proxima a outra estacao satelite existente dentro de 200m', function () {
+    $user = User::factory()->create();
+    $bairro = Bairro::factory()->create();
+
+    // Estação Satélite existente no sistema
+    $satelitePai = Estacao::factory()->create([
         'tipo_estacao' => 'Estação Satélite',
         'latitude' => -23.550520,
         'longitude' => -46.633308,
     ]);
 
-    // Tentativa de cadastrar outra satélite perto da satélite existente (a 50m)
+    // Nova estação satélite a cerca de 50 metros da satélite existente (~0.0004 graus)
     $payload = [
         'mac_address' => 'AA:AA:AA:AA:AA:AA',
         'tipo_estacao' => 'Estação Satélite',
@@ -272,9 +301,62 @@ test('nao pode cadastrar uma estacao satelite se nao houver nenhuma estacao matr
 
     $response = $this->actingAs($user)->post(route('estacoes.store'), $payload);
 
-    $response->assertSessionHasErrors(['tipo_estacao']);
-    $this->assertDatabaseMissing('estacoes', [
+    $response->assertRedirect(route('estacoes.index'));
+    $response->assertSessionHas('success');
+
+    $this->assertDatabaseHas('estacoes', [
         'mac_address' => 'AA:AA:AA:AA:AA:AA',
+        'tipo_estacao' => 'Estação Satélite',
+        'estacao_origem_id' => $satelitePai->private_id,
+    ]);
+});
+
+test('usuario com jurisdicao municipal vinculada nao pode cadastrar estacao em bairro de outro municipio', function () {
+    $cidadeUsuario = Cidade::factory()->create(['nome' => 'Campinas']);
+    $outraCidade = Cidade::factory()->create(['nome' => 'São Paulo']);
+
+    $user = User::factory()->create(['cidade_id' => $cidadeUsuario->id]);
+
+    $bairroOutraCidade = Bairro::factory()->create(['cidade_id' => $outraCidade->id, 'nome' => 'Pinheiros']);
+
+    $payload = [
+        'mac_address' => '11:22:33:AA:BB:CC',
+        'tipo_estacao' => 'Estação Matriz',
+        'bairro_id' => $bairroOutraCidade->id,
+        'latitude' => -23.560000,
+        'longitude' => -46.700000,
+    ];
+
+    $response = $this->actingAs($user)->post(route('estacoes.store'), $payload);
+
+    $response->assertSessionHasErrors(['bairro_id']);
+    $this->assertDatabaseMissing('estacoes', [
+        'mac_address' => '11:22:33:AA:BB:CC',
+    ]);
+});
+
+test('usuario com jurisdicao municipal vinculada pode cadastrar estacao em bairro do seu municipio', function () {
+    $cidadeUsuario = Cidade::factory()->create(['nome' => 'Campinas']);
+    $user = User::factory()->create(['cidade_id' => $cidadeUsuario->id]);
+
+    $bairroCidadeUsuario = Bairro::factory()->create(['cidade_id' => $cidadeUsuario->id, 'nome' => 'Taquaral']);
+
+    $payload = [
+        'mac_address' => '11:22:33:AA:BB:DD',
+        'tipo_estacao' => 'Estação Matriz',
+        'bairro_id' => $bairroCidadeUsuario->id,
+        'latitude' => -22.870000,
+        'longitude' => -47.050000,
+    ];
+
+    $response = $this->actingAs($user)->post(route('estacoes.store'), $payload);
+
+    $response->assertRedirect(route('estacoes.index'));
+    $response->assertSessionHas('success');
+
+    $this->assertDatabaseHas('estacoes', [
+        'mac_address' => '11:22:33:AA:BB:DD',
+        'bairro_id' => $bairroCidadeUsuario->id,
     ]);
 });
 
@@ -317,6 +399,10 @@ test('bloqueia cadastro com mac address em formato invalido', function () {
 });
 
 test('api de geocodificacao reversa retorna endereco a partir de coordenadas', function () {
+    $user = User::factory()->create();
+    $estado = Estado::factory()->create(['nome' => 'São Paulo', 'uf' => 'SP']);
+    $cidade = Cidade::factory()->create(['estado_id' => $estado->id, 'nome' => 'São Paulo']);
+
     Http::fake([
         'https://nominatim.openstreetmap.org/reverse*' => Http::response([
             'address' => [
@@ -325,11 +411,12 @@ test('api de geocodificacao reversa retorna endereco a partir de coordenadas', f
                 'suburb' => 'Cerqueira César',
                 'city' => 'São Paulo',
                 'state' => 'São Paulo',
+                'ISO3166-2-lvl4' => 'BR-SP',
             ],
         ], 200),
     ]);
 
-    $response = $this->getJson(route('api.geocoding.reverse', [
+    $response = $this->actingAs($user)->getJson(route('geocoding.reverse', [
         'lat' => -23.5645,
         'lng' => -46.6698,
     ]));
@@ -339,7 +426,11 @@ test('api de geocodificacao reversa retorna endereco a partir de coordenadas', f
         'endereco' => 'Rua Oscar Freire, 900',
         'latitude' => -23.5645,
         'longitude' => -46.6698,
+        'cidade_id' => $cidade->id,
+        'estado_id' => $estado->id,
+        'bairro' => 'Cerqueira César',
     ]);
+    expect($response->json('bairro_id'))->not->toBeNull();
 });
 
 test('listagem de estacoes exibe endereco estruturado junto da localidade', function () {
@@ -416,4 +507,32 @@ test('cadastro de estacao persiste endereco estruturado e substitui bairro pelo 
         'estado_uf' => 'SP',
         'cep' => '01310-200',
     ]);
+});
+
+test('listagem de estacoes exibe apenas estacoes da jurisdicao municipal do usuario', function () {
+    $cidade1 = Cidade::factory()->create(['nome' => 'Campinas']);
+    $cidade2 = Cidade::factory()->create(['nome' => 'Santos']);
+
+    $bairro1 = Bairro::factory()->create(['cidade_id' => $cidade1->id]);
+    $bairro2 = Bairro::factory()->create(['cidade_id' => $cidade2->id]);
+
+    $userCampinas = User::factory()->create(['cidade_id' => $cidade1->id]);
+
+    $estacaoCampinas = Estacao::factory()->create([
+        'bairro_id' => $bairro1->id,
+        'mac_address' => 'AA:11:11:11:11:11',
+        'logradouro' => 'Rua de Campinas',
+    ]);
+
+    $estacaoSantos = Estacao::factory()->create([
+        'bairro_id' => $bairro2->id,
+        'mac_address' => 'AA:22:22:22:22:22',
+        'logradouro' => 'Avenida da Praia Santos',
+    ]);
+
+    $response = $this->actingAs($userCampinas)->get(route('estacoes.index'));
+
+    $response->assertOk();
+    $response->assertSee('AA:11:11:11:11:11');
+    $response->assertDontSee('AA:22:22:22:22:22');
 });

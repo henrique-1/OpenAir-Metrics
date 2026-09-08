@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Bairro;
 use App\Models\Cidade;
 use App\Models\Estacao;
 use Illuminate\Support\Facades\Cache;
@@ -49,10 +50,25 @@ class PlanejamentoMalhaService
         $finalMatrizLng = $pontoMatrizRua ? $pontoMatrizRua['longitude'] : (float) $matrizLng;
         $nomeRuaMatriz = $pontoMatrizRua['nome_rua'] ?? null;
 
-        // Tenta obter detalhes adicionais de endereço da Matriz via cache
-        $enderecoMatriz = $this->geocodingService->obterDetalhesEndereco($finalMatrizLat, $finalMatrizLng) ?? [];
+        // Tenta obter detalhes adicionais de endereço e bairro da Matriz via Nominatim / cache
+        $enderecoMatriz = $this->geocodingService->obterDetalhesEndereco($finalMatrizLat, $finalMatrizLng, sync: true) ?? [];
 
-        $bairroMatriz = $enderecoMatriz['bairro_nome'] ?? $enderecoMatriz['bairro'] ?? 'Centro';
+        $bairroMatriz = $enderecoMatriz['bairro_nome'] ?? $enderecoMatriz['bairro'] ?? null;
+        $bairroId = null;
+
+        if (! empty($bairroMatriz) && $cidadeId) {
+            $bairroModel = Bairro::firstOrCreate([
+                'cidade_id' => $cidadeId,
+                'nome' => trim($bairroMatriz),
+            ]);
+            $bairroMatriz = $bairroModel->nome;
+            $bairroId = $bairroModel->id;
+        }
+
+        if (empty($bairroMatriz)) {
+            $bairroMatriz = 'Centro';
+        }
+
         $cidadeMatriz = $enderecoMatriz['cidade_nome'] ?? $enderecoMatriz['cidade'] ?? $cidadeNome ?? 'Cidade';
         $estadoMatriz = $enderecoMatriz['estado_uf'] ?? $estadoUf ?? 'SP';
         $logradouroMatriz = $nomeRuaMatriz ?: ($enderecoMatriz['logradouro'] ?? null);
@@ -64,7 +80,9 @@ class PlanejamentoMalhaService
             'longitude' => $finalMatrizLng,
             'logradouro' => $logradouroMatriz,
             'numero' => $enderecoMatriz['numero'] ?? null,
+            'bairro_id' => $bairroId,
             'bairro_nome' => $bairroMatriz,
+            'cidade_id' => $cidadeId,
             'cidade_nome' => $cidadeMatriz,
             'estado_uf' => $estadoMatriz,
             'cep' => $enderecoMatriz['cep'] ?? null,
@@ -128,7 +146,9 @@ class PlanejamentoMalhaService
                 'longitude' => $lng,
                 'logradouro' => $nomeRuaSat,
                 'numero' => null,
+                'bairro_id' => $bairroId,
                 'bairro_nome' => $bairroMatriz,
+                'cidade_id' => $cidadeId,
                 'cidade_nome' => $cidadeMatriz,
                 'estado_uf' => $estadoMatriz,
                 'cep' => null,

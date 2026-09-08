@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cidade;
 use App\Models\Estacao;
 use App\Models\Patrimonio;
 use Illuminate\Http\JsonResponse;
@@ -17,13 +18,30 @@ class PatrimonioController extends Controller
      */
     public function index(Request $request): View
     {
+        $user = Auth::user();
         $statusFiltro = $request->input('status');
         $busca = trim((string) $request->input('busca'));
+        $sort = (string) $request->input('sort', 'created_at');
+        $direction = strtolower((string) $request->input('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['mac_address', 'numero_patrimonio', 'status', 'data_aquisicao', 'created_at'];
 
-        $query = Patrimonio::with(['estacao', 'criador'])->latest('created_at');
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'created_at';
+        }
 
-        if ($statusFiltro && in_array($statusFiltro, ['Disponível', 'Alocado', 'Instalado', 'Manutenção', 'Descartado'])) {
-            $query->where('status', $statusFiltro);
+        $query = Patrimonio::with(['estacao', 'criador']);
+
+        // Jurisdição municipal: restringe aos equipamentos da cidade do usuário autenticado
+        if ($user && $user->cidade_id) {
+            $query->where('cidade_id', $user->cidade_id);
+        }
+
+        if ($statusFiltro && in_array($statusFiltro, ['Disponível', 'Alocado', 'Instalado', 'Instalada', 'Manutenção', 'Descartado'])) {
+            if ($statusFiltro === 'Instalado' || $statusFiltro === 'Instalada') {
+                $query->whereIn('status', ['Instalado', 'Instalada']);
+            } else {
+                $query->where('status', $statusFiltro);
+            }
         }
 
         if ($busca !== '') {
@@ -34,13 +52,18 @@ class PatrimonioController extends Controller
             });
         }
 
-        $patrimonios = $query->paginate(15)->withQueryString();
+        $patrimonios = $query->orderBy($sort, $direction)->paginate(15)->withQueryString();
 
-        // Contadores gerais para os cards de estatísticas
-        $total = Patrimonio::count();
-        $disponiveis = Patrimonio::where('status', 'Disponível')->count();
-        $instalados = Patrimonio::where('status', 'Instalado')->count();
-        $manutencao = Patrimonio::where('status', 'Manutenção')->count();
+        // Contadores gerais para os cards de estatísticas escopados por jurisdição
+        $baseQuery = Patrimonio::query();
+        if ($user && $user->cidade_id) {
+            $baseQuery->where('cidade_id', $user->cidade_id);
+        }
+
+        $total = (clone $baseQuery)->count();
+        $disponiveis = (clone $baseQuery)->where('status', 'Disponível')->count();
+        $instalados = (clone $baseQuery)->whereIn('status', ['Instalado', 'Instalada'])->count();
+        $manutencao = (clone $baseQuery)->where('status', 'Manutenção')->count();
 
         return view('patrimonios.index', [
             'patrimonios' => $patrimonios,
@@ -50,6 +73,8 @@ class PatrimonioController extends Controller
             'manutencao' => $manutencao,
             'statusFiltro' => $statusFiltro,
             'busca' => $busca,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -58,15 +83,33 @@ class PatrimonioController extends Controller
      */
     public function create(): View
     {
-        return view('patrimonios.create');
+        $user = Auth::user();
+        if ($user && $user->cidade_id) {
+            $cidades = Cidade::where('id', $user->cidade_id)->with('estado')->get();
+        } else {
+            $cidades = Cidade::with('estado')->orderBy('nome')->get();
+        }
+
+        return view('patrimonios.create', [
+            'cidades' => $cidades,
+            'cidadeUsuario' => $user?->cidade,
+        ]);
     }
 
     /**
-     * Salva um único item de patrimônio.
+     * Salva um único item de patrimônio com código gerado automaticamente: OAir-Estacao-<IdCidade>-<Num>.
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+
+        // Jurisdição municipal: se o usuário possui cidade vinculada, bloqueia tentativa de cadastro em outro município
+        if ($user && $user->cidade_id && $request->filled('cidade_id') && (int) $user->cidade_id !== (int) $request->input('cidade_id')) {
+            abort(403, 'Você só tem permissão para cadastrar equipamentos dentro do seu município de jurisdição.');
+        }
+
         $validated = $request->validate([
+            'cidade_id' => ['required', 'exists:cidades,id'],
             'mac_address' => [
                 'required',
                 'string',
@@ -74,44 +117,54 @@ class PatrimonioController extends Controller
                 'unique:patrimonios,mac_address',
                 'unique:estacoes,mac_address',
             ],
-            'numero_patrimonio' => ['nullable', 'string', 'max:50'],
-            'tipo_sugerido' => ['required', 'in:Indefinido,Estação Matriz,Estação Satélite'],
-            'status' => ['required', 'in:Disponível,Alocado,Instalado,Manutenção,Descartado'],
             'data_aquisicao' => ['nullable', 'date'],
             'observacoes' => ['nullable', 'string', 'max:1000'],
         ], [
+            'cidade_id.required' => 'Selecione o município do patrimônio.',
             'mac_address.required' => 'O endereço MAC é obrigatório.',
             'mac_address.regex' => 'O endereço MAC deve estar no formato AA:BB:CC:DD:EE:FF.',
             'mac_address.unique' => 'Este endereço MAC já está cadastrado no sistema.',
-            'tipo_sugerido.required' => 'Selecione o tipo sugerido do equipamento.',
-            'status.required' => 'Selecione o status inicial do patrimônio.',
         ]);
 
+        if ($user && $user->cidade_id) {
+            $validated['cidade_id'] = $user->cidade_id;
+        }
+
         $validated['mac_address'] = strtoupper(trim($validated['mac_address']));
+        $validated['status'] = 'Disponível';
         $validated['created_by'] = Auth::id();
+        $validated['numero_patrimonio'] = Patrimonio::gerarProximoCodigo((int) $validated['cidade_id']);
 
         Patrimonio::create($validated);
 
         return redirect()
             ->route('patrimonios.index')
-            ->with('success', 'Item de patrimônio cadastrado com sucesso!');
+            ->with('success', "Item cadastrado com sucesso sob o patrimônio {$validated['numero_patrimonio']}!");
     }
 
     /**
-     * Processa o cadastro em lote de múltiplos MAC Addresses.
+     * Processa o cadastro em lote de múltiplos MAC Addresses gerando os códigos de patrimônio sequenciais.
      */
     public function storeBatch(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+
+        // Jurisdição municipal: bloqueia tentativa de cadastrar lote para outro município
+        if ($user && $user->cidade_id && $request->filled('cidade_id') && (int) $user->cidade_id !== (int) $request->input('cidade_id')) {
+            abort(403, 'Você só tem permissão para cadastrar lotes de patrimônio dentro do seu município de jurisdição.');
+        }
+
         $request->validate([
+            'cidade_id' => ['required', 'exists:cidades,id'],
             'mac_addresses_batch' => ['required', 'string'],
-            'tipo_sugerido' => ['required', 'in:Indefinido,Estação Matriz,Estação Satélite'],
             'data_aquisicao' => ['nullable', 'date'],
         ], [
+            'cidade_id.required' => 'Selecione o município para o lote de patrimônio.',
             'mac_addresses_batch.required' => 'Informe a lista de endereços MAC.',
         ]);
 
+        $cidadeId = ($user && $user->cidade_id) ? (int) $user->cidade_id : (int) $request->input('cidade_id');
         $linhas = explode("\n", $request->input('mac_addresses_batch'));
-        $tipo = $request->input('tipo_sugerido', 'Indefinido');
         $dataAquisicao = $request->input('data_aquisicao');
         $userId = Auth::id();
 
@@ -146,18 +199,22 @@ class PatrimonioController extends Controller
                 continue;
             }
 
+            $numeroPatrimonio = Patrimonio::gerarProximoCodigo($cidadeId);
+
             Patrimonio::create([
+                'cidade_id' => $cidadeId,
                 'mac_address' => $macLimpo,
-                'tipo_sugerido' => $tipo,
+                'numero_patrimonio' => $numeroPatrimonio,
                 'status' => 'Disponível',
                 'data_aquisicao' => $dataAquisicao,
+                'observacoes' => 'Cadastrado em lote.',
                 'created_by' => $userId,
             ]);
 
             $cadastrados++;
         }
 
-        $mensagem = "{$cadastrados} placa(s) cadastrada(s) com sucesso no patrimônio.";
+        $mensagem = "{$cadastrados} placa(s) cadastrada(s) com códigos sequenciais no patrimônio.";
         if ($duplicados > 0) {
             $mensagem .= " ({$duplicados} MACs já existentes ignorados)";
         }
@@ -175,6 +232,11 @@ class PatrimonioController extends Controller
      */
     public function destroy(Patrimonio $patrimonio): RedirectResponse
     {
+        $user = Auth::user();
+        if ($user && $user->cidade_id && $patrimonio->cidade_id && (int) $patrimonio->cidade_id !== (int) $user->cidade_id) {
+            abort(403, 'Acesso restrito ao município da sua jurisdição.');
+        }
+
         if ($patrimonio->estacao()->exists()) {
             return redirect()
                 ->route('patrimonios.index')
@@ -193,9 +255,16 @@ class PatrimonioController extends Controller
      */
     public function apiDisponiveis(): JsonResponse
     {
-        $disponiveis = Patrimonio::where('status', 'Disponível')
+        $user = Auth::user();
+        $query = Patrimonio::where('status', 'Disponível');
+
+        if ($user && $user->cidade_id) {
+            $query->where('cidade_id', $user->cidade_id);
+        }
+
+        $disponiveis = $query
             ->orderBy('mac_address')
-            ->get(['private_id', 'public_id', 'mac_address', 'numero_patrimonio', 'tipo_sugerido']);
+            ->get(['private_id', 'public_id', 'mac_address', 'numero_patrimonio']);
 
         return response()->json($disponiveis);
     }

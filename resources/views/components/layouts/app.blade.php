@@ -13,21 +13,43 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
         
+        @if(request()->is('/'))
+            <script>
+                document.documentElement.classList.remove('dark');
+            </script>
+        @else
+            <script>
+                (function() {
+                    const savedTheme = localStorage.getItem('theme');
+                    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                })();
+            </script>
+        @endif
+
         @stack('styles')
     </head>
     
     {{-- Travamos a tela em 100% de largura e altura, sem scroll --}}
-    <body class="font-sans antialiased h-screen w-screen overflow-hidden bg-athens-gray-50">
+    <body class="font-sans antialiased h-screen w-screen overflow-hidden bg-athens-gray-50 {{ request()->is('/') ? 'text-athens-gray-900' : 'dark:bg-athens-gray-950 text-athens-gray-900 dark:text-athens-gray-100' }} transition-colors duration-200">
         
         {{-- Header Flutuante e Transparente (Apenas fora do Dashboard e Áreas Administrativas) --}}
-        @if(!request()->routeIs('dashboard*') && !request()->routeIs('estacoes.*') && !request()->routeIs('patrimonios.*') && !request()->routeIs('instalacoes.*'))
+        @if(!request()->routeIs('dashboard*') && !request()->routeIs('estacoes.*') && !request()->routeIs('patrimonios.*') && !request()->routeIs('instalacoes.*') && !request()->routeIs('perfil.*') && !request()->routeIs('usuarios.*') && !request()->routeIs('login*'))
             <header class="absolute top-0 left-0 w-full z-[2000] pointer-events-none p-4">
                 <div class="relative flex items-center w-full h-12">
                     
                     {{-- Logo Centralizado Absolutamente --}}
                     <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
                         <a href="/" class="transition hover:opacity-80 block">
-                            <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md">
+                            @if(request()->is('/'))
+                                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md">
+                            @else
+                                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md dark:hidden">
+                                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md hidden dark:block">
+                            @endif
                         </a>
                     </div>
 

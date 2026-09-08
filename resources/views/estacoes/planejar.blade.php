@@ -32,29 +32,29 @@
         </style>
     @endpush
 
-    <div class="flex h-full w-full bg-athens-gray-50">
+    <div class="flex flex-col md:flex-row h-full w-full bg-athens-gray-50 dark:bg-athens-gray-950 transition-colors duration-200">
         <!-- Sidebar de Navegação -->
         <x-sidebar active="estacoes" />
 
         <!-- Conteúdo Principal -->
-        <main class="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main class="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 lg:p-8">
             <div class="max-w-7xl mx-auto space-y-6">
 
                 <!-- Breadcrumb e Voltar -->
-                <div class="flex items-center gap-2 text-sm text-athens-gray-500">
-                    <a href="{{ route('estacoes.index') }}" class="hover:text-blue-dianne-600 transition">Minhas Estações</a>
+                <div class="flex items-center gap-2 text-sm text-athens-gray-500 dark:text-athens-gray-400">
+                    <a href="{{ route('estacoes.index') }}" class="hover:text-blue-dianne-600 dark:hover:text-blue-dianne-400 transition">Minhas Estações</a>
                     <x-heroicon-o-chevron-right class="w-4 h-4" />
-                    <span class="text-blue-dianne-950 font-medium">Planejador Automático de Malha</span>
+                    <span class="text-blue-dianne-950 dark:text-white font-medium">Planejador Automático de Malha</span>
                 </div>
 
                 <!-- Cabeçalho -->
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-blue-dianne-950 tracking-tight">Planejador de Malha de Sensores</h1>
-                        <p class="text-sm text-athens-gray-600 mt-1">Posicione a Estação Matriz e o sistema calculará a posição ideal das Satélites ao longo das ruas (limite de 200m).</p>
+                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">Planejador de Malha de Sensores</h1>
+                        <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">Posicione a Estação Matriz e o sistema calculará a posição ideal das Satélites ao longo das ruas (limite de 200m).</p>
                     </div>
 
-                    <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-dianne-600 bg-white border border-athens-gray-300 hover:bg-athens-gray-50 px-3.5 py-2 rounded-lg transition">
+                    <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-dianne-600 dark:text-blue-dianne-400 bg-white dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 px-3.5 py-2 rounded-lg transition">
                         <x-heroicon-o-arrow-path class="w-4 h-4" />
                         Cadastro Manual Individual
                     </a>
@@ -65,27 +65,43 @@
 
                     <!-- Painel Esquerdo: Parâmetros e Resumo (5 cols) -->
                     <div class="lg:col-span-5 space-y-5">
-                        <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 space-y-4">
-                            <h2 class="text-base font-bold text-blue-dianne-950 flex items-center gap-2 border-b border-athens-gray-100 pb-3">
-                                <x-heroicon-o-adjustments-horizontal class="w-5 h-5 text-blue-dianne-600" />
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 space-y-4">
+                            <h2 class="text-base font-bold text-blue-dianne-950 dark:text-white flex items-center gap-2 border-b border-athens-gray-100 dark:border-athens-gray-800 pb-3">
+                                <x-heroicon-o-adjustments-horizontal class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400" />
                                 1. Configurar Parâmetros da Rede
                             </h2>
+
+                            @if (isset($cidade) && $cidade)
+                                <div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 text-xs text-emerald-900 dark:text-emerald-200 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <x-heroicon-o-building-office-2 class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                        <span>Jurisdição Municipal: <strong>{{ $cidade->nome }} ({{ $cidade->estado->uf ?? '' }})</strong></span>
+                                    </div>
+                                    <span class="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-bold px-2 py-0.5 rounded">Fixa</span>
+                                </div>
+                            @endif
 
                             <!-- Estado e Cidade -->
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label class="block text-xs font-bold text-athens-gray-600 uppercase mb-1">Estado</label>
-                                    <select id="select-estado" class="w-full text-sm border border-athens-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-dianne-500">
-                                        <option value="">Selecione o Estado</option>
+                                    <label class="block text-xs font-bold text-athens-gray-600 dark:text-athens-gray-300 uppercase mb-1">Estado</label>
+                                    <select id="select-estado" @disabled(isset($cidade) && $cidade) class="w-full text-sm border border-athens-gray-300 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-dianne-500 disabled:bg-athens-gray-100 dark:disabled:bg-athens-gray-800/60 disabled:cursor-not-allowed">
+                                        @if (!isset($cidade) || !$cidade)
+                                            <option value="">Selecione o Estado</option>
+                                        @endif
                                         @foreach ($estados as $est)
-                                            <option value="{{ $est->id }}" data-uf="{{ $est->uf }}">{{ $est->nome }} ({{ $est->uf }})</option>
+                                            <option value="{{ $est->id }}" data-uf="{{ $est->uf }}" @selected(isset($cidade) && $cidade && $cidade->estado_id === $est->id)>{{ $est->nome }} ({{ $est->uf }})</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-athens-gray-600 uppercase mb-1">Cidade</label>
-                                    <select id="select-cidade" disabled class="w-full text-sm border border-athens-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-dianne-500 bg-athens-gray-50">
-                                        <option value="">Selecione a Cidade</option>
+                                    <label class="block text-xs font-bold text-athens-gray-600 dark:text-athens-gray-300 uppercase mb-1">Cidade</label>
+                                    <select id="select-cidade" @disabled(isset($cidade) && $cidade) class="w-full text-sm border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-dianne-500 bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 disabled:bg-athens-gray-100 dark:disabled:bg-athens-gray-800/60 disabled:cursor-not-allowed">
+                                        @if (isset($cidade) && $cidade)
+                                            <option value="{{ $cidade->id }}" selected>{{ $cidade->nome }}</option>
+                                        @else
+                                            <option value="">Selecione a Cidade</option>
+                                        @endif
                                     </select>
                                 </div>
                             </div>
@@ -93,39 +109,39 @@
                             <!-- Quantidade de Satélites Dinâmica -->
                             <div class="space-y-2">
                                 <div class="flex items-center justify-between">
-                                    <label for="qtd-satelites" class="block text-xs font-bold text-athens-gray-600 uppercase">
+                                    <label for="qtd-satelites" class="block text-xs font-bold text-athens-gray-600 dark:text-athens-gray-300 uppercase">
                                         Qtd. de Satélites:
                                     </label>
                                     <div class="flex items-center gap-2">
-                                        <input type="number" id="input-qtd-number" min="1" max="15" value="3" class="w-16 text-center text-sm font-bold text-blue-dianne-700 border border-athens-gray-300 rounded-lg py-1 px-1.5 focus:ring-2 focus:ring-blue-dianne-500 bg-white">
-                                        <span class="text-xs text-athens-gray-400 font-medium">(Total: <strong id="label-total" class="text-blue-dianne-950 font-bold">4 estações</strong>)</span>
+                                        <input type="number" id="input-qtd-number" min="1" max="15" value="3" class="w-16 text-center text-sm font-bold text-blue-dianne-700 dark:text-blue-dianne-400 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg py-1 px-1.5 focus:ring-2 focus:ring-blue-dianne-500 bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100">
+                                        <span class="text-xs text-athens-gray-400 dark:text-athens-gray-500 font-medium">(Total: <strong id="label-total" class="text-blue-dianne-950 dark:text-white font-bold">4 estações</strong>)</span>
                                     </div>
                                 </div>
                                 <input type="range" id="qtd-satelites" min="1" max="15" value="3" class="w-full accent-blue-dianne-600 cursor-pointer">
                             </div>
 
                             <!-- Card de Instrução de Ação -->
-                            <div class="bg-blue-dianne-50 border border-blue-dianne-200 p-3.5 rounded-lg flex items-start gap-2.5">
-                                <x-heroicon-o-cursor-arrow-rays class="w-5 h-5 text-blue-dianne-600 shrink-0 mt-0.5" />
-                                <div class="text-xs text-blue-dianne-900 leading-relaxed">
+                            <div class="bg-blue-dianne-50 dark:bg-blue-dianne-950/50 border border-blue-dianne-200 dark:border-blue-dianne-800 p-3.5 rounded-lg flex items-start gap-2.5">
+                                <x-heroicon-o-cursor-arrow-rays class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400 shrink-0 mt-0.5" />
+                                <div class="text-xs text-blue-dianne-900 dark:text-blue-dianne-200 leading-relaxed">
                                     <p class="font-bold">Passo 2: Marcar a Matriz no Mapa</p>
-                                    <p class="text-blue-dianne-800 mt-0.5">Clique no mapa para posicionar a <strong>Estação Matriz</strong>. A posição dela ficará fixa e as satélites serão calculadas ao longo das ruas. Para reposicionar a Matriz, <strong>arraste e solte</strong> o pino #1 ou clique em <strong>Remover Matriz</strong> para reposicionar do zero.</p>
+                                    <p class="text-blue-dianne-800 dark:text-blue-dianne-300 mt-0.5">Clique no mapa para posicionar a <strong>Estação Matriz</strong>. A posição dela ficará fixa e as satélites serão calculadas ao longo das ruas. Para reposicionar a Matriz, <strong>arraste e solte</strong> o pino #1 ou clique em <strong>Remover Matriz</strong> para reposicionar do zero.</p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Card de Lista das Estações Calculadas -->
-                        <div id="card-resultado-malha" class="bg-white rounded-xl shadow-sm border border-athens-gray-200 p-5 space-y-3 hidden">
-                            <div class="flex items-center justify-between border-b border-athens-gray-100 pb-3">
-                                <h3 class="text-sm font-bold text-blue-dianne-950 flex items-center gap-1.5">
-                                    <x-heroicon-o-list-bullet class="w-4 h-4 text-emerald-600" />
+                        <div id="card-resultado-malha" class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 space-y-3 hidden">
+                            <div class="flex items-center justify-between border-b border-athens-gray-100 dark:border-athens-gray-800 pb-3">
+                                <h3 class="text-sm font-bold text-blue-dianne-950 dark:text-white flex items-center gap-1.5">
+                                    <x-heroicon-o-list-bullet class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                                     Malha Calculada (<span id="count-estacoes">0</span> estações)
                                 </h3>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    <span class="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                                         Todas a ≤ 200m
                                     </span>
-                                    <button type="button" id="btn-remover-matriz-card" class="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer">
+                                    <button type="button" id="btn-remover-matriz-card" class="text-xs font-semibold text-cinnabar-600 dark:text-cinnabar-400 hover:text-cinnabar-800 dark:hover:text-cinnabar-300 hover:underline cursor-pointer">
                                         Remover Matriz
                                     </button>
                                 </div>
@@ -137,7 +153,7 @@
                             </div>
 
                             <!-- Formulário de Confirmação e Submissão -->
-                            <form id="form-salvar-malha" action="{{ route('estacoes.salvar-malha') }}" method="POST" class="pt-3 border-t border-athens-gray-100">
+                            <form id="form-salvar-malha" action="{{ route('estacoes.salvar-malha') }}" method="POST" class="pt-3 border-t border-athens-gray-100 dark:border-athens-gray-800">
                                 @csrf
                                 <input type="hidden" name="cidade_id" id="form-cidade-id">
                                 <input type="hidden" name="matriz" id="form-matriz-json">
@@ -153,26 +169,26 @@
 
                     <!-- Painel Direito: Mapa Interativo com Leaflet (7 cols) -->
                     <div class="lg:col-span-7">
-                        <div class="bg-white rounded-xl shadow-sm border border-athens-gray-200 overflow-hidden flex flex-col h-[640px]">
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 overflow-hidden flex flex-col h-[640px]">
                             <!-- Barra Superior do Mapa -->
-                            <div class="px-4 py-3 bg-athens-gray-50 border-b border-athens-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div class="px-4 py-3 bg-athens-gray-50 dark:bg-athens-gray-800 border-b border-athens-gray-200 dark:border-athens-gray-700 flex flex-wrap items-center justify-between gap-2 text-xs">
                                 <div class="flex items-center gap-2">
-                                    <span class="font-bold text-blue-dianne-950">Legenda:</span>
-                                    <span class="inline-flex items-center gap-1 text-dodger-blue-700 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-dodger-blue-600"></span> Matriz (Fixa / Arrastável)</span>
-                                    <span class="inline-flex items-center gap-1 text-purple-700 font-semibold ml-2"><span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span> Satélites (Arrastáveis)</span>
-                                    <span class="inline-flex items-center gap-1 text-slate-600 font-semibold ml-2"><span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span> Instaladas</span>
-                                    <span class="inline-flex items-center gap-1 text-slate-500 font-medium ml-2"><span class="w-3 h-0.5 bg-slate-400 border border-slate-400 border-dashed"></span> Raio Instaladas (Cinza)</span>
+                                    <span class="font-bold text-blue-dianne-950 dark:text-white">Legenda:</span>
+                                    <span class="inline-flex items-center gap-1 text-dodger-blue-700 dark:text-dodger-blue-400 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-dodger-blue-600"></span> Matriz (Fixa / Arrastável)</span>
+                                    <span class="inline-flex items-center gap-1 text-spindle-700 dark:text-spindle-400 font-semibold ml-2"><span class="w-2.5 h-2.5 rounded-full bg-spindle-600"></span> Satélites (Arrastáveis)</span>
+                                    <span class="inline-flex items-center gap-1 text-athens-gray-700 dark:text-athens-gray-300 font-semibold ml-2"><span class="w-2.5 h-2.5 rounded-full bg-athens-gray-500"></span> Instaladas</span>
+                                    <span class="inline-flex items-center gap-1 text-athens-gray-600 dark:text-athens-gray-400 font-medium ml-2"><span class="w-3 h-0.5 bg-athens-gray-400 border border-athens-gray-400 border-dashed"></span> Raio Instaladas (Cinza)</span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span id="map-status" class="text-athens-gray-500 italic">Aguardando seleção da Matriz</span>
-                                    <button type="button" id="btn-remover-matriz-topbar" class="hidden inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded transition cursor-pointer">
+                                    <span id="map-status" class="text-athens-gray-500 dark:text-athens-gray-400 italic">Aguardando seleção da Matriz</span>
+                                    <button type="button" id="btn-remover-matriz-topbar" class="hidden inline-flex items-center gap-1 text-xs font-semibold text-cinnabar-600 dark:text-cinnabar-400 hover:text-cinnabar-800 dark:hover:text-cinnabar-300 bg-cinnabar-50 dark:bg-cinnabar-950/50 hover:bg-cinnabar-100 dark:hover:bg-cinnabar-900/50 border border-cinnabar-200 dark:border-cinnabar-800 px-2 py-0.5 rounded transition cursor-pointer">
                                         Remover Matriz
                                     </button>
                                 </div>
                             </div>
 
                             <!-- Container do Mapa -->
-                            <div id="map-planejador" class="flex-1 w-full bg-athens-gray-100 z-0"></div>
+                            <div id="map-planejador" class="flex-1 w-full bg-athens-gray-100 dark:bg-athens-gray-950 z-0"></div>
                         </div>
                     </div>
 
@@ -228,9 +244,10 @@
                 btnCard.addEventListener('click', removerMatriz);
             }
 
-            // Função para busca de endereço e bairro reverso (mesmo modelo da tela create.blade.php)
+            // Função para busca de endereço e bairro reverso via Nominatim (mesmo modelo da tela create.blade.php)
             function buscarBairroReverso(lat, lng, callback) {
-                fetch(`/api/geocoding/reverse?lat=${lat}&lng=${lng}`)
+                const cidId = selectCidade.value || '';
+                fetch(`/geocoding/reverse?lat=${lat}&lng=${lng}&cidade_id=${cidId}`)
                     .then(res => res.json())
                     .then(data => {
                         if (data && callback) {
@@ -280,39 +297,95 @@
             map.addLayer(existingStationsLayers);
             map.addLayer(plannedLayers);
 
-            // Carrega estações já existentes para contexto
-            fetch('/api/estacoes/coordenadas')
-                .then(r => r.json())
-                .then(estacoes => {
-                    (estacoes || []).forEach(est => {
-                        if (est.latitude && est.longitude) {
-                            const isM = est.tipo_estacao === 'Estação Matriz';
-                            const latLng = [parseFloat(est.latitude), parseFloat(est.longitude)];
-
-                            // Círculo de cobertura de 200m em cinza das estações já instaladas
-                            const circleCoverage = L.circle(latLng, {
-                                radius: 200,
-                                color: '#94a3b8',
-                                weight: 1.5,
-                                dashArray: '5, 5',
-                                fillColor: '#cbd5e1',
-                                fillOpacity: 0.16
-                            });
-                            existingStationsLayers.addLayer(circleCoverage);
-
-                            // Ponto central da estação já cadastrada
-                            const marker = L.circleMarker(latLng, {
-                                radius: isM ? 7 : 5,
-                                fillColor: isM ? '#475569' : '#64748b',
-                                color: '#ffffff',
-                                weight: 1.5,
-                                fillOpacity: 0.85
-                            });
-                            marker.bindPopup(`<strong>${est.tipo_estacao} (Já Cadastrada)</strong><br>${est.endereco || ''}<br><span style="color:#64748b; font-size:11px;">Raio de alcance: 200m (Cinza)</span>`);
-                            existingStationsLayers.addLayer(marker);
-                        }
-                    });
+            // Carrega estações já existentes para contexto e traça suas linhas de conexão
+            function renderExistingStations(estacoes) {
+                const stationsById = {};
+                (estacoes || []).forEach(est => {
+                    if (est.id) {
+                        stationsById[est.id] = est;
+                    }
                 });
+
+                (estacoes || []).forEach(est => {
+                    if (est.latitude && est.longitude) {
+                        const isM = est.tipo_estacao === 'Estação Matriz';
+                        const latLng = [parseFloat(est.latitude), parseFloat(est.longitude)];
+
+                        // Círculo de cobertura de 200m em cinza das estações já instaladas
+                        const circleCoverage = L.circle(latLng, {
+                            radius: 200,
+                            color: '#94a3b8',
+                            weight: 1.5,
+                            dashArray: '5, 5',
+                            fillColor: '#cbd5e1',
+                            fillOpacity: 0.16
+                        });
+                        existingStationsLayers.addLayer(circleCoverage);
+
+                        // Linha traçando onde a estação está se ligando (árvore de comunicação existente)
+                        let parentLatLng = null;
+                        if (est.origem_latitude !== null && est.origem_longitude !== null && !isNaN(est.origem_latitude) && !isNaN(est.origem_longitude)) {
+                            parentLatLng = [parseFloat(est.origem_latitude), parseFloat(est.origem_longitude)];
+                        } else if (est.estacao_origem_id && stationsById[est.estacao_origem_id]) {
+                            const parentEst = stationsById[est.estacao_origem_id];
+                            if (parentEst.latitude && parentEst.longitude) {
+                                parentLatLng = [parseFloat(parentEst.latitude), parseFloat(parentEst.longitude)];
+                            }
+                        } else if (est.matriz_pai_id && stationsById[est.matriz_pai_id] && stationsById[est.matriz_pai_id].id !== est.id) {
+                            const parentEst = stationsById[est.matriz_pai_id];
+                            if (parentEst.latitude && parentEst.longitude) {
+                                parentLatLng = [parseFloat(parentEst.latitude), parseFloat(parentEst.longitude)];
+                            }
+                        }
+
+                        if (parentLatLng) {
+                            const connLine = L.polyline([parentLatLng, latLng], {
+                                color: '#64748b',
+                                weight: 2,
+                                dashArray: '4, 4',
+                                opacity: 0.75
+                            });
+                            existingStationsLayers.addLayer(connLine);
+                        }
+
+                        // Ponto central da estação já cadastrada
+                        const marker = L.circleMarker(latLng, {
+                            radius: isM ? 7 : 5,
+                            fillColor: isM ? '#475569' : '#64748b',
+                            color: '#ffffff',
+                            weight: 1.5,
+                            fillOpacity: 0.85
+                        });
+                        marker.bindPopup(`<strong>${est.tipo_estacao} (Já Cadastrada)</strong><br>${est.endereco || ''}<br><span style="color:#64748b; font-size:11px;">Raio de alcance: 200m (Cinza)</span>`);
+                        existingStationsLayers.addLayer(marker);
+                    }
+                });
+            }
+
+            const preloadedStations = @json($estacoesExistentes ?? []);
+            if (Array.isArray(preloadedStations) && preloadedStations.length > 0) {
+                renderExistingStations(preloadedStations);
+            } else {
+                fetch('{{ route('estacoes.coordenadas') }}')
+                    .then(r => r.json())
+                    .then(estacoes => renderExistingStations(estacoes))
+                    .catch(err => console.error('Erro ao carregar estações existentes:', err));
+            }
+
+            // Inicialização da Jurisdição Municipal se vinculada
+            const fixedCidade = @json(isset($cidade) && $cidade ? ['id' => $cidade->id, 'nome' => $cidade->nome, 'uf' => $cidade->estado?->uf ?? ''] : null);
+            if (fixedCidade) {
+                formCidadeId.value = fixedCidade.id;
+                selectCidade.value = fixedCidade.id;
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fixedCidade.nome + ', ' + fixedCidade.uf + ', Brasil')}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data[0]) {
+                            map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 14);
+                        }
+                    })
+                    .catch(() => {});
+            }
 
             // Carregamento em Cascata de Cidades
             selectEstado.addEventListener('change', function() {
@@ -326,10 +399,12 @@
 
                 if (!uf) {
                     selectCidade.innerHTML = '<option value="">Selecione o Estado primeiro</option>';
+                    selectCidade.classList.add('bg-athens-gray-50', 'dark:bg-athens-gray-800/60');
+                    selectCidade.classList.remove('bg-white', 'dark:bg-athens-gray-800');
                     return;
                 }
 
-                fetch(`/api/cidades/${uf}`)
+                fetch(`/localidades/cidades/${uf}`)
                     .then(r => r.json())
                     .then(cidades => {
                         selectCidade.innerHTML = '<option value="">Selecione a Cidade</option>';
@@ -338,7 +413,8 @@
                             selectCidade.add(opt);
                         });
                         selectCidade.disabled = false;
-                        selectCidade.classList.remove('bg-athens-gray-50');
+                        selectCidade.classList.remove('bg-athens-gray-50', 'dark:bg-athens-gray-800/60');
+                        selectCidade.classList.add('bg-white', 'dark:bg-athens-gray-800');
                     });
             });
 
@@ -371,7 +447,7 @@
                 }
 
                 if (currentMalha && currentMalha.matriz) {
-                    mapStatus.innerHTML = '<span class="text-amber-700 font-semibold">📍 Estação Matriz fixada. Arraste o pino #1 ou clique em "Remover Matriz" para alterar a posição.</span>';
+                    mapStatus.innerHTML = '<span class="text-tahiti-gold-700 font-semibold">📍 Estação Matriz fixada. Arraste o pino #1 ou clique em "Remover Matriz" para alterar a posição.</span>';
                     return;
                 }
 
@@ -386,7 +462,7 @@
                 const qtd = parseInt(sliderQtd.value);
                 const cidadeId = selectCidade.value;
 
-                fetch('/api/estacoes/calcular-malha', {
+                fetch('{{ route('estacoes.calcular-malha') }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -422,6 +498,9 @@
                             if (geo.bairro) {
                                 currentMalha.matriz.bairro_nome = geo.bairro;
                             }
+                            if (geo.bairro_id) {
+                                currentMalha.matriz.bairro_id = geo.bairro_id;
+                            }
                             if (geo.endereco_completo) {
                                 currentMalha.matriz.endereco_completo = geo.endereco_completo;
                             }
@@ -436,6 +515,9 @@
                             (currentMalha.satelites || []).forEach(s => {
                                 if (!s.bairro_nome || s.bairro_nome === 'Centro') {
                                     s.bairro_nome = geo.bairro || s.bairro_nome;
+                                    if (geo.bairro_id) {
+                                        s.bairro_id = geo.bairro_id;
+                                    }
                                 }
                             });
 
@@ -445,7 +527,7 @@
                             }
 
                             if (geo.bairro) {
-                                mapStatus.innerHTML = `<span class="text-emerald-700 font-semibold">✓ Malha viária calculada no bairro ${geo.bairro}!</span>`;
+                                mapStatus.innerHTML = `<span class="text-emerald-700 font-semibold">✓ Malha viária calculada no bairro <strong>${geo.bairro}</strong> (cadastrado no sistema)!</span>`;
                             }
                         }
                     });
@@ -755,7 +837,7 @@
                                 dashArray: '6, 6',
                                 opacity: 0.9
                             });
-                            mapStatus.innerHTML = `<span class="text-rose-600 font-semibold">⚠ Fora do alcance (> 200m da estação mais próxima: #${bestParent.ordem} a ${Math.round(dist)}m)</span>`;
+                            mapStatus.innerHTML = `<span class="text-cinnabar-600 font-semibold">⚠ Fora do alcance (> 200m da estação mais próxima: #${bestParent.ordem} a ${Math.round(dist)}m)</span>`;
                         }
                     });
 
@@ -776,7 +858,7 @@
                                 circlesMap[thisStationIdx].setLatLng(startLatLng);
                             }
                             atualizarLinhasConexao();
-                            mapStatus.innerHTML = `<span class="text-rose-600 font-bold">Posição inválida! A estação deve permanecer a no máximo 200m de outra estação (${Math.round(dist)}m detectado).</span>`;
+                            mapStatus.innerHTML = `<span class="text-cinnabar-600 font-bold">Posição inválida! A estação deve permanecer a no máximo 200m de outra estação (${Math.round(dist)}m detectado).</span>`;
                             return;
                         }
 
@@ -796,8 +878,8 @@
                             }
                         });
 
-                        // Executa o Snap to Road nativo no MariaDB via API
-                        fetch('/api/estacoes/snap-to-road', {
+                        // Executa o Snap to Road nativo no MariaDB via endpoint interno
+                        fetch('{{ route('estacoes.snap-to-road') }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -910,7 +992,7 @@
                                 circlesMap[thisStationIdx].setLatLng(startLatLng);
                             }
                             atualizarLinhasConexao();
-                            mapStatus.innerHTML = `<span class="text-rose-600 font-bold">Snap to Road não encontrou via pública válida a ≤ 200m da Estação #${bestParent.ordem}. Posição revertida.</span>`;
+                            mapStatus.innerHTML = `<span class="text-cinnabar-600 font-bold">Snap to Road não encontrou via pública válida a ≤ 200m da Estação #${bestParent.ordem}. Posição revertida.</span>`;
                         });
                     });
 
@@ -943,7 +1025,7 @@
                     const isM = est.tipo_estacao === 'Estação Matriz';
                     const item = document.createElement('div');
                     item.className = 'p-3 rounded-lg border text-xs flex items-start gap-2.5 ' + 
-                        (isM ? 'bg-blue-50/70 border-blue-200' : 'bg-athens-gray-50 border-athens-gray-200');
+                        (isM ? 'bg-blue-dianne-50/70 dark:bg-blue-dianne-950/60 border-blue-dianne-200 dark:border-blue-dianne-800' : 'bg-athens-gray-50 dark:bg-athens-gray-800/70 border-athens-gray-200 dark:border-athens-gray-700');
 
                     const lat = typeof est.latitude === 'number' ? est.latitude : parseFloat(est.latitude);
                     const lng = typeof est.longitude === 'number' ? est.longitude : parseFloat(est.longitude);
@@ -952,20 +1034,20 @@
                     if (!isM) {
                         const pIdx = est.origem_indice ?? 0;
                         const pOrdem = pIdx === 0 ? 1 : ((malha.satelites[pIdx - 1]?.ordem_instalacao) || (pIdx + 1));
-                        conexaoInfo = `<span class="text-[10px] text-athens-gray-500 font-mono">Ligada a #${pOrdem} (${Math.round(est.distancia_origem_metros || 0)}m)</span>`;
+                        conexaoInfo = `<span class="text-[10px] text-athens-gray-500 dark:text-athens-gray-400 font-mono">Ligada a #${pOrdem} (${Math.round(est.distancia_origem_metros || 0)}m)</span>`;
                     }
 
                     item.innerHTML = `
-                        <span class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-[11px] ${isM ? 'bg-blue-dianne-600' : 'bg-purple-600'}">
+                        <span class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-[11px] ${isM ? 'bg-blue-dianne-600' : 'bg-spindle-600'}">
                             #${est.ordem_instalacao || 1}
                         </span>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between gap-1">
-                                <span class="font-bold ${isM ? 'text-blue-dianne-950' : 'text-purple-950'}">${est.tipo_estacao}</span>
+                                <span class="font-bold ${isM ? 'text-blue-dianne-950 dark:text-blue-dianne-200' : 'text-spindle-950 dark:text-spindle-300'}">${est.tipo_estacao}</span>
                                 ${conexaoInfo}
                             </div>
-                            <p class="text-athens-gray-700 mt-0.5 truncate">${est.endereco_completo || (est.bairro_nome + ' - ' + est.cidade_nome)}</p>
-                            <p class="text-[10px] text-athens-gray-400 font-mono mt-0.5">Lat: ${!isNaN(lat) ? lat.toFixed(5) : '--'}, Lng: ${!isNaN(lng) ? lng.toFixed(5) : '--'}</p>
+                            <p class="text-athens-gray-700 dark:text-athens-gray-300 mt-0.5 truncate">${est.endereco_completo || (est.bairro_nome + ' - ' + est.cidade_nome)}</p>
+                            <p class="text-[10px] text-athens-gray-400 dark:text-athens-gray-500 font-mono mt-0.5">Lat: ${!isNaN(lat) ? lat.toFixed(5) : '--'}, Lng: ${!isNaN(lng) ? lng.toFixed(5) : '--'}</p>
                         </div>
                     `;
                     listaEstacoesEl.appendChild(item);

@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -52,6 +54,10 @@ class Estacao extends Model
         'estado_uf',
         'cep',
         'endereco_completo',
+        'solicitacao_substituicao',
+        'solicitacao_substituicao_em',
+        'motivo_substituicao',
+        'solicitado_por',
         'created_by',
         'coordenadas',
         'latitude',
@@ -66,6 +72,22 @@ class Estacao extends Model
         'longitude',
         'endereco',
     ];
+
+    /**
+     * Obter os atributos que devem ser convertidos.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'data_instalacao' => 'datetime',
+            'solicitacao_substituicao' => 'boolean',
+            'solicitacao_substituicao_em' => 'datetime',
+            'ordem_instalacao' => 'integer',
+            'distancia_origem_metros' => 'float',
+        ];
+    }
 
     /**
      * Variáveis internas para retenção de coordenadas quando definidas via latitude/longitude.
@@ -171,6 +193,46 @@ class Estacao extends Model
 
                 return [];
             }
+        );
+    }
+
+    /**
+     * Formata um nome de logradouro em Title/Camel Case (ex: "Rua das Flores", "Avenida Brasil").
+     */
+    public static function formatarLogradouro(?string $logradouro): ?string
+    {
+        if (! $logradouro) {
+            return null;
+        }
+
+        $logradouro = trim($logradouro);
+        if ($logradouro === '') {
+            return null;
+        }
+
+        $preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em'];
+        $palavras = preg_split('/\s+/', mb_strtolower($logradouro, 'UTF-8'));
+        $formatadas = [];
+
+        foreach ($palavras as $index => $palavra) {
+            if ($index > 0 && in_array($palavra, $preposicoes, true)) {
+                $formatadas[] = $palavra;
+            } else {
+                $formatadas[] = mb_convert_case($palavra, MB_CASE_TITLE, 'UTF-8');
+            }
+        }
+
+        return implode(' ', $formatadas);
+    }
+
+    /**
+     * Accessor e Mutator para Logradouro em Title/Camel Case.
+     */
+    protected function logradouro(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => self::formatarLogradouro($value),
+            set: fn (?string $value) => self::formatarLogradouro($value),
         );
     }
 
@@ -368,6 +430,78 @@ class Estacao extends Model
     }
 
     /**
+     * Relacionamento: Usuário que solicitou a substituição da estação.
+     */
+    public function solicitanteSubstituicao(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'solicitado_por');
+    }
+
+    /**
+     * Calcula o ciclo e a expectativa de vida útil dos sensores da estação.
+     * Referência técnica: Vida útil mínima de 5 anos (especificação do sensor MH-Z19C).
+     *
+     * @return array{
+     *     instalada: bool,
+     *     data_instalacao: Carbon|null,
+     *     data_expiracao: Carbon|null,
+     *     anos_vida_util_nominal: int,
+     *     dias_decorridos: int|null,
+     *     dias_restantes: int|null,
+     *     porcentagem_restante: float,
+     *     status: string,
+     *     badge_class: string
+     * }
+     */
+    public function calcularVidaUtil(): array
+    {
+        if (! $this->data_instalacao) {
+            return [
+                'instalada' => false,
+                'data_instalacao' => null,
+                'data_expiracao' => null,
+                'anos_vida_util_nominal' => 5,
+                'dias_decorridos' => null,
+                'dias_restantes' => null,
+                'porcentagem_restante' => 100.0,
+                'status' => 'Não Instalada',
+                'badge_class' => 'bg-athens-gray-50 text-athens-gray-600 border border-athens-gray-200 dark:bg-athens-gray-800 dark:text-athens-gray-300',
+            ];
+        }
+
+        $dataInstalacao = $this->data_instalacao;
+        $dataExpiracao = $dataInstalacao->copy()->addYears(5);
+        $totalDias = 5 * 365.25;
+        $diasDecorridos = (int) $dataInstalacao->diffInDays(now(), false);
+        $diasRestantes = (int) now()->diffInDays($dataExpiracao, false);
+
+        $porcentagemRestante = (float) max(0, min(100, round(($diasRestantes / $totalDias) * 100, 1)));
+
+        $status = 'Normal';
+        $badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400';
+
+        if ($diasRestantes <= 0) {
+            $status = 'Vencida';
+            $badgeClass = 'bg-cinnabar-100 text-cinnabar-800 dark:bg-cinnabar-900/30 dark:text-cinnabar-400';
+        } elseif ($diasRestantes <= 180) { // Menos de 6 meses
+            $status = 'Crítica (< 6 meses)';
+            $badgeClass = 'bg-tahiti-gold-100 text-tahiti-gold-800 dark:bg-tahiti-gold-900/30 dark:text-tahiti-gold-400';
+        }
+
+        return [
+            'instalada' => true,
+            'data_instalacao' => $dataInstalacao,
+            'data_expiracao' => $dataExpiracao,
+            'anos_vida_util_nominal' => 5,
+            'dias_decorridos' => max(0, $diasDecorridos),
+            'dias_restantes' => $diasRestantes,
+            'porcentagem_restante' => $porcentagemRestante,
+            'status' => $status,
+            'badge_class' => $badgeClass,
+        ];
+    }
+
+    /**
      * Calcula a menor distância em metros de uma coordenada até qualquer Estação Matriz cadastrada no banco.
      *
      * @param  int|null  $exceptPrivateId  ID de estação a desconsiderar (opcional para updates)
@@ -490,5 +624,109 @@ class Estacao extends Model
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
         return $raioTerra * $c;
+    }
+
+    /**
+     * Reordena uma coleção de estações da mesma malha em topologia de árvore/cascata (DFS a partir da Matriz).
+     * Garante que a Estação Matriz seja o Passo #1 e que toda estação satélite apareça rigorosamente
+     * após sua respectiva estação de origem (pai na malha).
+     * Normaliza os valores de `ordem_instalacao` sequencialmente de 1 a N no banco e em memória.
+     *
+     * @param  iterable<int, Estacao>  $estacoes
+     * @return Collection<int, Estacao>
+     */
+    public static function ordenarEmCascata(iterable $estacoes): Collection
+    {
+        $colecao = collect($estacoes);
+        if ($colecao->isEmpty()) {
+            return $colecao;
+        }
+
+        // Identifica a estação raiz (Matriz)
+        $matriz = $colecao->first(function (Estacao $e) {
+            return $e->tipo_estacao === 'Estação Matriz';
+        }) ?? $colecao->first();
+
+        $byId = $colecao->keyBy('private_id');
+
+        // Mapeia filhos por estação pai (origem)
+        $filhosPorPai = [];
+        foreach ($colecao as $estacao) {
+            if ($estacao->private_id === $matriz->private_id) {
+                continue;
+            }
+
+            $paiId = $estacao->estacao_origem_id;
+
+            // Se o pai não for informado, for a própria estação, ou não estiver na malha, assume a Matriz como pai
+            if (! $paiId || $paiId === $estacao->private_id || ! $byId->has($paiId)) {
+                $paiId = $matriz->private_id;
+            }
+
+            $filhosPorPai[$paiId][] = $estacao;
+        }
+
+        $ordenadas = collect();
+        $visitados = [];
+
+        // Travessia em profundidade (DFS) para garantir que cada ramo da malha viária
+        // seja percorrido em cascata contínua (Pai -> Filho -> Neto -> ...)
+        $dfs = function (Estacao $atual) use (&$dfs, &$ordenadas, &$visitados, &$filhosPorPai) {
+            if (isset($visitados[$atual->private_id])) {
+                return;
+            }
+
+            $visitados[$atual->private_id] = true;
+            $ordenadas->push($atual);
+
+            $filhos = $filhosPorPai[$atual->private_id] ?? [];
+
+            // Ordena nós irmãos mantendo a ordem original ou ID para estabilidade
+            usort($filhos, function (Estacao $a, Estacao $b) {
+                $ordemA = $a->ordem_instalacao ?? PHP_INT_MAX;
+                $ordemB = $b->ordem_instalacao ?? PHP_INT_MAX;
+
+                if ($ordemA === $ordemB) {
+                    return $a->private_id <=> $b->private_id;
+                }
+
+                return $ordemA <=> $ordemB;
+            });
+
+            foreach ($filhos as $filho) {
+                $dfs($filho);
+            }
+        };
+
+        $dfs($matriz);
+
+        // Fallback defensivo: adiciona quaisquer estações desconectadas ou remanescentes
+        foreach ($colecao as $estacao) {
+            if (! isset($visitados[$estacao->private_id])) {
+                $ordenadas->push($estacao);
+                $visitados[$estacao->private_id] = true;
+            }
+        }
+
+        // Normaliza a ordem_instalacao (1, 2, 3, ...) e atualiza no banco se necessário
+        $novoById = $ordenadas->keyBy('private_id');
+
+        foreach ($ordenadas as $posicao => $estacao) {
+            $novoPasso = $posicao + 1;
+
+            if ($estacao->ordem_instalacao !== $novoPasso) {
+                $estacao->ordem_instalacao = $novoPasso;
+                if ($estacao->exists) {
+                    $estacao->updateQuietly(['ordem_instalacao' => $novoPasso]);
+                }
+            }
+
+            // Garante que o relacionamento em memória aponte para a instância correta atualizada
+            if ($estacao->estacao_origem_id && $novoById->has($estacao->estacao_origem_id)) {
+                $estacao->setRelation('estacaoOrigem', $novoById->get($estacao->estacao_origem_id));
+            }
+        }
+
+        return $ordenadas;
     }
 }

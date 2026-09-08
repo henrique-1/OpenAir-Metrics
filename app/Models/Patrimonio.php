@@ -29,9 +29,9 @@ class Patrimonio extends Model
      */
     protected $fillable = [
         'public_id',
+        'cidade_id',
         'mac_address',
         'numero_patrimonio',
-        'tipo_sugerido',
         'status',
         'data_aquisicao',
         'observacoes',
@@ -58,6 +58,10 @@ class Patrimonio extends Model
             if (! empty($patrimonio->mac_address)) {
                 $patrimonio->mac_address = strtoupper(trim($patrimonio->mac_address));
             }
+
+            if (empty($patrimonio->numero_patrimonio) && ! empty($patrimonio->cidade_id)) {
+                $patrimonio->numero_patrimonio = static::gerarProximoCodigo((int) $patrimonio->cidade_id);
+            }
         });
 
         static::updating(function (Patrimonio $patrimonio) {
@@ -65,6 +69,33 @@ class Patrimonio extends Model
                 $patrimonio->mac_address = strtoupper(trim($patrimonio->mac_address));
             }
         });
+    }
+
+    /**
+     * Gera o próximo código de patrimônio sequencial no formato OAir-Estacao-<IdCidade>-<Num>.
+     */
+    public static function gerarProximoCodigo(int $cidadeId): string
+    {
+        $prefix = "OAir-Estacao-{$cidadeId}-";
+        $latest = static::where('cidade_id', $cidadeId)
+            ->where('numero_patrimonio', 'like', "{$prefix}%")
+            ->orderByRaw('LENGTH(numero_patrimonio) DESC, numero_patrimonio DESC')
+            ->first();
+
+        $nextNum = 1;
+        if ($latest && preg_match('/^'.preg_quote($prefix, '/').'(\d+)$/', $latest->numero_patrimonio, $matches)) {
+            $nextNum = ((int) $matches[1]) + 1;
+        }
+
+        return sprintf('%s%04d', $prefix, $nextNum);
+    }
+
+    /**
+     * Relacionamento: Cidade do patrimônio.
+     */
+    public function cidade(): BelongsTo
+    {
+        return $this->belongsTo(Cidade::class, 'cidade_id');
     }
 
     /**
