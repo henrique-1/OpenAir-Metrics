@@ -637,3 +637,525 @@ OpenAir-Metrics/
 - `php artisan view:clear && php artisan view:cache`: Compilação de templates Blade sem erros.
 - `npm run build`: Assets Vite/Tailwind compilados para produção.
 - `php artisan test`: Suíte completa do Pest com 123 testes aprovados (586 asserções), 0 falhas.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Ingestão de Medições por Patrimônio e Registro Automático de Data/Hora)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Substituição de MAC Address por Patrimônio na API de Medições (`POST /api/medicoes`)**:
+    - Alterada a validação do endpoint para esperar `patrimonio` (`required_without:estacao_id`) em vez de `mac_address`.
+    - Resolução da estação associada via relacionamento com o modelo `Patrimonio`, buscando tanto por `numero_patrimonio` (ex: `"OAir-Estacao-1-0001"`) quanto por seu `public_id` (UUID).
+    - Preservada a busca alternativa via `estacao_id` para flexibilidade.
+    - Mensagens de erro 404 e 422 atualizadas para refletir a busca por patrimônio e status da estação.
+    - O payload de resposta da medição registrada agora retorna a chave `patrimonio` com o número de patrimônio da estação.
+- **Registro Automático de Data e Hora (`data_hora`)**:
+    - Removido o campo `data_hora` da validação da API (não é mais recebido nem aceito das estações via payload).
+    - No `MedicaoApiController`, a medição é gravada explicitamente com `now()`.
+    - No modelo `Medicao` (`booted`), adicionada garantia de preenchimento automático no evento `creating` (`if (empty($medicao->data_hora)) { $medicao->data_hora = now(); }`), blindando qualquer fluxo de criação contra campos temporais nulos.
+- **Validação e Testes Automatizados**:
+    - Refatoração completa da suíte `tests/Feature/MedicaoApiTest.php` cobrindo:
+        - Envio de medições via `numero_patrimonio`.
+        - Envio de medições via `public_id` do patrimônio.
+        - Descarte de `data_hora` enviada no payload e garantia de data e hora atuais no banco de dados.
+        - Envio de medições via `estacao_id` público.
+        - Retorno 404 para patrimônio não localizado.
+        - Retorno 422 para estação ainda não instalada.
+        - Validação dos campos obrigatórios (`patrimonio`, `temperatura`, `umidade`, `co2`, `poeira`).
+        - Teste unitário de preenchimento automático de `data_hora` no ciclo de vida do modelo `Medicao`.
+    - Suíte completa do Pest executada com 125 testes aprovados (594 asserções), 0 falhas.
+
+#### 2. Arquivos Modificados
+
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Validação e busca de estação por `patrimonio`, remoção do recebimento de `data_hora` da requisição e gravação com `now()`, retorno de `patrimonio` no JSON.
+- `app/Models/Medicao.php`: Garantia de preenchimento automático de `data_hora` no evento `creating` do modelo.
+- `tests/Feature/MedicaoApiTest.php`: Atualização de testes para envio por patrimônio, persistência automática de data/hora e validações.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact`: Suíte completa do Pest com 125 testes aprovados (594 asserções), 0 falhas.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Cálculo e Armazenamento do IQA por Interpolação Linear e Atualização do Mapa)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Persistência do IQA na Tabela `medicoes`**:
+    - Criada a migration `2026_09_09_134500_add_iqa_to_medicoes_table.php` adicionando a coluna inteira `iqa` (nullable) na tabela `medicoes`.
+    - Atualizado o modelo `Medicao` adicionando `iqa` ao `$fillable` e `$casts`.
+    - No `MedicaoApiController@store`, o valor do IQA é calculado imediatamente ao receber os dados dos sensores e persistido na coluna `iqa` do registro criado.
+    - No hook de ciclo de vida `creating` do modelo `Medicao`, configurado cálculo de fallback automático de `iqa` caso seja omitido em qualquer criação de medição.
+- **Implementação da Fórmula de Interpolação Linear do IQA**:
+    - Implementada a fórmula oficial no modelo `Medicao::calcularIqa`:
+      $$I_p = I_{\text{inf}} + \left[ \frac{I_{\text{sup}} - I_{\text{inf}}}{C_{\text{sup}} - C_{\text{inf}}} \right] \times (C_p - C_{\text{inf}})$$
+    - O índice composto da estação é definido pelo valor mais crítico entre os poluentes avaliados: $\text{IQA} = \max(I_{\text{PM2.5}}, I_{\text{CO2}})$.
+    - Tabela de pontos de corte aplicada para ambos os poluentes:
+        - **Boa**: $I = 0 \text{ a } 50$ | PM2.5 $= 0 \text{ a } 25{,}0\,\mu\text{g/m}^3$ | CO2 $= 0 \text{ a } 700\,\text{ppm}$
+        - **Moderada**: $I = 51 \text{ a } 100$ | PM2.5 $= >25{,}0 \text{ a } 60{,}0\,\mu\text{g/m}^3$ | CO2 $= >700 \text{ a } 1000\,\text{ppm}$
+        - **Ruim**: $I = 101 \text{ a } 150$ | PM2.5 $= >60{,}0 \text{ a } 125{,}0\,\mu\text{g/m}^3$ | CO2 $= >1000 \text{ a } 1500\,\text{ppm}$
+        - **Muito Ruim**: $I = 151 \text{ a } 200$ | PM2.5 $= >125{,}0 \text{ a } 210{,}0\,\mu\text{g/m}^3$ | CO2 $= >1500 \text{ a } 2500\,\text{ppm}$
+        - **Péssima**: $I > 200$ (escala até $500$) | PM2.5 $= >210{,}0\,\mu\text{g/m}^3$ | CO2 $= >2500\,\text{ppm}$
+- **Pontos de Corte e Exibição no Mapa Público (`home.blade.php`)**:
+    - Atualizados os segmentos da camada `iqa` para os 5 níveis oficiais: **Boa**, **Moderada**, **Ruim**, **Muito Ruim** e **Péssima**.
+    - Atualizada a função JavaScript `getStatusInfo` para aplicar exatamente as faixas $\le 50$, $\le 100$, $\le 150$, $\le 200$ e $> 200$.
+    - Gradiente da camada de calor WebGL reconfigurado para as novas faixas e cores institucionais.
+- **Validação e Testes Automatizados**:
+    - Suíte expandida em `tests/Feature/MedicaoApiTest.php` validando cada faixa de corte da interpolação, dominância de poluentes e a persistência direta do `iqa` na coluna física do banco de dados.
+    - Teste de séries temporais do dashboard (`DashboardTest.php`) atualizado para o novo ponto de corte da faixa Boa.
+    - Suíte completa do Pest com 127 testes aprovados (605 asserções), 0 falhas.
+
+#### 2. Arquivos Modificados e Criados
+
+- `database/migrations/2026_09_09_134500_add_iqa_to_medicoes_table.php`: Nova migration adicionando coluna `iqa`.
+- `app/Models/Medicao.php`: `$fillable`, `$casts`, hook `creating`, método `calcularIqa` e `calcularIqaPoluente`.
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Cálculo e gravação de `iqa` na criação da medição.
+- `resources/views/home.blade.php`: Segmentos, gradiente WebGL e função `getStatusInfo` com a nova tabela de pontos de corte.
+- `tests/Feature/MedicaoApiTest.php`: Testes para interpolação linear, faixas e persistência de `iqa`.
+- `tests/Feature/DashboardTest.php`: Ajuste para limite superior da faixa Boa do novo IQA.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact`: Suíte completa do Pest com 127 testes aprovados (605 asserções), 0 falhas.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Integração de Dados dos Sensores do Banco de Dados no Mapa Público)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Alimentação do Mapa Público (`resources/views/home.blade.php`) com Dados do Banco**:
+    - Substituídos os arrays estáticos (mock) de pontos nas camadas de monitoramento (`iqa`, `temperatura`, `umidade`, `pm`, `co2`) por injeções Blade `@json($dados...)` alimentadas diretamente pelas medições mais recentes de cada estação ativa.
+    - Preservação estrita de todas as paletas de cores, gradientes WebGL, escalas e configurações visuais originais.
+    - Cálculo dinâmico do centro e zoom inicial do mapa (`$centroMapa`), enquadrando automaticamente o centroide geográfico das estações com leituras válidas, ou adotando as coordenadas padrão quando não houver estações cadastradas.
+- **Criação do `HomeController` e Otimização de Consultas**:
+    - Criado `app/Http/Controllers/HomeController.php` responsável por extrair as estações com medições (`Estacao::whereHas('medicoes')->with(['ultimaMedicao'])`).
+    - Compatibilidade geoespacial em múltiplos bancos: no MySQL/MariaDB utiliza `ST_AsText(coordenadas)`, `ST_X` e `ST_Y`; em SQLite (ambiente de testes automatizados), consome os accessors nativos do modelo `Estacao` (`latitude` e `longitude`).
+    - Formatação dos dados estruturados `{ lat, lng, value }` para cada métrica ambiental, calculando o IQA em tempo real caso o valor físico na coluna ainda não estivesse populado.
+- **Relacionamento `ultimaMedicao` no Modelo `Estacao`**:
+    - Adicionado relacionamento `ultimaMedicao(): HasOne` utilizando `latestOfMany('data_hora')` para busca de alta performance da última leitura registrada por estação.
+- **Validação e Testes Automatizados**:
+    - Adicionado suporte a `RefreshDatabase` e testes de integração em `tests/Feature/ExampleTest.php` cobrindo a renderização inicial da home sem estações e com dados reais de sensores persistidos no banco.
+    - Suíte completa do Pest executada com 128 testes aprovados (618 asserções), 0 falhas.
+    - Código formatado pelo Laravel Pint (`vendor/bin/pint --format agent`).
+
+#### 2. Arquivos Modificados e Criados
+
+- `app/Http/Controllers/HomeController.php`: Novo controller para carga e agrupamento das medições mais recentes por camada para a view pública.
+- `app/Models/Estacao.php`: Relacionamento `ultimaMedicao(): HasOne` via `latestOfMany('data_hora')`.
+- `routes/web.php`: Rota pública `/` apontada para `HomeController@index`.
+- `resources/views/home.blade.php`: Injeção de `@json($dados...)` e coordenadas dinâmicas no mapa Leaflet, mantendo gradientes e estilos visuais intactos.
+- `tests/Feature/ExampleTest.php`: Testes de integração da home com e sem estações.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact`: Suíte completa com 128 testes aprovados (618 asserções), 0 falhas.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Seleção Exclusiva via Dropdown no Roteiro de Instalação em Campo)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Seleção Exclusiva via Dropdown de Equipamentos em Campo (`resources/views/instalacoes/show.blade.php`)**:
+    - Removida a seleção alternada de modos ("Por Patrimônio" vs "Por MAC Address").
+    - Removidos todos os campos de texto manual (`patrimonio-input` e `mac-input`), eliminando preenchimento manual ou autopreenchimento indevido.
+    - O dropdown `<select>` agora é o controle único de seleção de placas disponíveis em estoque, iniciando permanentemente vazio com a opção padrão `"Selecione o equipamento (Patrimônio / MAC)..."`.
+    - Cada opção do dropdown apresenta de forma clara e consolidada o número do Patrimônio e o MAC Address correspondente (`Patrimônio: {numero} — MAC: {mac}`).
+    - Caso não existam equipamentos com status "Disponível" no município, o formulário desabilita os controles e exibe alerta explicativo orientando o cadastramento prévio no módulo de Patrimônio.
+- **Simplificação e Otimização do Script Frontend**:
+    - Removidas as funções de chaveamento de abas (`setModoVinculacao`), preenchimento auxiliar (`selecionarPatrimonioEstoque`) e máscara dinâmica de MAC.
+    - A função assíncrona `vincularEstacao` foi simplificada para extrair o `patrimonio_id` diretamente do valor selecionado no dropdown e enviá-lo ao endpoint `POST /instalacoes/{public_id}/vincular-mac`.
+- **Validação e Testes Automatizados**:
+    - Adicionado teste de integração em `tests/Feature/PlanejamentoEInstalacaoTest.php` garantindo a presença do select com opção padrão vazia e dados de patrimônio/MAC, a ausência de abas de modo ou inputs de texto, e a ativação bem-sucedida via payload do dropdown.
+    - Suíte de testes aprovada com 100% de sucesso.
+    - Código formatado com o Laravel Pint.
+
+#### 2. Arquivos Modificados
+
+- `resources/views/instalacoes/show.blade.php`: Substituição do formulário duplo por dropdown único com Patrimônio e MAC, e script simplificado.
+- `tests/Feature/PlanejamentoEInstalacaoTest.php`: Teste de integração do roteiro com seleção exclusiva via dropdown.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact tests/Feature/PlanejamentoEInstalacaoTest.php`: 26 testes aprovados (138 asserções), 0 falhas.
+- `npm run build`: Assets compilados via Vite para produção.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Correção de Estilização dos Botões de Métricas no Modo Escuro do Dashboard)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Correção da Seleção de Métricas, Período e Agrupamento no Modo Escuro (`resources/views/dashboard.blade.php`)**:
+    - **Diagnóstico da Causa Raiz**: Os botões de seleção de métricas (`.btn-metrica` - Qualidade do Ar, Temperatura, Umidade Relativa, Material Particulado e Dióxido de Carbono) possuíam classes de modo escuro estáticas no HTML inicial (`dark:bg-emerald-950/60`, `dark:text-emerald-200` no botão de Qualidade do Ar, e `dark:bg-athens-gray-800`, `dark:border-athens-gray-700` nos botões inativos). O JavaScript manipulava apenas classes de modo claro (`border-emerald-500`, `bg-emerald-50`, etc.) durante os cliques, mantendo o botão de Qualidade do Ar visualmente ativo no modo escuro mesmo quando a métrica de Temperatura (ou outra) era selecionada.
+    - **Implementação de Atributos Reativos de Classes (`data-active-classes` e `data-inactive-classes`)**:
+        - Cada botão de métrica recebeu a especificação explícita de classes completas para seus estados ativo e inativo em ambos os temas:
+            - **Qualidade do Ar**: Ativo com verde esmeralda (`border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200`);
+            - **Temperatura**: Ativo com laranja dourado (`border-tahiti-gold-500 dark:border-tahiti-gold-500 bg-tahiti-gold-50 dark:bg-tahiti-gold-950/60 text-tahiti-gold-900 dark:text-tahiti-gold-200`);
+            - **Umidade Relativa**: Ativo com azul (`border-dodger-blue-500 dark:border-dodger-blue-500 bg-dodger-blue-50 dark:bg-dodger-blue-950/60 text-dodger-blue-900 dark:text-dodger-blue-200`);
+            - **Material Particulado**: Ativo com vermelho/cinábrio (`border-cinnabar-500 dark:border-cinnabar-500 bg-cinnabar-50 dark:bg-cinnabar-950/60 text-cinnabar-900 dark:text-cinnabar-200`);
+            - **Dióxido de Carbono**: Ativo com tons de ardósia/cinza escuro (`border-athens-gray-500 dark:border-athens-gray-400 bg-athens-gray-100 dark:bg-athens-gray-800/90 text-athens-gray-900 dark:text-athens-gray-100`);
+            - **Estado Inativo Unificado**: Classes neutras consistentes para light e dark mode (`border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700`).
+        - O mesmo padrão robusto foi estendido aos botões de agrupamento (`btn-tipo-cidade` e `btn-tipo-bairro`) e aos seletores de período (`24 Horas`, `7 Dias`, `30 Dias`).
+    - **Funções Auxiliares de Sincronização em JavaScript**:
+        - Implementada a função `aplicarEstadoBotao(elemento, ativo)` que extrai individualmente os tokens via `split(' ').filter(Boolean)` e aplica via `classList.add`/`classList.remove`.
+        - Implementadas as rotinas `atualizarBotoesMetrica()`, `atualizarBotoesPeriodo()` e `atualizarBotoesTipo()`.
+        - Integrada a re-sincronização no listener do evento customizado `themechanged`, assegurando transição visual impecável caso o usuário alterne o tema enquanto navega no dashboard.
+- **Badges de Classificação com Suporte Completo ao Dark Mode (`app/Http/Controllers/DashboardController.php`)**:
+    - O método `obterClassificacao` foi atualizado para retornar classes contextuais para ambos os modos (`text-*-600 dark:text-*-400 bg-*-50 dark:bg-*-950/50 border-*-200 dark:border-*-800`), garantindo contraste e visualização nítida das faixas nos cards de média calculada.
+- **Validação e Testes Automatizados**:
+    - Testes do Dashboard (`tests/Feature/DashboardTest.php`) executados com sucesso (8 testes, 22 asserções, 0 falhas).
+    - Código formatado via Laravel Pint (`vendor/bin/pint --format agent`).
+    - Assets frontend compilados com sucesso via Vite (`npm run build`).
+
+#### 2. Arquivos Modificados
+
+- `resources/views/dashboard.blade.php`: Configuração de `data-active-classes` e `data-inactive-classes` em todos os botões e implementação das rotinas reativas em JavaScript (`aplicarEstadoBotao`, `atualizarBotoesMetrica`, `atualizarBotoesPeriodo`, `atualizarBotoesTipo` e listener `themechanged`).
+- `app/Http/Controllers/DashboardController.php`: Inclusão de classes com suporte a Dark Mode no método `obterClassificacao`.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact tests/Feature/DashboardTest.php`: 8 testes aprovados (22 asserções), 0 falhas.
+- `npm run build`: Assets compilados via Vite para produção com sucesso.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Exibição de Data e Hora no Marcador/Popup do Mapa Público)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Exibição de Data e Hora no `markerHtml` do Mapa Público (`resources/views/home.blade.php`)**:
+    - O marcador informativo interativo (`markerHtml`), acionado por clique no mapa público, agora exibe com elegância a data e a hora da leitura associada (`d/m/Y H:i`).
+    - Inclusão do componente de ícone de relógio `<x-heroicon-o-clock class="w-3.5 h-3.5 text-[#b0b2b5] shrink-0" />`, acompanhado de divisor sutil (`border-t border-white/10 pt-1`) e texto sem quebra de linha (`whitespace-nowrap`).
+    - Ajuste defensivo da largura mínima da caixa (`min-w-[155px]`) para assegurar espaçamento harmonioso sem colisão com o botão de fechar e o badge de IQA.
+- **Rastreabilidade Temporal na Interpolação IDW**:
+    - Implementada a função `getInterpolatedData(lat, lng, layerKey)`, que além de calcular a média ponderada espacial (IDW) do ponto clicado, identifica a estação física mais próxima (`nearestPt`) dentro do raio de influência do gradiente visual e extrai o respectivo atributo temporal `data_hora`.
+    - Função `getInterpolatedValue(lat, lng, layerKey)` preservada como wrapper de compatibilidade.
+- **Formatação de Data e Hora no `HomeController` (`app/Http/Controllers/HomeController.php`)**:
+    - Inclusão de `data_hora` formatada (`d/m/Y H:i`) nos dados estruturados de cada camada ambiental (`dadosIqa`, `dadosTemperatura`, `dadosUmidade`, `dadosPm`, `dadosCo2`), a partir de `medicao->data_hora` com fallback para `medicao->created_at`.
+- **Validação e Testes Automatizados**:
+    - Expandido o teste de integração em `tests/Feature/ExampleTest.php` para validar o formato e presença de `data_hora` nas leituras fornecidas para a view da home.
+    - Suíte executada com 100% de aprovação.
+    - Código formatado com Laravel Pint e assets compilados via Vite (`npm run build`).
+
+#### 2. Arquivos Modificados
+
+- `app/Http/Controllers/HomeController.php`: Adicionado campo `data_hora` formatado nos arrays de sensores de cada camada.
+- `resources/views/home.blade.php`: Implementação de `getInterpolatedData`, inclusão do bloco `dataHoraHtml` no `markerHtml` com ícone de relógio e divisor visual.
+- `tests/Feature/ExampleTest.php`: Adição de asserção para verificar o campo `data_hora` na view pública.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact tests/Feature/ExampleTest.php`: 2 testes aprovados (14 asserções), 0 falhas.
+- `npm run build`: Assets compilados via Vite para produção com sucesso.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Implementação de WebSockets em Tempo Real com Laravel Reverb e Laravel Echo)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Integração de WebSockets em Tempo Real no Ecossistema**:
+    - Instalado e configurado o servidor WebSocket nativo **Laravel Reverb** (`laravel/reverb` `^1.11`) no backend e **Laravel Echo** (`laravel-echo` e `pusher-js`) no frontend.
+    - Publicado e configurado `config/reverb.php` e atualizado `config/broadcasting.php` para utilizar a conexão `reverb`.
+    - Configuradas as variáveis de ambiente em `.env` e `.env.example` (`BROADCAST_CONNECTION=reverb`, `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET`, `REVERB_HOST`, `REVERB_PORT`, `REVERB_SCHEME` e suas correspondentes `VITE_*`).
+- **Evento de Broadcast de Telemetria (`NovaMedicaoRecebida`)**:
+    - Criada a classe `App\Events\NovaMedicaoRecebida` implementando `ShouldBroadcastNow` para emissão imediata e síncrona pelo WebSocket no canal público `Channel('medicoes')` sob o nome `NovaMedicaoRecebida`.
+    - Payload estruturado contendo a identificação da estação, coordenadas geográficas (`lat`, `lng`), leituras de todos os sensores (`iqa`, `temperatura`, `umidade`, `poeira`, `co2`) e carimbo de data e hora formatado.
+    - O controller de ingestão de dados (`App\Http\Controllers\Api\MedicaoApiController`) agora dispara o evento via `NovaMedicaoRecebida::dispatch($medicao)` assim que a telemetria é gravada com sucesso.
+- **Atualização Reativa do Mapa Público (`resources/views/home.blade.php`)**:
+    - Instanciado o cliente Echo em `resources/js/echo.js` e exposto globalmente via `resources/js/app.js`.
+    - Implementada a função `processarNovaMedicao(dados)` na view pública, que:
+        1. Localiza a estação ou insere novos pontos nos arrays de memória `mapLayersData[layerKey].data.data` para todas as camadas (`iqa`, `temperatura`, `umidade`, `pm`, `co2`).
+        2. Recalcula os dados de intensidade e atualiza a camada de calor ativa diretamente na GPU (`currentHeatmapLayer.setData(webglData)`).
+        3. Se o visitante estiver com o popup do marcador aberto na tela (`window.clickMarker`), reexecuta `updateClickMarker(...)`, atualizando o valor numérico e o carimbo de Data e Hora no popup instantaneamente sem necessidade de recarregar a página (F5).
+- **Validação e Testes Automatizados**:
+    - Novo teste de integração em `tests/Feature/MedicaoApiTest.php` com `Event::fake([NovaMedicaoRecebida::class])`, validando que a requisição à API dispara o evento com canal `medicoes`, nome de evento e payload corretos.
+    - Suíte executada com 100% de aprovação (11 testes e 51 asserções no `MedicaoApiTest`).
+    - Assets frontend compilados com sucesso via Vite (`npm run build`).
+    - Código formatado via Laravel Pint (`vendor/bin/pint --format agent`).
+
+#### 2. Arquivos Modificados e Criados
+
+- `composer.json` e `composer.lock`: Adição de dependência `laravel/reverb`.
+- `package.json` e `package-lock.json`: Adição de `laravel-echo` e `pusher-js`.
+- `config/reverb.php`: Configuração do servidor e aplicações Reverb.
+- `config/broadcasting.php`: Configuração do driver de broadcasting.
+- `.env` e `.env.example`: Adição de variáveis de ambiente do Reverb e Vite.
+- `app/Events/NovaMedicaoRecebida.php`: Nova classe de evento com interface `ShouldBroadcastNow`.
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Disparo do evento `NovaMedicaoRecebida`.
+- `resources/js/echo.js`: Novo script de inicialização do Laravel Echo.
+- `resources/js/app.js`: Importação do `echo.js`.
+- `resources/views/home.blade.php`: Função `processarNovaMedicao` e escuta do canal `medicoes`.
+- `tests/Feature/MedicaoApiTest.php`: Adição de teste para validação do broadcast do evento.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact tests/Feature/MedicaoApiTest.php`: 11 testes aprovados (51 asserções), 0 falhas.
+- `php artisan test --compact tests/Feature/ExampleTest.php`: 2 testes aprovados (14 asserções), 0 falhas.
+- `npm run build`: Assets compilados via Vite para produção com sucesso.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Extensão de WebSockets em Tempo Real para o Painel Analítico de Monitoramento)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Atualização Dinâmica e Silenciosa no Painel Analítico (`resources/views/dashboard.blade.php`)**:
+    - Integrado o listener do **Laravel Echo** escutando o canal público `medicoes` e o evento `NovaMedicaoRecebida` na tela do Dashboard Analítico.
+    - Implementada a função `processarNovaMedicaoDashboard(dados)` que:
+        1. Analisa a localidade atualmente selecionada pelo usuário:
+            - Se agrupando por **Cidade**, verifica se a telemetria pertence à mesma `cidade_id` selecionada.
+            - Se agrupando por **Bairro**, verifica se a telemetria pertence ao mesmo `bairro_id` selecionado.
+            - Descarta silenciosamente medições de outras localidades para poupar requisições desnecessárias.
+        2. Dispara `carregarDadosGrafico(silent = true)`:
+            - Recalcula a série temporal e re-renderiza o gráfico de linhas Chart.js com transição suave da curva.
+            - Atualiza os 4 cards estatísticos superiores: **Média Calculada**, **Pico Máximo**, **Ponto Mínimo** e total de **Amostras Registradas**.
+            - Atualiza o badge qualitativo de classificação da média e as estações ativas.
+            - O parâmetro `silent = true` previne o piscar do spinner de carregamento central, garantindo fluidez total da interface durante novas chegadas de dados.
+- **Enriquecimento do Evento de Broadcast (`app/Events/NovaMedicaoRecebida.php`)**:
+    - Inclusão dos atributos `cidade_id` e `bairro_id` no payload `broadcastWith()`, viabilizando filtragem local precisa no frontend do Dashboard.
+- **Proteção e Resiliência na API de Ingestão (`app/Http/Controllers/Api/MedicaoApiController.php`)**:
+    - Disparo do broadcast encapsulado em bloco `try/catch (\Throwable $e)` com `report($e)`. Caso o serviço Reverb esteja reiniciando ou indisponível, a resposta `201 Created` para a estação IoT é preservada e os dados continuam salvos no banco.
+- **Automação no Script de Desenvolvimento (`composer.json`)**:
+    - Adicionado `"php artisan reverb:start"` no comando `composer run dev`, unificando a inicialização de `server`, `queue`, `logs`, `vite` e `reverb`.
+- **Padronização de Fuso Horário (`America/Sao_Paulo`)**:
+    - Definido `APP_TIMEZONE=America/Sao_Paulo` no `.env` e `config/app.php`, assegurando gravação e exibição oficial no horário de Brasília (UTC-3).
+
+#### 2. Arquivos Modificados
+
+- `resources/views/dashboard.blade.php`: Parâmetro `silent` em `carregarDadosGrafico`, funções `processarNovaMedicaoDashboard` e `inicializarEchoDashboard`.
+- `app/Events/NovaMedicaoRecebida.php`: Inclusão de `cidade_id` e `bairro_id` no payload do broadcast.
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Tratamento defensivo no disparo do evento.
+- `composer.json`: Inclusão do Reverb no script `dev`.
+- `.env` e `config/app.php`: Configuração do timezone `America/Sao_Paulo`.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact tests/Feature/DashboardTest.php tests/Feature/MedicaoApiTest.php`: 19 testes aprovados (73 asserções), 0 falhas.
+- `php artisan view:cache` e `php artisan view:clear`: Templates Blade compilados sem erros.
+- `npm run build`: Assets frontend compilados com sucesso.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Correção da Atualização em Tempo Real do Mapa e Transição Suave do Gráfico do Dashboard)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Correção da Atualização em Tempo Real no Mapa Público (`resources/views/home.blade.php`)**:
+    - **Identificação Exata por Estação**: Adicionado o identificador `estacao_id` em todas as camadas no `HomeController.php` (`$dadosIqa`, `$dadosTemperatura`, `$dadosUmidade`, `$dadosPm`, `$dadosCo2`), permitindo que a função `processarNovaMedicao` no frontend localize o ponto correto instantaneamente sem depender exclusivamente de tolerâncias flutuantes de coordenadas geográficas.
+    - **Compatibilidade Espacial no Broadcast**: No `MedicaoApiController.php` e no `NovaMedicaoRecebida.php`, adicionado o escopo `withCoordinates()` (`ST_X` e `ST_Y` do MySQL) e a associação `setRelation('estacao', $estacao)`, garantindo que a latitude e a longitude nunca cheguem como nulas ou corrompidas pelo binário WKB do MySQL no evento transmitido via WebSocket.
+    - **Redesenho Completo da Camada e Marcadores**: A função `processarNovaMedicao` agora invoca `renderLayer(currentLayerKey)`, recalculando tanto a camada de calor WebGL quanto os dados interpolados do marcador/popup ativo (`updateClickMarker`). O visitante vê o valor, o badge e a Data/Hora atualizarem em tempo real sem precisar teclar F5.
+    - **Resiliência do Script e Ciclo de Vida**: Removido o atributo `type="module"` e adicionada verificação segura `document.readyState` para execução do mapa sem bloqueios ou condições de corrida com o carregamento do Leaflet.
+- **Transição Suave do Gráfico no Painel Analítico (`resources/views/dashboard.blade.php`)**:
+    - **Eliminação do "Reset" do Gráfico**: Em `renderizarGrafico(data)`, removida a chamada incondicional de `chartInstance.destroy()` a cada chegada de dado via WebSocket.
+    - Quando `chartInstance` já existe, a instância do Chart.js é atualizada _in-place_ (`chartInstance.data.labels`, `chartInstance.data.datasets[0].data`, cores, gradientes e callbacks de tooltip) seguida de `chartInstance.update()`.
+    - Isso proporciona uma transição fluida e suave da curva do gráfico, eliminando piscadas em branco e a reinicialização da animação a partir do zero.
+    - A recriação do gráfico (`destroy`) foi preservada exclusivamente para eventos de alternância de tema claro/escuro (`themechanged`) ou quando a consulta não retornar leituras.
+
+#### 2. Arquivos Modificados
+
+- `app/Http/Controllers/HomeController.php`: Adicionado `estacao_id` nos arrays de pontos de todas as camadas.
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Consulta da estação com `withCoordinates()` e injeção da relação no modelo da medição antes do dispatch.
+- `app/Events/NovaMedicaoRecebida.php`: Fallback defensivo com `Estacao::withCoordinates()` para garantir integridade das coordenadas espaciais.
+- `resources/views/home.blade.php`: Script unificado, busca por `estacao_id` e coordenadas, chamada de `renderLayer` para atualização do mapa de calor e marcador.
+- `resources/views/dashboard.blade.php`: Atualização suave _in-place_ com `chartInstance.update()`, evitando o reset visual do canvas.
+- `.agents/skills/historico.md`: Registro documental desta sessão.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Código PHP 100% formatado e padronizado.
+- `php artisan test --compact`: Suíte completa com 130 testes automatizados (647 asserções), 100% aprovados.
+- `npm run build`: Assets frontend compilados com sucesso.
+
+- **Resolução de Gargalo e Latência de 500ms em Rajadas de Dados**:
+    - **Habilitação de Múltiplos Workers**: Descomentada a diretiva `PHP_CLI_SERVER_WORKERS=4` no `.env` e `.env.example`, permitindo que o `php artisan serve` processe requisições HTTP em paralelo, eliminando o enfileiramento sequencial de conexões.
+    - **Remoção de Flood de Browser Logs**: Removido o `console.log` de debug da recepção de eventos no `home.blade.php`, que disparava dezenas de requisições HTTP `POST /_boost/browser-logs` no servidor local para cada medição recebida via WebSocket.
+    - **Debounce de Atualização no Dashboard**: Adicionado timer de debounce de 350ms em `processarNovaMedicaoDashboard` no `dashboard.blade.php`, consolidando rajadas simultâneas de dezenas de estações em uma única requisição AJAX ao invés de dezenas de chamadas concorrentes.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Exibição de Máximo e Mínimo nos Gráficos do Dashboard e Formatação do Eixo Y)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Séries Temporais de Máximo e Mínimo nos Gráficos do Dashboard**:
+    - **Agregação no Backend (`app/Http/Controllers/DashboardController.php`)**:
+        - No método `dadosGrafico`, foram incorporados os cálculos de `maximos` e `minimos` para cada grupo de intervalo temporal analisado (horas ou dias), além do vetor de média `valores`.
+        - Em consultas sem registros, retorna vetores vazios normalizados (`maximos: []`, `minimos: []`).
+    - **Visualização Multissérie no Chart.js (`resources/views/dashboard.blade.php`)**:
+        - Implementada a função `gerarDatasetsGrafico(data, isDark)`, estruturando 3 curvas simultâneas para qualquer métrica selecionada (Qualidade do Ar, Temperatura, Umidade Relativa, Material Particulado, Dióxido de Carbono):
+            1. **Média (`Média`)**: Curva contínua sólida com a cor tema da métrica (`data.cor`) e espessura de 2.5px.
+            2. **Valor Máximo (`Máximo`)**: Linha tracejada (`borderDash: [5, 4]`) em tom vermelho/cinnabar (`#ef4444` / `#dc2626`) indicando o teto de medições registradas.
+            3. **Valor Mínimo (`Mínimo`)**: Linha tracejada (`borderDash: [5, 4]`) em tom azul/dodger (`#3b82f6` / `#0284c7`) indicando o piso de medições registradas.
+        - **Legenda Interativa**: Legenda habilitada no canto superior direito (`plugins.legend.display: true`), permitindo que o operador clique para exibir ou ocultar qualquer uma das curvas dinamicamente.
+        - **Atualização In-Place Suave**: Tanto no carregamento AJAX quanto nas atualizações automáticas via WebSocket (Reverb), os datasets são atualizados suavemente preservando o canvas e a animação.
+- **Formatação Numérica Padronizada no Eixo Y e Tooltips**:
+    - **Qualidade do Ar (IQA) e Dióxido de Carbono (CO₂)**:
+        - Os valores exibidos na legenda do eixo Y (`scales.y.ticks`) agora são rigorosamente inteiros (`precision: 0`), sem casas decimais, acompanhados da respectiva unidade (ex: `50 IQA`, `450 ppm`).
+    - **Demais Métricas (Temperatura, Umidade Relativa, Material Particulado)**:
+        - Os valores na legenda do eixo Y agora são formatados com exatamente 2 casas decimais e separador decimal por vírgula (`toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })`), gerando marcações elegantes (ex: `24,50 °C`, `60,00 %`, `15,20 µg/m³`).
+    - **Harmonização dos Tooltips e Cards**:
+        - Os tooltips flutuantes e os cards de estatísticas no topo (`statMedia`, `statMaximo`, `statMinimo`) passam a seguir a mesma regra de formatação numérica (inteiro para IQA e CO2, 2 casas decimais com vírgula para os demais).
+
+#### 2. Arquivos Modificados
+
+- `app/Http/Controllers/DashboardController.php`: Inclusão dos arrays `maximos` e `minimos` no retorno JSON.
+- `resources/views/dashboard.blade.php`: Suporte a múltiplos datasets (Média, Máximo, Mínimo), ativação de legenda interativa e formatação condicional de inteiros e decimais com vírgula no eixo Y e tooltips.
+- `tests/Feature/DashboardTest.php`: Asserções para `maximos` e `minimos` no retorno da API e teste de agregação simultânea de múltiplas estações.
+- `.agents/skills/historico.md`: Registro documental desta sessão.
+
+#### 3. Testes, Formatação e Compilação
+
+- `php artisan test --compact tests/Feature/DashboardTest.php`: 9 testes aprovados (29 asserções), 0 falhas.
+- `vendor/bin/pint --format agent`: Código PHP 100% formatado.
+- `npm run build`: Assets frontend compilados com sucesso.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Granularidade Temporal Adaptativa nos Gráficos da Dashboard)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Correção da Granularidade e Agrupamento dos Gráficos (`app/Http/Controllers/DashboardController.php`)**:
+    - **Identificação da Causa Raiz**: O agrupamento temporal do backend estava estaticamente fixado em horas (`Y-m-d H:00`). Quando medições eram geradas ou transmitidas ao longo de minutos (ex: 6.428 leituras entre 15:57 e 16:28), todas as leituras colapsavam em apenas dois baldes horários (hora 15 e hora 16), gerando exatamente dois pontos no gráfico (`15:57` e `16:28`) e resultando em linhas retas horizontais que pareciam ligar apenas o primeiro e o último registro.
+    - **Implementação do Algoritmo Adaptativo (`determinarBucketTemporal`)**:
+        - O sistema agora calcula a amplitude real dos dados (`spanMinutos = max_time - min_time`) e ajusta a resolução temporal de forma inteligente:
+            - **<= 2 minutos**: Agrupamento a cada 5 segundos (`H:i:s`).
+            - **<= 10 minutos**: Agrupamento a cada 15 segundos (`H:i:s`).
+            - **<= 2 horas**: Agrupamento **minuto a minuto** (`H:i`), gerando ~30 a 120 pontos que exibem em alta fidelidade a oscilação contínua e as curvas de Média, Máximo e Mínimo.
+            - **<= 6 horas**: Agrupamento a cada 5 minutos (`H:i`).
+            - **<= 24 horas**: Agrupamento a cada 15 minutos (`H:i`).
+            - **<= 7 dias**: Agrupamento a cada 1 hora (`d/m H:00`).
+            - **> 7 dias**: Agrupamento diário (`d/m`).
+- **Validação e Testes**:
+    - Novo teste implementado em `tests/Feature/DashboardTest.php` validando que telemetrias em intervalos curtos preservam todos os pontos temporais com suas respectivas médias, máximos e mínimos.
+    - Suíte executada com 100% de aprovação (10 testes, 33 asserções).
+    - Código formatado via Laravel Pint e assets compilados via Vite.
+
+---
+
+### Sessão: 09 de Setembro de 2026 (Cálculo dos Blocos Estatísticos por Período e Resolução de Warning no Span Minutos)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Eliminação do Alerta de Conversão Float-to-Int (`app/Http/Controllers/DashboardController.php`)**:
+    - **Causa Raiz**: O método `Carbon::diffInMinutes()` retorna um `float` (ex: `48.13333333333333`). Ao passá-lo para `determinarBucketTemporal(Carbon $dt, int $spanMinutos, string $periodo)`, o PHP 8.1+ emitia o aviso `Implicit conversion from float to int loses precision`.
+    - **Correção**:
+        1. Cálculo do span arredondado para o inteiro superior mais próximo: `$spanMinutos = max(1, (int) ceil($primeiraData->diffInMinutes($ultimaData)));`.
+        2. Assinatura do método flexibilizada com union type: `protected function determinarBucketTemporal(Carbon $dt, int|float $spanMinutos, string $periodo): array`.
+- **Cálculo Rigoroso dos Blocos Estatísticos por Período (`24h`, `7d`, `30d`)**:
+    - **Backend (`DashboardController.php`)**:
+        - Validação do filtro temporal nas consultas com suporte a fallback de `created_at` caso `data_hora` seja nulo.
+        - Inclusão dos metadados `'periodo'` e `'periodo_rotulo'` no payload JSON da API `/dashboard/graficos`.
+        - Os blocos de Média Calculada, Valor Máximo, Valor Mínimo e Amostras são calculados estritamente sobre as medições recuperadas para o período requisitado.
+    - **Frontend (`resources/views/dashboard.blade.php`)**:
+        - Correção das legendas descritivas dos cards: substituição do texto estático antigo ("Pico máximo registrado na localidade") por legendas descritivas dinâmicas (`Pico máximo registrado nas últimas 24 horas`, `Pico máximo registrado nos últimos 7 dias`, `Pico máximo registrado nos últimos 30 dias`).
+        - Atualização contextual em tempo real (`atualizarCardsEstatisticos`) sincronizada com as trocas de botão de período e eventos de WebSocket.
+- **Validação e Testes**:
+    - Novo teste de integração em `tests/Feature/DashboardTest.php` (`api de graficos calcula blocos estatisticos estritamente para o periodo selecionado`) inserindo medições distribuídas em 2 horas atrás, 3 dias atrás e 15 dias atrás, comprovando numericamente a diferenciação de média, máximo e mínimo entre os períodos 24h, 7d e 30d.
+    - Suíte executada com 100% de aprovação (11 testes, 39 asserções no arquivo de Dashboard).
+    - Código validado via Laravel Pint e frontend compilado via Vite.
+
+---
+
+### Sessão: 10 de Setembro de 2026 (Ordem Sucessória Municipal, Roteiro de Substituição de Sensores e Permissões por Papel)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Correção da Migration MySQL/MariaDB (Erro 1265 - Data Truncated)**:
+    - Resolução da falha na migration `2026_09_10_140000_update_patrimonio_status_and_user_roles.php` no MySQL/MariaDB ao alterar dados para o novo enum. A coluna `status` é temporariamente convertida em `VARCHAR(50)`, os registros antigos com valor `'Instalado'` são normalizados para `'Instalada'`, e a restrição `ENUM('Disponível', 'Instalada', 'Descartado')` é aplicada de forma estrita.
+- **Ordem Sucessória de Administradores Municipais**:
+    - Implementada a regra de sucessão da gestão municipal: o Administrador municipal agora pode cadastrar outro Administrador vinculado à sua jurisdição (`cidade_id`).
+    - Ao concluir o cadastro do novo titular, a conta do administrador autor da ação é imediatamente desativada (`ativo = false`), sua sessão é encerrada (`Auth::logout()`, invalidação de sessão e regeneração de tokens CSRF), e o usuário é redirecionado para o login com mensagem informativa de transição de cargo.
+    - Na interface de cadastro (`usuarios/create.blade.php`), foi adicionado o card interativo para o nível "Administrador" acompanhado de banner de alerta dinâmico (`aviso-sucessao-admin`) que conscientiza o gestor sobre o logout e a desativação da sua conta.
+- **Remoção de Menção ao Super-usuário no Guia de Permissões**:
+    - O card informativo referente ao "Super-usuário" foi excluído do Guia de Níveis e Permissões em `resources/views/perfil/edit.blade.php`, reorganizando a visualização em uma grade balanceada de 3 colunas focada exclusivamente nos níveis sob jurisdição municipal (Administrador, Planejador Técnico e Instalador).
+- **Ocultação de Recursos Restritos para o Perfil Instalador**:
+    - Botões que levariam o usuário com perfil de Instalador a telas restritas (gerando erros 403) foram ocultados condicionalmente com `@if(!auth()->user()?->isInstalador())`:
+        - Ocultados os botões "Planejar Nova Malha" e "Planejar Primeira Malha" em `resources/views/instalacoes/index.blade.php`;
+        - Ocultados os botões "Planejar Malha (Automático)" e "Cadastrar Nova Estação" em `resources/views/estacoes/index.blade.php`;
+        - Ocultados o botão "Cadastrar Equipamentos" e o botão de ação de descarte de patrimônio (`title="Marcar como Descartado"`) em `resources/views/patrimonios/index.blade.php`.
+- **Ordem de Instalação para Substituição de Sensores em Campo**:
+    - Quando a substituição de sensores de uma estação é confirmada (pelo Planejador Técnico ou Administrador), uma Ordem de Instalação/Substituição é aberta no roteiro de campo para o Instalador:
+        - Na listagem de ordens (`instalacoes/index.blade.php`), a malha passa a exibir badge pulsante de "Substituição Pendente" e o quantitativo de sensores pendentes de troca, ajustando o cálculo de progresso;
+        - No roteiro de instalação (`instalacoes/show.blade.php`), a estação é realçada com badge de "Ordem de Substituição Aberta", exibe aviso descritivo com o número de patrimônio/MAC da placa anterior a ser descartada e renderiza o dropdown de seleção do novo equipamento disponível com botão "Concluir Substituição";
+        - No backend (`InstalacaoController::vincularMac`), ao registrar a nova placa, o patrimônio anterior vinculado à estação passa imediatamente para o status `'Descartado'`, o novo equipamento assume o status `'Instalada'` e a pendência de substituição na estação é finalizada (`solicitacao_substituicao = false`).
+
+#### 2. Arquivos Modificados e Criados
+
+- `database/migrations/2026_09_10_140000_update_patrimonio_status_and_user_roles.php`: Conversão temporária para `VARCHAR(50)` antes de atualizar para `'Instalada'`, evitando o erro MySQL 1265 e aplicando ENUM estrito (`'Disponível', 'Instalada', 'Descartado'`).
+- `resources/views/perfil/edit.blade.php`: Remoção da menção ao Super-usuário no Guia de Níveis e Permissões e reestruturação do grid para 3 colunas.
+- `app/Http/Controllers/UsuarioController.php`: Liberação do cadastro de sucessor municipal pelo Administrador, acompanhado de logout e desativação imediata da conta do administrador atual.
+- `resources/views/usuarios/create.blade.php`: Inclusão do card de nível "Administrador", banner dinâmico de aviso de sucessão e atualização da rotina JavaScript `selecionarNivel`.
+- `resources/views/instalacoes/index.blade.php`: Ocultação do botão "Planejar Nova Malha" para instaladores, exibição de badge de substituição pendente e cálculo de progresso com satélites pendentes de troca.
+- `resources/views/instalacoes/show.blade.php`: Tratamento de estações com `solicitacao_substituicao` ativa como ordens abertas, exibição de dados do equipamento antigo e formulário para conclusão da substituição pelo instalador.
+- `app/Http/Controllers/InstalacaoController.php`: Ajuste das queries com `substituicoes_pendentes` e garantia de descarte automático do patrimônio anterior durante `vincularMac`.
+- `resources/views/estacoes/index.blade.php`: Ocultação dos botões de planejar malha e cadastrar nova estação para instaladores.
+- `resources/views/patrimonios/index.blade.php`: Ocultação de botão de cadastro de novos equipamentos e de descarte manual de patrimônios para instaladores.
+- `tests/Feature/UsuarioMunicipalTest.php`: Atualização do teste de cadastro de administrador para validar a nova regra de sucessão municipal com desativação de conta e exibição do seletor em tela.
+- `tests/Feature/PermissoesPapeisTest.php`: Atualização dos testes de permissões administrativas com sucessão, bloqueio visual de botões para o instalador e execução da ordem de substituição em campo com descarte de equipamento anterior.
+- `.agents/skills/historico.md`: Registro documental da sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `php artisan test --compact tests/Feature/UsuarioMunicipalTest.php`: 10 testes executados com 100% de aprovação (61 asserções).
+- `php artisan test --compact tests/Feature/PermissoesPapeisTest.php tests/Feature/EstacaoSubstituicaoTest.php`: 24 testes executados com 100% de aprovação (129 asserções).
+- `php artisan test --compact`: Suíte completa com 156 testes automatizados (773 asserções), 100% aprovados.
+- `vendor/bin/pint --dirty --format agent`: Formatação de código PHP 100% validada conforme o padrão do projeto.
+
+---
+
+### Sessão: 11 de Setembro de 2026 (Seleção em Cascata de Jurisdição Municipal, Unificação da Escala IDW e Otimizações de Zoom no Mapa)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Seleção em Cascata de Jurisdição Municipal por Estado (`/usuarios/create` e `/usuarios/{id}/edit`)**:
+    - Reestruturação do sistema de seleção de jurisdição municipal nos formulários de cadastro e edição de Administradores Municipais operados pelo Super-usuário.
+    - O operador seleciona previamente o Estado (UF) em um dropdown alimentado com todos os estados brasileiros (`Estado::orderBy('nome')->get()`), e o dropdown de Município é populado dinamicamente via requisição assíncrona (`/localidades/estados/{estadoId}/cidades`) apenas com as cidades daquela unidade federativa.
+    - No backend (`UsuarioController`), foram adicionadas validações estritas de `estado_id` (`nullable, exists:estados,id`), validação de vínculo garantindo que a cidade pertença ao estado selecionado e sanitização do array antes de persistir em `users`. Na edição, o estado e o município do administrador já são pré-carregados selecionados.
+- **Unificação da Escala de Cores, Interpolação IDW e Legenda no Mapa Público (`home.blade.php`)**:
+    - **Diagnóstico da Causa Raiz**: O componente anterior (`webgl-heatmap.js`) utilizava blending aditivo no shader WebGL (`ONE, ONE`), fazendo com que leituras próximas de estações somassem intensidades exponencialmente até saturar na cor máxima da escala (1.0), exibindo estações de 13 °C em tons marrom/vermelhos (como se fossem 40 °C). Além disso, a régua da legenda possuía paradas não lineares desconectadas da normalização da textura WebGL.
+    - **Implementação do `L.IdwSurfaceLayer` em HTML5 Canvas**: Camada matricial contínua nativa do Leaflet que calcula a média física real entre os sensores utilizando ponderação pelo inverso do quadrado da distância ($w = 1 / d^2$), eliminando completamente a saturação aditiva falsa. O desvanecimento nas bordas do raio de busca (350 metros) ocorre exclusivamente pelo canal alfa nos últimos 35% do alcance, preservando a fidelidade numérica.
+    - **Função Centralizadora de Cores (`getColorForValue` e `layerColorStops`)**: Mapeamento unificado de valores para RGB para todas as grandezas ambientais (IQA, Temperatura, Umidade Relativa, Material Particulado e Dióxido de Carbono).
+    - **Sincronização Absoluta de Legenda e Pin**: O gradiente CSS da legenda (`linear-gradient`) agora é gerado a partir de `getColorForValue` nas posições percentuais exatas de cada parada. O cálculo do popup de clique (`getInterpolatedData`) adota rigorosamente a mesma fórmula e raio de busca do canvas, e o selo circular do IQA reflete as cores exatas da legenda (`#2ecc71` Boa, `#f1c40f` Moderada, `#e67e22` Insalubre, `#e74c3c` Perigoso, `#8e44ad` Péssima).
+    - **Resolução de Erro de Inicialização Assíncrona do Vite**: A definição da classe `L.IdwSurfaceLayer` foi encapsulada na função `definirIdwSurfaceLayer()`, chamada de dentro de `inicializarMapa()` após a resolução assíncrona do módulo Leaflet (`window.L`) pelo Vite, sanando o erro `ReferenceError: L is not defined`.
+- **Otimizações de Performance no Zoom-in e Zoom-out da Camada IDW**:
+    - **Escalonamento Hardware via CSS Transform (`zoomanim` e `leaflet-zoom-animated`)**: Durante os 250ms da transição de zoom do Leaflet, o canvas existente é transformado e escalonado suavemente a 60 FPS pela GPU (`L.DomUtil.setTransform`), eliminando congelamentos e "piscadas" na tela.
+    - **Debounce de Renderização com `requestAnimationFrame`**: Consolidação de múltiplos eventos rápidos de scroll do mouse, cancelando redesenhos intermediários e executando apenas 1 cálculo por frame de tela quando a visualização estabiliza.
+    - **Resolução de Grade (`cellSize`) Adaptativa**: Tamanho de célula ajustado dinamicamente com base no zoom (4px para zoom $\le 13$, 5px para zoom 14-15, 6px para zoom $\ge 16$), economizando até 75% de ciclos de CPU em zoom aproximado sem qualquer perda de qualidade perceptível graças à suavização bilinear na GPU (`imageSmoothingQuality = 'high'`).
+    - **Early-Exit no Laço IDW**: Rejeição antecipada de estações fora do raio do pixel com checagens unidimensionais (`|dx| > r` ou `|dy| > r`), suprimindo cálculos de distância e multiplicações desnecessárias.
+
+#### 2. Arquivos Modificados e Criados
+
+- `app/Http/Controllers/UsuarioController.php`: Carga de estados na criação/edição de usuários para Super-usuário, validação de pertinência cidade/estado e sanitização de dados.
+- `resources/views/usuarios/create.blade.php`: Campo de jurisdição municipal reestruturado em 2 colunas com busca assíncrona de cidades dependente do estado selecionado.
+- `resources/views/usuarios/edit.blade.php`: Campo de jurisdição municipal reestruturado com pré-seleção de estado/cidade e atualização dinâmica de cidades ao alternar o estado.
+- `resources/views/home.blade.php`: Criação da camada `L.IdwSurfaceLayer`, unificação das escalas de cores em `getColorForValue`, geração do gradiente da legenda, alinhamento do popup de clique IDW, tratamento de carregamento assíncrono do Leaflet e aceleração de zoom via `zoomanim`, `cellSize` dinâmico e debounce.
+- `tests/Feature/SuperUsuarioTest.php`: Adição de testes de integração para o fluxo em cascata de estado e cidades no cadastro e edição de administradores municipais pelo Super-usuário.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `php artisan test --compact tests/Feature/SuperUsuarioTest.php`: 12 testes executados com 100% de aprovação (47 asserções).
+- `php artisan test --compact tests/Feature/ExampleTest.php`: 2 testes da página inicial executados com 100% de aprovação (14 asserções).
+- `php artisan test --compact`: Suíte completa com 159 testes automatizados aprovados (785 asserções), 0 falhas.
+- `vendor/bin/pint --dirty --format agent`: Código PHP 100% formatado e em conformidade com as regras do Laravel Pint.

@@ -181,7 +181,7 @@ test('instalador pode vincular mac address e ativar estacao em campo', function 
     expect($matriz->status_instalacao)->toBe('Instalada');
     expect($matriz->mac_address)->toBe('AA:BB:CC:11:22:33');
     expect($matriz->patrimonio_id)->toBe($patrimonio->private_id);
-    expect($patrimonio->status)->toBe('Instalado');
+    expect($patrimonio->status)->toBe('Instalada');
 });
 
 test('bloqueia ativacao de satelite se a estacao anterior nao estiver instalada', function () {
@@ -339,7 +339,7 @@ test('instalador pode vincular estacao por numero de patrimonio ou selecao de in
     expect($matriz->status_instalacao)->toBe('Instalada');
     expect($matriz->patrimonio_id)->toBe($patrimonio->private_id);
     expect($matriz->mac_address)->toBe('AA:BB:CC:DD:EE:FF');
-    expect($patrimonio->status)->toBe('Instalado');
+    expect($patrimonio->status)->toBe('Instalada');
 });
 
 test('somente instalador pode manipular o roteiro e vincular mac retornando 403 para outros papeis', function () {
@@ -820,4 +820,58 @@ test('roteiro de instalacao reordena estacoes topologicamente em cascata e exibe
 
     $sat2->refresh();
     expect($sat2->status_instalacao)->toBe('Instalada');
+});
+
+test('roteiro de instalacao exibe selecao exclusiva via dropdown e nao renderiza inputs de texto ou abas de modo', function () {
+    $user = User::factory()->create(['nivel' => 'instalador']);
+    $bairro = Bairro::factory()->create();
+
+    $patrimonio = Patrimonio::factory()->create([
+        'cidade_id' => $bairro->cidade_id,
+        'numero_patrimonio' => 'OAir-DISP-001',
+        'mac_address' => 'AA:BB:CC:DD:EE:01',
+        'status' => 'Disponível',
+        'created_by' => $user->id,
+    ]);
+
+    $matriz = Estacao::factory()->create([
+        'tipo_estacao' => 'Estação Matriz',
+        'status_instalacao' => 'Planejada',
+        'ordem_instalacao' => 1,
+        'mac_address' => null,
+        'bairro_id' => $bairro->id,
+        'latitude' => -21.9847,
+        'longitude' => -46.7947,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('instalacoes.show', $matriz->public_id));
+
+    $response->assertOk();
+    // Verifica a presenca do select com a opcao inicial vazia e os dados do patrimonio/mac
+    $response->assertSee('Selecione o equipamento (Patrimônio / MAC)...');
+    $response->assertSee('Patrimônio: OAir-DISP-001');
+    $response->assertSee('MAC: AA:BB:CC:DD:EE:01');
+    $response->assertSee("select-patrimonio-{$matriz->public_id}");
+
+    // Verifica que NAO ha mais abas de selecao de modo nem inputs manuais de texto
+    $response->assertDontSee('Por Patrimônio');
+    $response->assertDontSee('Por MAC Address');
+    $response->assertDontSee("patrimonio-input-{$matriz->public_id}");
+    $response->assertDontSee("mac-input-{$matriz->public_id}");
+
+    // Ativacao direta via dropdown enviando patrimonio_id
+    $responseAtivacao = $this->actingAs($user)->postJson(route('instalacoes.vincular-mac', $matriz->public_id), [
+        'patrimonio_id' => $patrimonio->public_id,
+    ]);
+
+    $responseAtivacao->assertOk();
+    $responseAtivacao->assertJson(['success' => true]);
+
+    $matriz->refresh();
+    $patrimonio->refresh();
+
+    expect($matriz->status_instalacao)->toBe('Instalada');
+    expect($matriz->mac_address)->toBe('AA:BB:CC:DD:EE:01');
+    expect($matriz->patrimonio_id)->toBe($patrimonio->private_id);
+    expect($patrimonio->status)->toBe('Instalada');
 });

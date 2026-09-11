@@ -1,4 +1,4 @@
-<x-layouts.app title="Editar Usuário Municipal - OpenAir Metrics">
+<x-layouts.app title="{{ $currentUser->isSuperAdmin() ? 'Editar Administrador' : 'Editar Usuário Municipal' }} - OpenAir Metrics">
     <div class="flex flex-col md:flex-row h-full w-full bg-athens-gray-50 dark:bg-athens-gray-950 transition-colors duration-200">
         <!-- Sidebar de Navegação -->
         <x-sidebar active="usuarios" />
@@ -9,9 +9,11 @@
 
                 <!-- Breadcrumb -->
                 <div class="flex items-center gap-2 text-sm text-athens-gray-500 dark:text-athens-gray-400">
-                    <a href="{{ route('usuarios.index') }}" class="hover:text-blue-dianne-600 dark:hover:text-blue-dianne-400 transition">Usuários Municipais</a>
+                    <a href="{{ route('usuarios.index') }}" class="hover:text-blue-dianne-600 dark:hover:text-blue-dianne-400 transition">
+                        {{ $currentUser->isSuperAdmin() ? 'Administradores' : 'Usuários Municipais' }}
+                    </a>
                     <x-heroicon-o-chevron-right class="w-4 h-4" />
-                    <span class="text-blue-dianne-950 dark:text-white font-medium">Editar Usuário</span>
+                    <span class="text-blue-dianne-950 dark:text-white font-medium">Editar {{ $currentUser->isSuperAdmin() ? 'Administrador' : 'Usuário' }}</span>
                 </div>
 
                 <!-- Erros -->
@@ -32,10 +34,16 @@
                 <!-- Cabeçalho -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">Editar Usuário: {{ $usuario->name }}</h1>
+                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">
+                            {{ $currentUser->isSuperAdmin() ? 'Editar Administrador: ' : 'Editar Usuário: ' }}{{ $usuario->name }}
+                        </h1>
                         <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">
-                            Atualize os dados e credenciais do membro da equipe municipal de 
-                            <strong class="text-blue-dianne-950 dark:text-white">{{ $cidade->nome ?? 'Sua Cidade' }} ({{ $cidade->estado->uf ?? '' }})</strong>.
+                            @if($currentUser->isSuperAdmin())
+                                Atualize os dados do administrador e sua jurisdição municipal.
+                            @else
+                                Atualize os dados e credenciais do membro da equipe municipal de 
+                                <strong class="text-blue-dianne-950 dark:text-white">{{ $cidade->nome ?? 'Sua Cidade' }} ({{ $cidade->estado->uf ?? '' }})</strong>.
+                            @endif
                         </p>
                     </div>
                     <div>
@@ -54,168 +62,173 @@
                         @csrf
                         @method('PUT')
 
-                        <!-- Alerta Dinâmico para Novo Administrador -->
-                        <div id="alerta-transicao-adm" class="{{ old('nivel', $usuario->nivel) === 'administrador' && $usuario->id !== $currentUser->id ? '' : 'hidden' }} bg-tahiti-gold-50 dark:bg-tahiti-gold-950/40 border border-tahiti-gold-300 dark:border-tahiti-gold-800 rounded-xl p-4 text-tahiti-gold-900 dark:text-tahiti-gold-200">
-                            <div class="flex items-start gap-3">
-                                <x-heroicon-o-exclamation-triangle class="w-6 h-6 text-tahiti-gold-600 dark:text-tahiti-gold-400 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <h4 class="font-bold text-sm text-tahiti-gold-950 dark:text-tahiti-gold-100">Aviso Crítico: Transição de Titularidade Municipal</h4>
-                                    <p class="text-xs text-tahiti-gold-800 dark:text-tahiti-gold-300 mt-1 leading-relaxed">
-                                        Ao promover este usuário para <strong>Administrador</strong>, seu próprio acesso ao sistema será <strong>imediatamente desabilitado</strong> e você será desconectado. Esta regra de segurança garante a titularidade única na prefeitura.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
                         <div>
                             <h2 class="text-lg font-bold text-blue-dianne-950 dark:text-white border-b border-athens-gray-100 dark:border-athens-gray-800 pb-2">Função e Acesso</h2>
                         </div>
 
-                        <!-- Seleção de Nível e Permissões (Estilo Guia de Níveis e Permissões) -->
-                        <div class="space-y-3">
-                            <label class="block text-sm font-semibold text-blue-dianne-950 dark:text-white">
-                                Selecione o Nível de Acesso e Permissões <span class="text-cinnabar-500">*</span>
-                            </label>
-
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="grupo-niveis">
-                                <!-- Opção: Planejador Técnico -->
-                                <div 
-                                    id="card-nivel-cadastrador"
-                                    onclick="selecionarNivel('cadastrador')"
-                                    class="nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none"
-                                >
-                                    <input 
-                                        type="radio" 
-                                        name="nivel" 
-                                        id="radio-cadastrador"
-                                        value="cadastrador" 
-                                        class="sr-only" 
-                                        @checked(old('nivel', $usuario->nivel) === 'cadastrador')
-                                    >
-                                    <div>
-                                        <div class="flex items-center justify-between gap-2 mb-2">
-                                            <div class="flex items-center gap-2">
-                                                <div class="p-1.5 rounded-lg bg-blue-dianne-100 dark:bg-blue-dianne-900/60 text-blue-dianne-700 dark:text-blue-dianne-300">
-                                                    <x-heroicon-o-pencil-square class="w-5 h-5" />
-                                                </div>
-                                                <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Planejador Técnico</span>
-                                            </div>
-                                            <div id="check-cadastrador" class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors">
-                                                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400 leading-relaxed">
-                                            Cadastra estações, patrimônios físicos, planeja malhas e rotas de instalação em campo.
-                                        </p>
-                                    </div>
-                                    <div class="mt-3 pt-2.5 border-t border-athens-gray-200/60 dark:border-athens-gray-800/80 flex items-center gap-1.5 text-[11px] font-medium text-blue-dianne-600 dark:text-blue-dianne-400">
-                                        <x-heroicon-o-check-circle class="w-3.5 h-3.5" />
-                                        <span>Gestão Técnica & Malhas</span>
-                                    </div>
+                        @if($currentUser->isSuperAdmin())
+                            <div class="bg-blue-dianne-50 dark:bg-blue-dianne-950/40 border border-blue-dianne-200 dark:border-blue-dianne-800 rounded-xl p-4 flex items-center gap-3">
+                                <div class="p-2 rounded-lg bg-blue-dianne-600 text-white">
+                                    <x-heroicon-o-shield-check class="w-6 h-6" />
                                 </div>
-
-                                <!-- Opção: Instalador de Campo -->
-                                <div 
-                                    id="card-nivel-instalador"
-                                    onclick="selecionarNivel('instalador')"
-                                    class="nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none"
-                                >
-                                    <input 
-                                        type="radio" 
-                                        name="nivel" 
-                                        id="radio-instalador"
-                                        value="instalador" 
-                                        class="sr-only" 
-                                        @checked(old('nivel', $usuario->nivel) === 'instalador')
-                                    >
-                                    <div>
-                                        <div class="flex items-center justify-between gap-2 mb-2">
-                                            <div class="flex items-center gap-2">
-                                                <div class="p-1.5 rounded-lg bg-tahiti-gold-100 dark:bg-tahiti-gold-900/60 text-tahiti-gold-700 dark:text-tahiti-gold-300">
-                                                    <x-heroicon-o-wrench-screwdriver class="w-5 h-5" />
-                                                </div>
-                                                <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Instalador</span>
-                                            </div>
-                                            <div id="check-instalador" class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors">
-                                                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400 leading-relaxed">
-                                            Acessa o roteiro em campo, localiza os pontos geográficos e vincula o MAC/Patrimônio físico à estação.
-                                        </p>
-                                    </div>
-                                    <div class="mt-3 pt-2.5 border-t border-athens-gray-200/60 dark:border-athens-gray-800/80 flex items-center gap-1.5 text-[11px] font-medium text-tahiti-gold-600 dark:text-tahiti-gold-400">
-                                        <x-heroicon-o-check-circle class="w-3.5 h-3.5" />
-                                        <span>Ativação & Roteiro em Campo</span>
-                                    </div>
-                                </div>
-
-                                <!-- Opção: Administrador Municipal -->
-                                <div 
-                                    id="card-nivel-administrador"
-                                    onclick="selecionarNivel('administrador')"
-                                    class="nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none"
-                                >
-                                    <input 
-                                        type="radio" 
-                                        name="nivel" 
-                                        id="radio-administrador"
-                                        value="administrador" 
-                                        class="sr-only" 
-                                        @checked(old('nivel', $usuario->nivel) === 'administrador')
-                                    >
-                                    <div>
-                                        <div class="flex items-center justify-between gap-2 mb-2">
-                                            <div class="flex items-center gap-2">
-                                                <div class="p-1.5 rounded-lg bg-ebony-clay-100 dark:bg-ebony-clay-800 text-ebony-clay-700 dark:text-ebony-clay-200">
-                                                    <x-heroicon-o-shield-check class="w-5 h-5" />
-                                                </div>
-                                                <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Administrador</span>
-                                            </div>
-                                            <div id="check-administrador" class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors">
-                                                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400 leading-relaxed">
-                                            Cadastra e gerencia novos usuários na prefeitura, além de solicitar substituição de sensores da cidade.
-                                        </p>
-                                    </div>
-                                    <div class="mt-3 pt-2.5 border-t border-athens-gray-200/60 dark:border-athens-gray-800/80 flex items-center gap-1.5 text-[11px] font-medium @if($usuario->id === $currentUser->id) text-emerald-600 dark:text-emerald-400 @else text-cinnabar-600 dark:text-cinnabar-400 @endif">
-                                        @if($usuario->id === $currentUser->id)
-                                            <x-heroicon-o-check-badge class="w-3.5 h-3.5" />
-                                            <span>Administrador Atual (Sua Conta)</span>
-                                        @else
-                                            <x-heroicon-o-exclamation-triangle class="w-3.5 h-3.5" />
-                                            <span>Sucessão / Titularidade Única</span>
-                                        @endif
-                                    </div>
+                                <div>
+                                    <h4 class="font-bold text-sm text-blue-dianne-950 dark:text-white">Perfil: Administrador Municipal</h4>
+                                    <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400 mt-0.5">
+                                        Gestor municipal responsável pela rede de estações e equipe da sua cidade.
+                                    </p>
                                 </div>
                             </div>
-                            @error('nivel')
-                                <p class="text-xs text-cinnabar-600 dark:text-cinnabar-400 mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        @else
+                            <!-- Seleção de Nível e Permissões para Administrador Municipal -->
+                            <div class="space-y-3">
+                                <label class="block text-sm font-semibold text-blue-dianne-950 dark:text-white">
+                                    Selecione o Nível de Acesso e Permissões <span class="text-cinnabar-500">*</span>
+                                </label>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="grupo-niveis">
+                                    <!-- Opção: Planejador Técnico -->
+                                    <div 
+                                        id="card-nivel-cadastrador"
+                                        onclick="selecionarNivel('cadastrador')"
+                                        class="nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none"
+                                    >
+                                        <input 
+                                            type="radio" 
+                                            name="nivel" 
+                                            id="radio-cadastrador"
+                                            value="cadastrador" 
+                                            class="sr-only" 
+                                            @checked(old('nivel', $usuario->nivel) === 'cadastrador')
+                                        >
+                                        <div>
+                                            <div class="flex items-center justify-between gap-2 mb-2">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="p-1.5 rounded-lg bg-blue-dianne-100 dark:bg-blue-dianne-900/60 text-blue-dianne-700 dark:text-blue-dianne-300">
+                                                        <x-heroicon-o-pencil-square class="w-5 h-5" />
+                                                    </div>
+                                                    <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Planejador Técnico</span>
+                                                </div>
+                                                <div id="check-cadastrador" class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors">
+                                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400 leading-relaxed">
+                                                Cadastra patrimônios físicos, solicita substituição de sensores e planeja malhas viárias.
+                                            </p>
+                                        </div>
+                                        <div class="mt-3 pt-2.5 border-t border-athens-gray-200/60 dark:border-athens-gray-800/80 flex items-center gap-1.5 text-[11px] font-medium text-blue-dianne-600 dark:text-blue-dianne-400">
+                                            <x-heroicon-o-check-circle class="w-3.5 h-3.5" />
+                                            <span>Gestão de Patrimônio & Malhas</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Opção: Instalador de Campo -->
+                                    <div 
+                                        id="card-nivel-instalador"
+                                        onclick="selecionarNivel('instalador')"
+                                        class="nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none"
+                                    >
+                                        <input 
+                                            type="radio" 
+                                            name="nivel" 
+                                            id="radio-instalador"
+                                            value="instalador" 
+                                            class="sr-only" 
+                                            @checked(old('nivel', $usuario->nivel) === 'instalador')
+                                        >
+                                        <div>
+                                            <div class="flex items-center justify-between gap-2 mb-2">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="p-1.5 rounded-lg bg-tahiti-gold-100 dark:bg-tahiti-gold-900/60 text-tahiti-gold-700 dark:text-tahiti-gold-300">
+                                                        <x-heroicon-o-wrench-screwdriver class="w-5 h-5" />
+                                                    </div>
+                                                    <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Instalador</span>
+                                                </div>
+                                                <div id="check-instalador" class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors">
+                                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400 leading-relaxed">
+                                                Acessa o roteiro em campo, localiza os pontos geográficos e vincula o MAC/Patrimônio físico à estação.
+                                            </p>
+                                        </div>
+                                        <div class="mt-3 pt-2.5 border-t border-athens-gray-200/60 dark:border-athens-gray-800/80 flex items-center gap-1.5 text-[11px] font-medium text-tahiti-gold-600 dark:text-tahiti-gold-400">
+                                            <x-heroicon-o-check-circle class="w-3.5 h-3.5" />
+                                            <span>Ativação & Roteiro em Campo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                @error('nivel')
+                                    <p class="text-xs text-cinnabar-600 dark:text-cinnabar-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endif
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
-                            <!-- Cidade Jurisdição (Fixa) -->
+                            <!-- Jurisdição Municipal -->
                             <div class="sm:col-span-2">
                                 <label class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
-                                    Jurisdição Municipal
+                                    Jurisdição Municipal <span class="text-cinnabar-500">*</span>
                                 </label>
-                                <input 
-                                    type="text" 
-                                    readonly 
-                                    disabled
-                                    value="{{ $cidade->nome ?? 'Cidade Não Definida' }} - {{ $cidade->estado->uf ?? '' }}" 
-                                    class="w-full px-4 py-2.5 text-sm bg-athens-gray-100 dark:bg-athens-gray-800/60 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg text-athens-gray-700 dark:text-athens-gray-300 cursor-not-allowed"
-                                >
-                                <p class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mt-1">Vinculado automaticamente à cidade de atuação.</p>
+                                @if($currentUser->isSuperAdmin())
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <!-- Estado -->
+                                        <div>
+                                            <label for="estado_id" class="block text-xs font-semibold text-athens-gray-700 dark:text-athens-gray-300 mb-1">
+                                                Estado (UF) <span class="text-cinnabar-500">*</span>
+                                            </label>
+                                            <select name="estado_id" id="estado_id" required class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 border @error('estado_id') border-cinnabar-500 ring-1 ring-cinnabar-500 @else border-athens-gray-300 dark:border-athens-gray-700 @enderror rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition">
+                                                <option value="">Selecione o estado...</option>
+                                                @if(isset($estados) && $estados->isNotEmpty())
+                                                    @foreach($estados as $est)
+                                                        <option value="{{ $est->id }}" @selected(old('estado_id', $selectedEstadoId ?? '') == $est->id)>
+                                                            {{ $est->nome }} ({{ $est->uf }})
+                                                        </option>
+                                                    @endforeach
+                                                @endif
+                                            </select>
+                                            @error('estado_id')
+                                                <p class="text-xs text-cinnabar-600 dark:text-cinnabar-400 mt-1">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+
+                                        <!-- Município -->
+                                        <div>
+                                            <label for="cidade_id" class="block text-xs font-semibold text-athens-gray-700 dark:text-athens-gray-300 mb-1">
+                                                Município <span class="text-cinnabar-500">*</span>
+                                            </label>
+                                            <select name="cidade_id" id="cidade_id" required @disabled(!old('estado_id', $selectedEstadoId ?? '')) class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 border @error('cidade_id') border-cinnabar-500 ring-1 ring-cinnabar-500 @else border-athens-gray-300 dark:border-athens-gray-700 @enderror rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                                                <option value="">{{ old('estado_id', $selectedEstadoId ?? '') ? 'Selecione o município...' : 'Selecione o estado primeiro...' }}</option>
+                                                @if(isset($cidades) && $cidades->isNotEmpty())
+                                                    @foreach($cidades as $c)
+                                                        <option value="{{ $c->id }}" @selected(old('cidade_id', $usuario->cidade_id) == $c->id)>
+                                                            {{ $c->nome }}
+                                                        </option>
+                                                    @endforeach
+                                                @endif
+                                            </select>
+                                            @error('cidade_id')
+                                                <p class="text-xs text-cinnabar-600 dark:text-cinnabar-400 mt-1">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mt-1.5">
+                                        Selecione o estado para carregar os municípios correspondentes para a jurisdição do administrador.
+                                    </p>
+                                @else
+                                    <input 
+                                        type="text" 
+                                        readonly 
+                                        disabled
+                                        value="{{ $cidade->nome ?? 'Cidade Não Definida' }} - {{ $cidade->estado->uf ?? '' }}" 
+                                        class="w-full px-4 py-2.5 text-sm bg-athens-gray-100 dark:bg-athens-gray-800/60 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg text-athens-gray-700 dark:text-athens-gray-300 cursor-not-allowed"
+                                    >
+                                    <p class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mt-1">Vinculado à cidade de atuação.</p>
+                                @endif
                             </div>
 
                             <!-- Nome -->
@@ -369,88 +382,28 @@
     </div>
 
     <script>
-        const isSelf = {{ $usuario->id === $currentUser->id ? 'true' : 'false' }};
-
-        function selecionarNivel(nivel) {
-            const radio = document.getElementById('radio-' + nivel);
-            if (radio) {
-                radio.checked = true;
-            }
-
-            const niveis = ['cadastrador', 'instalador', 'administrador'];
-            
-            niveis.forEach(n => {
-                const card = document.getElementById('card-nivel-' + n);
-                const check = document.getElementById('check-' + n);
-                if (!card || !check) return;
-
-                const checkIcon = check.querySelector('svg');
-
-                if (n === nivel) {
-                    if (n === 'cadastrador') {
-                        card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-blue-dianne-600 dark:border-blue-dianne-400 bg-blue-dianne-50/70 dark:bg-blue-dianne-950/50 shadow-sm ring-2 ring-blue-dianne-500/20';
-                        check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors bg-blue-dianne-600 border-blue-dianne-600';
-                    } else if (n === 'instalador') {
-                        card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-tahiti-gold-500 dark:border-tahiti-gold-400 bg-tahiti-gold-50/70 dark:bg-tahiti-gold-950/50 shadow-sm ring-2 ring-tahiti-gold-500/20';
-                        check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors bg-tahiti-gold-500 border-tahiti-gold-500';
-                    } else {
-                        card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-tahiti-gold-600 dark:border-tahiti-gold-500 bg-tahiti-gold-50/80 dark:bg-tahiti-gold-950/60 shadow-sm ring-2 ring-tahiti-gold-500/30';
-                        check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors bg-tahiti-gold-600 border-tahiti-gold-600';
-                    }
-                    if (checkIcon) checkIcon.classList.remove('opacity-0');
-                } else {
-                    card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-athens-gray-200 dark:border-athens-gray-800 bg-white dark:bg-athens-gray-900 hover:border-athens-gray-300 dark:hover:border-athens-gray-700';
-                    check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors border-athens-gray-300 dark:border-athens-gray-700 bg-transparent';
-                    if (checkIcon) checkIcon.classList.add('opacity-0');
-                }
-            });
-
-            verificarNivel(nivel);
-        }
-
-        function verificarNivel(nivel) {
-            const alerta = document.getElementById('alerta-transicao-adm');
-            const btn = document.getElementById('btn-submit');
-
-            if (nivel === 'administrador') {
-                if (!isSelf) {
-                    if (alerta) alerta.classList.remove('hidden');
-                    btn.classList.remove('bg-blue-dianne-600', 'hover:bg-blue-dianne-700');
-                    btn.classList.add('bg-tahiti-gold-600', 'hover:bg-tahiti-gold-700');
-                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Confirmar e Transferir Administração';
-                } else {
-                    if (alerta) alerta.classList.add('hidden');
-                    btn.classList.add('bg-blue-dianne-600', 'hover:bg-blue-dianne-700');
-                    btn.classList.remove('bg-tahiti-gold-600', 'hover:bg-tahiti-gold-700');
-                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Salvar Alterações';
-                }
-            } else {
-                if (alerta) alerta.classList.add('hidden');
-                btn.classList.add('bg-blue-dianne-600', 'hover:bg-blue-dianne-700');
-                btn.classList.remove('bg-tahiti-gold-600', 'hover:bg-tahiti-gold-700');
-                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Salvar Alterações';
-            }
-        }
-
         // Auto-preenchimento CEP
         const cepInput = document.getElementById('cep');
         const cepLoading = document.getElementById('cep-loading');
         const cepStatus = document.getElementById('cep-status');
 
-        cepInput.addEventListener('input', function(e) {
-            let v = e.target.value.replace(/\D/g, '');
-            if (v.length > 5) {
-                v = v.substring(0, 5) + '-' + v.substring(5, 8);
-            }
-            e.target.value = v;
+        if (cepInput) {
+            cepInput.addEventListener('input', function(e) {
+                let v = e.target.value.replace(/\D/g, '');
+                if (v.length > 5) {
+                    v = v.substring(0, 5) + '-' + v.substring(5, 8);
+                }
+                e.target.value = v;
 
-            const cleanCep = v.replace(/\D/g, '');
-            if (cleanCep.length === 8) {
-                buscarCep(cleanCep);
-            }
-        });
+                const cleanCep = v.replace(/\D/g, '');
+                if (cleanCep.length === 8) {
+                    buscarCep(cleanCep);
+                }
+            });
+        }
 
         async function buscarCep(cep) {
+            if (!cepLoading || !cepStatus) return;
             cepLoading.classList.remove('hidden');
             cepStatus.classList.add('hidden');
 
@@ -480,10 +433,93 @@
             }
         }
 
+        @if(! $currentUser->isSuperAdmin())
+        function selecionarNivel(nivel) {
+            const radio = document.getElementById('radio-' + nivel);
+            if (radio) {
+                radio.checked = true;
+            }
+
+            const niveis = ['cadastrador', 'instalador'];
+            
+            niveis.forEach(n => {
+                const card = document.getElementById('card-nivel-' + n);
+                const check = document.getElementById('check-' + n);
+                if (!card || !check) return;
+
+                const checkIcon = check.querySelector('svg');
+
+                if (n === nivel) {
+                    if (n === 'cadastrador') {
+                        card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-blue-dianne-600 dark:border-blue-dianne-400 bg-blue-dianne-50/70 dark:bg-blue-dianne-950/50 shadow-sm ring-2 ring-blue-dianne-500/20';
+                        check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors bg-blue-dianne-600 border-blue-dianne-600';
+                    } else if (n === 'instalador') {
+                        card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-tahiti-gold-500 dark:border-tahiti-gold-400 bg-tahiti-gold-50/70 dark:bg-tahiti-gold-950/50 shadow-sm ring-2 ring-tahiti-gold-500/20';
+                        check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors bg-tahiti-gold-500 border-tahiti-gold-500';
+                    }
+                    if (checkIcon) checkIcon.classList.remove('opacity-0');
+                } else {
+                    card.className = 'nivel-card relative flex flex-col justify-between p-4 rounded-xl border-2 transition-all cursor-pointer select-none border-athens-gray-200 dark:border-athens-gray-800 bg-white dark:bg-athens-gray-900 hover:border-athens-gray-300 dark:hover:border-athens-gray-700';
+                    check.className = 'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors border-athens-gray-300 dark:border-athens-gray-700 bg-transparent';
+                    if (checkIcon) checkIcon.classList.add('opacity-0');
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const radioChecked = document.querySelector('input[name="nivel"]:checked');
             const nivelInicial = radioChecked ? radioChecked.value : '{{ old('nivel', $usuario->nivel) }}';
             selecionarNivel(nivelInicial);
         });
+        @endif
+
+        @if($currentUser->isSuperAdmin())
+        document.addEventListener('DOMContentLoaded', () => {
+            const estadoSelect = document.getElementById('estado_id');
+            const cidadeSelect = document.getElementById('cidade_id');
+
+            if (!estadoSelect || !cidadeSelect) return;
+
+            estadoSelect.addEventListener('change', function () {
+                const estadoId = this.value;
+                cidadeSelect.innerHTML = '';
+
+                if (!estadoId) {
+                    cidadeSelect.disabled = true;
+                    cidadeSelect.innerHTML = '<option value="">Selecione o estado primeiro...</option>';
+                    return;
+                }
+
+                cidadeSelect.disabled = true;
+                cidadeSelect.innerHTML = '<option value="">Carregando municípios...</option>';
+
+                fetch(`/localidades/estados/${estadoId}/cidades`)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Falha na resposta da rede');
+                        return response.json();
+                    })
+                    .then(cidades => {
+                        cidadeSelect.innerHTML = '<option value="">Selecione o município...</option>';
+                        if (Array.isArray(cidades) && cidades.length > 0) {
+                            cidades.forEach(c => {
+                                const opt = document.createElement('option');
+                                opt.value = c.id;
+                                opt.textContent = c.nome;
+                                cidadeSelect.appendChild(opt);
+                            });
+                            cidadeSelect.disabled = false;
+                        } else {
+                            cidadeSelect.innerHTML = '<option value="">Nenhum município cadastrado</option>';
+                            cidadeSelect.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar cidades:', error);
+                        cidadeSelect.innerHTML = '<option value="">Erro ao carregar municípios</option>';
+                        cidadeSelect.disabled = false;
+                    });
+            });
+        });
+        @endif
     </script>
 </x-layouts.app>

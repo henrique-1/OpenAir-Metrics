@@ -3,6 +3,7 @@
 use App\Models\Bairro;
 use App\Models\Cidade;
 use App\Models\Estacao;
+use App\Models\Patrimonio;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -259,4 +260,100 @@ test('instalador nao pode solicitar substituicao de sensores retornando 403', fu
     ]);
 
     $response->assertForbidden();
+});
+
+test('ao substituir sensor da estacao o patrimonio anterior e marcado como descartado e o novo como instalada', function () {
+    $cidade = Cidade::factory()->create();
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $planejador = User::factory()->create(['nivel' => 'planejador', 'cidade_id' => $cidade->id]);
+
+    $patrimonioAntigo = Patrimonio::factory()->create([
+        'cidade_id' => $cidade->id,
+        'status' => 'Instalada',
+        'mac_address' => '11:22:33:44:55:66',
+        'numero_patrimonio' => 'PAT-OLD-01',
+    ]);
+
+    $patrimonioNovo = Patrimonio::factory()->create([
+        'cidade_id' => $cidade->id,
+        'status' => 'Disponível',
+        'mac_address' => 'AA:BB:CC:DD:EE:FF',
+        'numero_patrimonio' => 'PAT-NEW-02',
+    ]);
+
+    $estacao = Estacao::factory()->create([
+        'bairro_id' => $bairro->id,
+        'patrimonio_id' => $patrimonioAntigo->private_id,
+        'mac_address' => $patrimonioAntigo->mac_address,
+        'status_instalacao' => 'Instalada',
+        'data_instalacao' => Carbon::now()->subYears(5),
+        'solicitacao_substituicao' => true,
+        'motivo_substituicao' => 'Sensores vencidos',
+    ]);
+
+    $response = $this->actingAs($planejador)->post(route('estacoes.substituir-sensor', $estacao->public_id), [
+        'patrimonio_id' => $patrimonioNovo->private_id,
+    ]);
+
+    $response->assertRedirect(route('estacoes.index'));
+    $response->assertSessionHas('success');
+
+    $patrimonioAntigo->refresh();
+    $patrimonioNovo->refresh();
+    $estacao->refresh();
+
+    // Regra: o status do patrimônio anterior deve ser alterado para Descartado
+    expect($patrimonioAntigo->status)->toBe('Descartado');
+    // Novo patrimônio passa a ser 'Instalada'
+    expect($patrimonioNovo->status)->toBe('Instalada');
+    // Estação vinculada ao novo patrimônio e com solicitação limpa
+    expect($estacao->patrimonio_id)->toBe($patrimonioNovo->private_id);
+    expect($estacao->mac_address)->toBe($patrimonioNovo->mac_address);
+    expect($estacao->solicitacao_substituicao)->toBeFalse();
+    expect($estacao->motivo_substituicao)->toBeNull();
+});
+
+test('ao vincular novo patrimonio em estacao existente via ordem de instalacao o patrimonio antigo torna-se descartado', function () {
+    $cidade = Cidade::factory()->create();
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $instalador = User::factory()->create(['nivel' => 'instalador', 'cidade_id' => $cidade->id]);
+
+    $patrimonioAntigo = Patrimonio::factory()->create([
+        'cidade_id' => $cidade->id,
+        'status' => 'Instalada',
+        'mac_address' => 'AA:11:22:33:44:55',
+    ]);
+
+    $patrimonioNovo = Patrimonio::factory()->create([
+        'cidade_id' => $cidade->id,
+        'status' => 'Disponível',
+        'mac_address' => 'BB:11:22:33:44:55',
+    ]);
+
+    $estacao = Estacao::factory()->create([
+        'bairro_id' => $bairro->id,
+        'patrimonio_id' => $patrimonioAntigo->private_id,
+        'mac_address' => $patrimonioAntigo->mac_address,
+        'status_instalacao' => 'Planejada',
+        'solicitacao_substituicao' => true,
+    ]);
+
+    $response = $this->actingAs($instalador)->postJson(route('instalacoes.vincular-mac', $estacao->public_id), [
+        'patrimonio_id' => $patrimonioNovo->public_id,
+    ]);
+
+    $response->assertOk();
+    $response->assertJson(['success' => true]);
+
+    $patrimonioAntigo->refresh();
+    $patrimonioNovo->refresh();
+    $estacao->refresh();
+
+    // Patrimônio anterior torna-se Descartado
+    expect($patrimonioAntigo->status)->toBe('Descartado');
+    // Novo torna-se Instalada
+    expect($patrimonioNovo->status)->toBe('Instalada');
+    // Estação atualizada
+    expect($estacao->patrimonio_id)->toBe($patrimonioNovo->private_id);
+    expect($estacao->solicitacao_substituicao)->toBeFalse();
 });

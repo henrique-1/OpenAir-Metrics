@@ -129,22 +129,25 @@ test('usuario pode cadastrar multiplos patrimonios em lote com codigos sequencia
     ]);
 });
 
-test('usuario pode excluir um patrimonio nao vinculado', function () {
-    $user = User::factory()->create();
-    $patrimonio = Patrimonio::factory()->create(['created_by' => $user->id]);
+test('ao excluir patrimonio status e alterado para descartado e registro e mantido no banco', function () {
+    $user = User::factory()->create(['nivel' => 'planejador']);
+    $patrimonio = Patrimonio::factory()->create(['cidade_id' => $user->cidade_id, 'created_by' => $user->id]);
 
     $response = $this->actingAs($user)->delete(route('patrimonios.destroy', $patrimonio->private_id));
 
     $response->assertRedirect(route('patrimonios.index'));
     $response->assertSessionHas('success');
 
-    $this->assertDatabaseMissing('patrimonios', ['private_id' => $patrimonio->private_id]);
+    $this->assertDatabaseHas('patrimonios', [
+        'private_id' => $patrimonio->private_id,
+        'status' => 'Descartado',
+    ]);
 });
 
 test('endpoint de patrimonios disponiveis retorna apenas status disponivel', function () {
     $user = User::factory()->create();
     Patrimonio::factory()->create(['status' => 'Disponível', 'mac_address' => '00:11:22:33:44:55']);
-    Patrimonio::factory()->create(['status' => 'Instalado', 'mac_address' => '00:11:22:33:44:66']);
+    Patrimonio::factory()->create(['status' => 'Instalada', 'mac_address' => '00:11:22:33:44:66']);
 
     $response = $this->actingAs($user)->getJson(route('patrimonios.disponiveis'));
 
@@ -168,7 +171,7 @@ test('listagem de patrimonios permite busca, filtros e ordenacao', function () {
     Patrimonio::factory()->create([
         'mac_address' => 'DD:EE:FF:44:55:66',
         'numero_patrimonio' => 'PAT-002',
-        'status' => 'Manutenção',
+        'status' => 'Descartado',
         'created_by' => $user->id,
     ]);
 
@@ -179,7 +182,7 @@ test('listagem de patrimonios permite busca, filtros e ordenacao', function () {
     $responseBusca->assertDontSee('PAT-002');
 
     // Filtro por status
-    $responseStatus = $this->actingAs($user)->get(route('patrimonios.index', ['status' => 'Manutenção']));
+    $responseStatus = $this->actingAs($user)->get(route('patrimonios.index', ['status' => 'Descartado']));
     $responseStatus->assertOk();
     $responseStatus->assertSee('PAT-002');
     $responseStatus->assertDontSee('PAT-001');
@@ -190,7 +193,7 @@ test('listagem de patrimonios permite busca, filtros e ordenacao', function () {
     $responseSort->assertSeeInOrder(['PAT-002', 'PAT-001']);
 });
 
-test('patrimonio muda status para instalado e exibe instalada na listagem quando ativado na ordem de instalacao', function () {
+test('patrimonio muda status para instalada e exibe instalada na listagem quando ativado na ordem de instalacao', function () {
     $instalador = User::factory()->create(['nivel' => 'instalador']);
     $patrimonio = Patrimonio::factory()->create([
         'mac_address' => 'AA:BB:CC:99:88:77',
@@ -215,7 +218,7 @@ test('patrimonio muda status para instalado e exibe instalada na listagem quando
     $response->assertJson(['success' => true]);
 
     $patrimonio->refresh();
-    expect($patrimonio->status)->toBe('Instalado');
+    expect($patrimonio->status)->toBe('Instalada');
 
     // Verifica que a listagem de patrimônio renderiza a badge "Instalada"
     $responseIndex = $this->actingAs($instalador)->get(route('patrimonios.index'));

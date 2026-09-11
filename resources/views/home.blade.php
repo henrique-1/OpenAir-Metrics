@@ -20,6 +20,13 @@
             .layer-option input[type="radio"]:checked + div .font-medium {
                 color: var(--color-blue-dianne-900);
             }
+
+            /* Garante que o canvas do WebGL Heatmap nunca capture ou bloqueie eventos de clique no mapa */
+            canvas[id^="webgl-leaflet-"],
+            .leaflet-pane > canvas,
+            .leaflet-overlay-pane canvas {
+                pointer-events: none !important;
+            }
         </style>
     @endpush
 
@@ -94,7 +101,7 @@
     </div>
 
     @push('scripts')
-        <script type="module">
+        <script>
             // Função global anexada à janela para permitir o fechamento do Pin via HTML onClick
             window.removeClickMarker = function() {
                 if (window.clickMarker) {
@@ -103,103 +110,364 @@
                 }
             };
 
-            // Função auxiliar para converter o seu dicionário de gradientes em uma Textura (Canvas) compatível com WebGL
-            function createGradientTexture(gradientObj) {
-                const canvas = document.createElement('canvas');
-                canvas.width = 256;
-                canvas.height = 1;
-                const ctx = canvas.getContext('2d');
-                const gradient = ctx.createLinearGradient(0, 0, 256, 0);
-                
-                for (const [stop, color] of Object.entries(gradientObj)) {
-                    gradient.addColorStop(parseFloat(stop), color);
+            // Definição das escalas e paradas de cores unificadas para cada camada
+            const layerColorStops = {
+                'iqa': [
+                    { val: 0, color: [46, 204, 113] },     // Boa (#2ecc71)
+                    { val: 48, color: [46, 204, 113] },
+                    { val: 52, color: [241, 196, 15] },    // Moderada (#f1c40f)
+                    { val: 98, color: [241, 196, 15] },
+                    { val: 102, color: [230, 126, 34] },   // Insalubre (#e67e22)
+                    { val: 148, color: [230, 126, 34] },
+                    { val: 152, color: [231, 76, 60] },    // Perigoso (#e74c3c)
+                    { val: 198, color: [231, 76, 60] },
+                    { val: 202, color: [142, 68, 173] },   // Péssima (#8e44ad)
+                    { val: 400, color: [67, 17, 12] }      // Extrema (#43110c)
+                ],
+                'temperatura': [
+                    { val: -20, color: [80, 131, 167] },   // Azul frio (#5083a7)
+                    { val: -10, color: [222, 250, 233] },  // Azul gelo esbranquiçado (#defae9)
+                    { val: 0, color: [139, 234, 179] },    // Verde água (#8beab3)
+                    { val: 10, color: [46, 204, 113] },    // Verde suave (#2ecc71)
+                    { val: 20, color: [241, 196, 15] },    // Amarelo (#f1c40f)
+                    { val: 30, color: [230, 126, 34] },    // Laranja (#e67e22)
+                    { val: 40, color: [231, 76, 60] }      // Vermelho quente (#e74c3c)
+                ],
+                'umidade': [
+                    { val: 20, color: [231, 76, 60] },     // Vermelho seco (#e74c3c)
+                    { val: 35, color: [230, 126, 34] },    // Laranja atenção (#e67e22)
+                    { val: 50, color: [241, 196, 15] },    // Amarelo moderado (#f1c40f)
+                    { val: 70, color: [46, 204, 113] },    // Verde ideal (#2ecc71)
+                    { val: 85, color: [77, 163, 255] },    // Azul claro (#4da3ff)
+                    { val: 100, color: [21, 38, 86] }      // Azul marinho úmido (#152656)
+                ],
+                'pm': [
+                    { val: 0, color: [21, 38, 86] },       // Azul escuro (#152656)
+                    { val: 10, color: [77, 163, 255] },    // Azul claro (#4da3ff)
+                    { val: 25, color: [218, 235, 255] },   // Branco azulado (#daebff)
+                    { val: 50, color: [241, 196, 15] },    // Amarelo moderado (#f1c40f)
+                    { val: 100, color: [230, 126, 34] },   // Laranja insalubre (#e67e22)
+                    { val: 300, color: [231, 76, 60] },    // Vermelho crítico (#e74c3c)
+                    { val: 1000, color: [67, 17, 12] }     // Marrom extremo (#43110c)
+                ],
+                'co2': [
+                    { val: 0, color: [7, 44, 24] },        // Verde escuro (#072c18)
+                    { val: 200, color: [46, 204, 113] },   // Verde puro (#2ecc71)
+                    { val: 400, color: [222, 250, 233] },  // Verde claro (#defae9)
+                    { val: 600, color: [241, 196, 15] },   // Amarelo (#f1c40f)
+                    { val: 800, color: [230, 126, 34] },   // Laranja (#e67e22)
+                    { val: 1000, color: [231, 76, 60] },   // Vermelho (#e74c3c)
+                    { val: 1200, color: [67, 17, 12] }     // Marrom escuro (#43110c)
+                ]
+            };
+
+            function interpolateColor(val, stops) {
+                if (val <= stops[0].val) return stops[0].color;
+                if (val >= stops[stops.length - 1].val) return stops[stops.length - 1].color;
+
+                for (let i = 0; i < stops.length - 1; i++) {
+                    const s1 = stops[i];
+                    const s2 = stops[i + 1];
+                    if (val >= s1.val && val <= s2.val) {
+                        const t = (val - s1.val) / (s2.val - s1.val);
+                        return [
+                            Math.round(s1.color[0] + t * (s2.color[0] - s1.color[0])),
+                            Math.round(s1.color[1] + t * (s2.color[1] - s1.color[1])),
+                            Math.round(s1.color[2] + t * (s2.color[2] - s1.color[2]))
+                        ];
+                    }
                 }
-                
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 256, 1);
-                
-                // Retorna como DataURL para ser usado na engine WebGL
-                return canvas;
+                return stops[0].color;
             }
 
-            document.addEventListener('DOMContentLoaded', function () {
-                const fallbackLat = -21.967194;
-                const fallbackLng = -46.812740;
+            function getColorForValue(val, layerKey) {
+                const stops = layerColorStops[layerKey];
+                if (!stops) return [46, 204, 113];
+                return interpolateColor(val, stops);
+            }
 
-                // Garante que o Leaflet carregou via Vite
+            // Raio de busca adaptativo com base no nível de zoom:
+            // - Zoom <= 13 (visão macroscópica): 320m (mancha contida e precisa nos limites urbanos)
+            // - Zoom 14 (visão de bairros): 380m
+            // - Zoom 15 (visão de avenidas/corredores): 450m
+            // - Zoom >= 16 (visão microscópica de quarteirões): 500m (fusão contínua e suave sem "bolas")
+            function getAdaptiveSearchRadius(zoom, baseRadius = 320) {
+                if (zoom >= 16) return 500;
+                if (zoom === 15) return 450;
+                if (zoom === 14) return 380;
+                return baseRadius;
+            }
+
+            // Camada de Superfície Contínua IDW em Canvas nativo para o Leaflet
+            // Elimina o blending aditivo e saturações falsas, garantindo 100% de paridade com o popup e legenda
+            function definirIdwSurfaceLayer() {
+                if (L.IdwSurfaceLayer) return;
+
+                L.IdwSurfaceLayer = L.Layer.extend({
+                    options: {
+                        cellSize: 4,
+                        searchRadius: 320,
+                        opacity: 0.75
+                    },
+
+                    initialize: function (options) {
+                        L.setOptions(this, options);
+                        this._data = [];
+                        this._colorFn = null;
+                        this._bounds = null;
+                        this._redrawFrame = null;
+                    },
+
+                    onAdd: function (map) {
+                        this._map = map;
+                        if (!this._canvas) {
+                            this._initCanvas();
+                        }
+                        map.getPanes().overlayPane.appendChild(this._canvas);
+                        map.on('moveend zoomend resize', this._redraw, this);
+                        if (map.options.zoomAnimation && L.Browser.any3d) {
+                            map.on('zoomanim', this._animateZoom, this);
+                        }
+                        this._redraw();
+                    },
+
+                    onRemove: function (map) {
+                        if (this._redrawFrame) {
+                            cancelAnimationFrame(this._redrawFrame);
+                            this._redrawFrame = null;
+                        }
+                        if (this._canvas && this._canvas.parentNode) {
+                            this._canvas.parentNode.removeChild(this._canvas);
+                        }
+                        map.off('moveend zoomend resize', this._redraw, this);
+                        if (map.options.zoomAnimation && L.Browser.any3d) {
+                            map.off('zoomanim', this._animateZoom, this);
+                        }
+                    },
+
+                    setData: function (data, colorFn) {
+                        this._data = data || [];
+                        if (colorFn) this._colorFn = colorFn;
+                        this._redraw();
+                    },
+
+                    _initCanvas: function () {
+                        this._canvas = L.DomUtil.create('canvas', 'leaflet-idw-surface-layer leaflet-zoom-animated');
+                        this._canvas.style.position = 'absolute';
+                        this._canvas.style.pointerEvents = 'none';
+                        this._ctx = this._canvas.getContext('2d');
+                    },
+
+                    _animateZoom: function (e) {
+                        if (!this._canvas || !this._bounds) return;
+                        const scale = this._map.getZoomScale(e.zoom);
+                        const offset = this._map._latLngBoundsToNewLayerBounds(this._bounds, e.zoom, e.center).min;
+                        L.DomUtil.setTransform(this._canvas, offset, scale);
+                    },
+
+                    _redraw: function () {
+                        if (this._redrawFrame) {
+                            cancelAnimationFrame(this._redrawFrame);
+                        }
+                        this._redrawFrame = requestAnimationFrame(() => {
+                            this._render();
+                            this._redrawFrame = null;
+                        });
+                    },
+
+                    _render: function () {
+                        if (!this._map || !this._canvas || !this._ctx) return;
+                        if (!this._data || this._data.length === 0 || !this._colorFn) {
+                            this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+                            return;
+                        }
+
+                        const map = this._map;
+                        const size = map.getSize();
+                        if (size.x === 0 || size.y === 0) return;
+
+                        this._bounds = map.getBounds();
+
+                        const topLeft = map.containerPointToLayerPoint([0, 0]);
+                        L.DomUtil.setPosition(this._canvas, topLeft);
+
+                        if (this._canvas.width !== size.x || this._canvas.height !== size.y) {
+                            this._canvas.width = size.x;
+                            this._canvas.height = size.y;
+                        } else {
+                            this._ctx.clearRect(0, 0, size.x, size.y);
+                        }
+
+                        const centerLatLng = map.getCenter();
+                        const currentZoom = map.getZoom();
+                        const baseRadiusMeters = this.options.searchRadius || 320;
+                        const searchRadiusMeters = getAdaptiveSearchRadius(currentZoom, baseRadiusMeters);
+                        const latOffset = (searchRadiusMeters / 111320);
+                        const p1 = map.latLngToContainerPoint(centerLatLng);
+                        const p2 = map.latLngToContainerPoint(L.latLng(centerLatLng.lat + latOffset, centerLatLng.lng));
+                        const radiusPixels = Math.max(Math.abs(p1.y - p2.y), 15);
+
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        const points = [];
+                        for (let i = 0; i < this._data.length; i++) {
+                            const pt = this._data[i];
+                            if (pt.lat == null || pt.lng == null || pt.value == null || isNaN(pt.value)) continue;
+                            const ptContainer = map.latLngToContainerPoint([pt.lat, pt.lng]);
+                            if (ptContainer.x >= -radiusPixels && ptContainer.x <= size.x + radiusPixels &&
+                                ptContainer.y >= -radiusPixels && ptContainer.y <= size.y + radiusPixels) {
+                                points.push({
+                                    x: ptContainer.x,
+                                    y: ptContainer.y,
+                                    val: Number(pt.value)
+                                });
+                                if (ptContainer.x < minX) minX = ptContainer.x;
+                                if (ptContainer.x > maxX) maxX = ptContainer.x;
+                                if (ptContainer.y < minY) minY = ptContainer.y;
+                                if (ptContainer.y > maxY) maxY = ptContainer.y;
+                            }
+                        }
+
+                        if (points.length === 0) {
+                            this._ctx.clearRect(0, 0, size.x, size.y);
+                            return;
+                        }
+
+                        // Resolução dinâmica adaptada ao nível de zoom para manter altíssimo FPS
+                        const baseCellSize = this.options.cellSize || 4;
+                        const cellSize = currentZoom >= 16 ? Math.max(baseCellSize, 6) : (currentZoom >= 14 ? Math.max(baseCellSize, 5) : baseCellSize);
+
+                        const gridW = Math.ceil(size.x / cellSize);
+                        const gridH = Math.ceil(size.y / cellSize);
+
+                        if (!this._offCanvas) {
+                            this._offCanvas = document.createElement('canvas');
+                        }
+                        if (this._offCanvas.width !== gridW || this._offCanvas.height !== gridH) {
+                            this._offCanvas.width = gridW;
+                            this._offCanvas.height = gridH;
+                        }
+                        const offCtx = this._offCanvas.getContext('2d');
+                        const imgData = offCtx.createImageData(gridW, gridH);
+                        const data32 = new Uint32Array(imgData.data.buffer);
+
+                        const r2 = radiusPixels * radiusPixels;
+                        const invRadius = 1 / radiusPixels;
+                        const baseOpacity = this.options.opacity || 0.75;
+                        const colorFn = this._colorFn;
+
+                        const startGx = Math.max(0, Math.floor((minX - radiusPixels) / cellSize));
+                        const endGx = Math.min(gridW - 1, Math.ceil((maxX + radiusPixels) / cellSize));
+                        const startGy = Math.max(0, Math.floor((minY - radiusPixels) / cellSize));
+                        const endGy = Math.min(gridH - 1, Math.ceil((maxY + radiusPixels) / cellSize));
+
+                        for (let gy = startGy; gy <= endGy; gy++) {
+                            const py = gy * cellSize + cellSize / 2;
+                            const rowOffset = gy * gridW;
+
+                            for (let gx = startGx; gx <= endGx; gx++) {
+                                const px = gx * cellSize + cellSize / 2;
+
+                                let num = 0;
+                                let den = 0;
+                                let minD2 = Infinity;
+
+                                for (let p = 0; p < points.length; p++) {
+                                    const pt = points[p];
+                                    const dx = px - pt.x;
+                                    if (dx > radiusPixels || dx < -radiusPixels) continue;
+                                    const dy = py - pt.y;
+                                    if (dy > radiusPixels || dy < -radiusPixels) continue;
+
+                                    const d2 = dx * dx + dy * dy;
+                                    if (d2 < r2) {
+                                        const dist = Math.sqrt(d2);
+                                        const u = dist * invRadius; // Distância normalizada no intervalo [0, 1)
+                                        const oneMinusU = 1.0 - u;
+
+                                        // Método de Shepard Modificado com suporte compacto:
+                                        // O peso atinge exatamente 0 na borda do raio com derivada zero (C1 suave),
+                                        // eliminando 100% dos arcos circulares e cortes bruscos entre sensores vizinhos.
+                                        const w = (oneMinusU * oneMinusU) / Math.max(u, 0.005);
+                                        num += pt.val * w;
+                                        den += w;
+
+                                        if (d2 < minD2) {
+                                            minD2 = d2;
+                                        }
+                                    }
+                                }
+
+                                if (den > 0) {
+                                    const interpolatedVal = num / den;
+                                    const rgb = colorFn(interpolatedVal);
+
+                                    const distRatio = Math.min(1.0, Math.sqrt(minD2) * invRadius);
+                                    // Transição suave de opacidade (Hermite Smoothstep) apenas nas bordas externas do cluster.
+                                    // Abaixo de 55% do raio (zona de sobreposição entre sensores a até 200m), a opacidade permanece sólida (sem afundar no meio).
+                                    const edgeFade = distRatio > 0.55 ? Math.max(0, 1.0 - Math.pow((distRatio - 0.55) / 0.45, 2)) : 1.0;
+                                    const alpha = Math.max(0, Math.min(255, Math.round(baseOpacity * edgeFade * 255)));
+
+                                    data32[rowOffset + gx] = (alpha << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0];
+                                }
+                            }
+                        }
+
+                        offCtx.putImageData(imgData, 0, 0);
+
+                        this._ctx.clearRect(0, 0, size.x, size.y);
+                        this._ctx.imageSmoothingEnabled = true;
+                        this._ctx.imageSmoothingQuality = 'high';
+                        this._ctx.drawImage(this._offCanvas, 0, 0, gridW, gridH, 0, 0, size.x, size.y);
+                    }
+                });
+
+                L.idwSurfaceLayer = function (options) {
+                    return new L.IdwSurfaceLayer(options);
+                };
+            }
+
+            function inicializarMapa() {
                 if (typeof L === 'undefined') {
-                    console.error("Leaflet (L) não encontrado. Verifique se o app.js foi compilado e importado.");
+                    setTimeout(inicializarMapa, 50);
                     return;
                 }
 
-                // Salva o mapa no escopo global (window) para facilitar o fechamento do Pin
-                const map = L.map('air-quality-map', { zoomControl: false }).setView([fallbackLat, fallbackLng], 13);
+                definirIdwSurfaceLayer();
+
+                const fallbackLat = {{ $centroMapa['lat'] ?? -21.967194 }};
+                const fallbackLng = {{ $centroMapa['lng'] ?? -46.812740 }};
+                const initialZoom = {{ $centroMapa['zoom'] ?? 13 }};
+
+                const map = L.map('air-quality-map', { zoomControl: false }).setView([fallbackLat, fallbackLng], initialZoom);
                 window.leafletMap = map; 
                 window.clickMarker = null;
-                let currentLayerKey = 'iqa'; // Armazena a camada ativa atual
+                let currentLayerKey = 'iqa';
                 let currentHeatmapLayer = null;
+                const searchRadiusMeters = 320;
 
                 L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
                     maxZoom: 16, minZoom: 3,
                     attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>, Tiles style by Humanitarian OpenStreetMap Team hosted by OpenStreetMap France'
                 }).addTo(map);
 
-                // Dicionário com os GRADIENTES ATUALIZADOS e os Dados
+                // Dicionário das Camadas e Dados
                 const mapLayersData = {
                     'iqa': {
                         name: 'Qualidade do Ar (IQA)',
                         icon: `<x-heroicon-o-globe-americas class="w-3.5 h-3.5" />`,
                         type: 'segments',
                         unit: 'IQA',
+                        searchRadius: searchRadiusMeters,
                         segments: [
-                            { text: 'Bom', color: '#2ecc71' }, 
-                            { text: 'Moderado', color: '#f1c40f' }, 
+                            { text: 'Boa', color: '#2ecc71' }, 
+                            { text: 'Moderada', color: '#f1c40f' }, 
                             { text: 'Insalubre', color: '#e67e22' }, 
-                            { text: 'Perigoso', color: '#e74c3c' }
+                            { text: 'Perigoso', color: '#e74c3c' },
+                            { text: 'Péssima', color: '#8e44ad' },
+                            { text: 'Extrema', color: '#43110c' }
                         ],
-                        config: {
-                            size: 310,
-                            gradient: { '0.0': '#2ecc71', '0.125': '#2ecc71', '0.25': '#f1c40f', '0.75': '#e67e22', '0.85': '#e74c3c', '1.0': '#43110c' }
-                        },
                         data: { 
-                            min: 0, max: 400, 
-                            data: [
-                                // Av. Dr. Durval Nicolau
-                                { lat: -21.969051, lng: -46.749774, value: 42 },
-                                { lat: -21.968894, lng: -46.751707, value: 57 },
-                                { lat: -21.968737, lng: -46.753640, value: 88 },
-                                { lat: -21.968565, lng: -46.755572, value: 104 },
-                                { lat: -21.968387, lng: -46.757503, value: 112 },
-                                { lat: -21.968155, lng: -46.759428, value: 135 },
-                                { lat: -21.968713, lng: -46.761080, value: 140 },
-                                { lat: -21.969963, lng: -46.762473, value: 165 },
-                                { lat: -21.971356, lng: -46.763704, value: 172 },
-                                { lat: -21.972155, lng: -46.765432, value: 158 },
-                                { lat: -21.972603, lng: -46.767232, value: 181 },
-                                { lat: -21.972259, lng: -46.769136, value: 195 },
-
-                                // Rua Maria de Lourdes Peixoto, Rua Haig Moussessian, Rua Romeu Nhola
-                                { lat: -21.975122, lng: -46.766432, value: 115 },
-                                { lat: -21.974648, lng: -46.764561, value: 92 },
-                                { lat: -21.974054, lng: -46.762233, value: 78 },
-
-                                // Av Dr. Oscar Pirajá Martins
-                                { lat: -21.976250, lng: -46.781424, value: 64 },
-                                { lat: -21.972789, lng: -46.785642, value: 49 },
-                                { lat: -21.970162, lng: -46.788254, value: 81 },
-                                { lat: -21.966977, lng: -46.790109, value: 122 }, 
-                                { lat: -21.964072, lng: -46.791691, value: 147 },
-
-                                // Av. Rodrigues Alves
-                                { lat: -21.963174, lng: -46.784563, value: 103 }, 
-                                { lat: -21.963807, lng: -46.788247, value: 95 },
-                                { lat: -21.963623, lng: -46.795263, value: 130 },
-                                { lat: -21.962540, lng: -46.797410, value: 168 },
-                                
-                                // Av. Racticliff
-                                { lat: -21.959941, lng: -46.799577, value: 188 },
-                                { lat: -21.958552, lng: -46.802201, value: 155 }
-                            ]
+                            data: @json($dadosIqa ?? [])
                         }
                     },
                     'temperatura': {
@@ -207,54 +475,13 @@
                         icon: `<x-heroicon-o-sun class="w-3.5 h-3.5" />`,
                         type: 'continuous',
                         unit: '°C',
+                        searchRadius: searchRadiusMeters,
                         legend: [
-                            { val: -20, pos: 15 }, { val: -10, pos: 28 }, { val: 0,   pos: 42 },
-                            { val: 10,  pos: 56 }, { val: 20,  pos: 70 }, { val: 30,  pos: 84 }, { val: 40,  pos: 95 }
+                            { val: -20, pos: 10 }, { val: -10, pos: 25 }, { val: 0,   pos: 40 },
+                            { val: 10,  pos: 55 }, { val: 20,  pos: 70 }, { val: 30,  pos: 85 }, { val: 40,  pos: 95 }
                         ],
-                        config: {
-                            size: 310,
-                            gradient: { '0.0': '#5083a7', '0.16': '#defae9', '0.33': '#8beab3', '0.50': '#2ecc71', '0.66': '#f1c40f', '0.83': '#e67e22', '0.91': '#e74c3c', '1.0': '#43110c' }
-                        },
                         data: { 
-                            min: -20, max: 40, 
-                            data: [
-                                // Av. Dr. Durval Nicolau
-                                { lat: -21.969051, lng: -46.749774, value: 22.0 },
-                                { lat: -21.968894, lng: -46.751707, value: 22.5 },
-                                { lat: -21.968737, lng: -46.753640, value: 23.2 },
-                                { lat: -21.968565, lng: -46.755572, value: 24.1 },
-                                { lat: -21.968387, lng: -46.757503, value: 24.8 },
-                                { lat: -21.968155, lng: -46.759428, value: 25.5 },
-                                { lat: -21.968061, lng: -46.760219, value: 27 },
-                                { lat: -21.968713, lng: -46.761080, value: 26.0 },
-                                { lat: -21.969963, lng: -46.762473, value: 26.8 },
-                                { lat: -21.971356, lng: -46.763704, value: 27.5 },
-                                { lat: -21.972155, lng: -46.765432, value: 27.1 },
-                                { lat: -21.972603, lng: -46.767232, value: 28.3 },
-                                { lat: -21.972259, lng: -46.769136, value: 29.2 },
-
-                                // Rua Maria de Lourdes Peixoto, Rua Haig Moussessian, Rua Romeu Nhola
-                                { lat: -21.975122, lng: -46.766432, value: 25.2 },
-                                { lat: -21.974648, lng: -46.764561, value: 24.5 },
-                                { lat: -21.974054, lng: -46.762233, value: 23.8 },
-
-                                // Av Dr. Oscar Pirajá Martins
-                                { lat: -21.976250, lng: -46.781424, value: 23.1 },
-                                { lat: -21.972789, lng: -46.785642, value: 22.4 },
-                                { lat: -21.970162, lng: -46.788254, value: 24.0 },
-                                { lat: -21.966977, lng: -46.790109, value: 25.7 }, 
-                                { lat: -21.964072, lng: -46.791691, value: 26.9 },
-
-                                // Av. Rodrigues Alves
-                                { lat: -21.963174, lng: -46.784563, value: 24.8 }, 
-                                { lat: -21.963807, lng: -46.788247, value: 24.2 },
-                                { lat: -21.963623, lng: -46.795263, value: 26.1 },
-                                { lat: -21.962540, lng: -46.797410, value: 27.8 },
-                                
-                                // Av. Racticliff
-                                { lat: -21.959941, lng: -46.799577, value: 28.9 },
-                                { lat: -21.958552, lng: -46.802201, value: 27.4 }
-                            ]
+                            data: @json($dadosTemperatura ?? [])
                         }
                     },
                     'umidade': {
@@ -262,54 +489,13 @@
                         icon: `<x-heroicon-o-cloud class="w-3.5 h-3.5" />`,
                         type: 'continuous',
                         unit: '%',
+                        searchRadius: searchRadiusMeters,
                         legend: [
-                            { val: 30,  pos: 20 }, { val: 50,  pos: 40 }, { val: 80,  pos: 60 },
-                            { val: 90,  pos: 80 }, { val: 100, pos: 95 }
+                            { val: 20, pos: 15 }, { val: 35, pos: 35 }, { val: 50, pos: 55 },
+                            { val: 70, pos: 75 }, { val: 100, pos: 95 }
                         ],
-                        config: {
-                            size: 310,
-                            gradient: { '0.0': '#43110c', '0.14': '#e74c3c', '0.28': '#e67e22', '0.50': '#f1c40f', '0.71': '#2ecc71', '0.85': '#4da3ff', '1.0': '#152656' }
-                        },
                         data: { 
-                            min: 30, max: 100, 
-                            data: [
-                                // Av. Dr. Durval Nicolau
-                                { lat: -21.969051, lng: -46.749774, value: 78 },
-                                { lat: -21.968894, lng: -46.751707, value: 75 },
-                                { lat: -21.968737, lng: -46.753640, value: 71 },
-                                { lat: -21.968565, lng: -46.755572, value: 68 },
-                                { lat: -21.968387, lng: -46.757503, value: 65 },
-                                { lat: -21.968155, lng: -46.759428, value: 61 },
-                                { lat: -21.968061, lng: -46.760219, value: 60 },
-                                { lat: -21.968713, lng: -46.761080, value: 59 },
-                                { lat: -21.969963, lng: -46.762473, value: 55 },
-                                { lat: -21.971356, lng: -46.763704, value: 52 },
-                                { lat: -21.972155, lng: -46.765432, value: 54 },
-                                { lat: -21.972603, lng: -46.767232, value: 48 },
-                                { lat: -21.972259, lng: -46.769136, value: 42 },
-
-                                // Rua Maria de Lourdes Peixoto, Rua Haig Moussessian, Rua Romeu Nhola
-                                { lat: -21.975122, lng: -46.766432, value: 62 },
-                                { lat: -21.974648, lng: -46.764561, value: 66 },
-                                { lat: -21.974054, lng: -46.762233, value: 69 },
-
-                                // Av Dr. Oscar Pirajá Martins
-                                { lat: -21.976250, lng: -46.781424, value: 72 },
-                                { lat: -21.972789, lng: -46.785642, value: 76 },
-                                { lat: -21.970162, lng: -46.788254, value: 68 },
-                                { lat: -21.966977, lng: -46.790109, value: 60 }, 
-                                { lat: -21.964072, lng: -46.791691, value: 55 },
-
-                                // Av. Rodrigues Alves
-                                { lat: -21.963174, lng: -46.784563, value: 65 }, 
-                                { lat: -21.963807, lng: -46.788247, value: 67 },
-                                { lat: -21.963623, lng: -46.795263, value: 58 },
-                                { lat: -21.962540, lng: -46.797410, value: 50 },
-                                
-                                // Av. Racticliff
-                                { lat: -21.959941, lng: -46.799577, value: 45 },
-                                { lat: -21.958552, lng: -46.802201, value: 52 }
-                            ]
+                            data: @json($dadosUmidade ?? [])
                         }
                     },
                     'pm': {
@@ -317,133 +503,47 @@
                         icon: `<x-heroicon-o-shield-exclamation class="w-3.5 h-3.5" />`,
                         type: 'continuous',
                         unit: 'µg/m³',
+                        searchRadius: searchRadiusMeters,
                         legend: [
-                            { val: 0,    pos: 15 }, { val: 10,   pos: 35 }, { val: 20,   pos: 55 },
-                            { val: 100,  pos: 75 }, { val: 1000, pos: 95 }
+                            { val: 0,    pos: 12 }, { val: 10,   pos: 28 }, { val: 25,   pos: 46 },
+                            { val: 50,   pos: 65 }, { val: 100,  pos: 82 }, { val: 500,  pos: 95 }
                         ],
-                        config: {
-                            size: 310,
-                            gradient: { '0.0': '#152656', '0.01': '#4da3ff', '0.02': '#daebff', '0.05': '#f1c40f', '0.1': '#e67e22', '0.5': '#e74c3c', '1.0': '#43110c'}
-                        },
                         data: { 
-                            min: 0, max: 1000, 
-                            data: [
-                                // Av. Dr. Durval Nicolau
-                                { lat: -21.969051, lng: -46.749774, value: 12 },
-                                { lat: -21.968894, lng: -46.751707, value: 28 },
-                                { lat: -21.968737, lng: -46.753640, value: 45 },
-                                { lat: -21.968565, lng: -46.755572, value: 75 },
-                                { lat: -21.968387, lng: -46.757503, value: 110 },
-                                { lat: -21.968155, lng: -46.759428, value: 155 },
-                                { lat: -21.968061, lng: -46.760219, value: 170 },
-                                { lat: -21.968713, lng: -46.761080, value: 180 },
-                                { lat: -21.969963, lng: -46.762473, value: 240 },
-                                { lat: -21.971356, lng: -46.763704, value: 290 },
-                                { lat: -21.972155, lng: -46.765432, value: 260 },
-                                { lat: -21.972603, lng: -46.767232, value: 340 },
-                                { lat: -21.972259, lng: -46.769136, value: 410 },
-
-                                // Rua Maria de Lourdes Peixoto, Rua Haig Moussessian, Rua Romeu Nhola
-                                { lat: -21.975122, lng: -46.766432, value: 165 },
-                                { lat: -21.974648, lng: -46.764561, value: 120 },
-                                { lat: -21.974054, lng: -46.762233, value: 85 },
-
-                                // Av Dr. Oscar Pirajá Martins
-                                { lat: -21.976250, lng: -46.781424, value: 55 },
-                                { lat: -21.972789, lng: -46.785642, value: 30 },
-                                { lat: -21.970162, lng: -46.788254, value: 95 },
-                                { lat: -21.966977, lng: -46.790109, value: 175 }, 
-                                { lat: -21.964072, lng: -46.791691, value: 215 },
-
-                                // Av. Rodrigues Alves
-                                { lat: -21.963174, lng: -46.784563, value: 130 }, 
-                                { lat: -21.963807, lng: -46.788247, value: 110 },
-                                { lat: -21.963623, lng: -46.795263, value: 195 },
-                                { lat: -21.962540, lng: -46.797410, value: 280 },
-                                
-                                // Av. Racticliff
-                                { lat: -21.959941, lng: -46.799577, value: 390 },
-                                { lat: -21.958552, lng: -46.802201, value: 245 }
-                            ]
+                            data: @json($dadosPm ?? [])
                         }
                     },
                     'co2': {
-                        name: 'Óxido de Carbono (CO)',
+                        name: 'Dióxido de Carbono (CO₂)',
                         icon: `<x-heroicon-o-building-office-2 class="w-3.5 h-3.5" />`,
                         type: 'continuous',
                         unit: 'ppm',
+                        searchRadius: searchRadiusMeters,
                         legend: [
-                            { val: 0,    pos: 20}, { val: 50,   pos: 40 }, { val: 100,  pos: 60 },
-                            { val: 500,  pos: 80 }, { val: 1200, pos: 95 }
+                            { val: 0,    pos: 12 }, { val: 200,  pos: 28 }, { val: 400,  pos: 46 },
+                            { val: 600,  pos: 64 }, { val: 800,  pos: 80 }, { val: 1200, pos: 95 }
                         ],
-                        config: {
-                            size: 310,
-                            gradient: {
-                                '0.0': '#072c18',
-                                '0.04': '#2ecc71',
-                                '0.08': '#defae9',
-                                '0.20': '#f1c40f',
-                                '0.41': '#e67e22',
-                                '0.70': '#e74c3c',
-                                '1.0': '#43110c'
-                            }
-                        },
                         data: { 
-                            min: 0, max: 1200, 
-                            data: [
-                                // Av. Dr. Durval Nicolau
-                                { lat: -21.969051, lng: -46.749774, value: 45 },
-                                { lat: -21.968894, lng: -46.751707, value: 90 },
-                                { lat: -21.968737, lng: -46.753640, value: 160 },
-                                { lat: -21.968565, lng: -46.755572, value: 240 },
-                                { lat: -21.968387, lng: -46.757503, value: 310 },
-                                { lat: -21.968155, lng: -46.759428, value: 420 },
-                                { lat: -21.968061, lng: -46.760219, value: 460 },
-                                { lat: -21.968713, lng: -46.761080, value: 480 },
-                                { lat: -21.969963, lng: -46.762473, value: 590 },
-                                { lat: -21.971356, lng: -46.763704, value: 680 },
-                                { lat: -21.972155, lng: -46.765432, value: 610 },
-                                { lat: -21.972603, lng: -46.767232, value: 770 },
-                                { lat: -21.972259, lng: -46.769136, value: 920 },
-
-                                // Rua Maria de Lourdes Peixoto, Rua Haig Moussessian, Rua Romeu Nhola
-                                { lat: -21.975122, lng: -46.766432, value: 450 },
-                                { lat: -21.974648, lng: -46.764561, value: 320 },
-                                { lat: -21.974054, lng: -46.762233, value: 210 },
-
-                                // Av Dr. Oscar Pirajá Martins
-                                { lat: -21.976250, lng: -46.781424, value: 140 },
-                                { lat: -21.972789, lng: -46.785642, value: 85 },
-                                { lat: -21.970162, lng: -46.788254, value: 250 },
-                                { lat: -21.966977, lng: -46.790109, value: 410 }, 
-                                { lat: -21.964072, lng: -46.791691, value: 520 },
-
-                                // Av. Rodrigues Alves
-                                { lat: -21.963174, lng: -46.784563, value: 340 }, 
-                                { lat: -21.963807, lng: -46.788247, value: 290 },
-                                { lat: -21.963623, lng: -46.795263, value: 470 },
-                                { lat: -21.962540, lng: -46.797410, value: 650 },
-                                
-                                // Av. Racticliff
-                                { lat: -21.959941, lng: -46.799577, value: 850 },
-                                { lat: -21.958552, lng: -46.802201, value: 620 }
-                            ]
+                            data: @json($dadosCo2 ?? [])
                         }
                     }
                 };
 
                 // Lógica de Ponderação IDW (Interpolação de valores entre os Sensores)
-                function getInterpolatedValue(lat, lng, layerKey) {
+                function getInterpolatedData(lat, lng, layerKey) {
                     const layerInfo = mapLayersData[layerKey];
+                    if (!layerInfo || !layerInfo.data || !layerInfo.data.data) return null;
                     const dataPoints = layerInfo.data.data;
                     
-                    // O 'size' configurado na camada representa o diâmetro total em metros.
-                    // O limite visual real (onde o gradiente acaba) é exatamente o raio (size / 2).
-                    const visualDiameter = layerInfo.config.size || 200;
-                    const searchRadius = visualDiameter / 2; 
+                    const currentZoom = (window.leafletMap && typeof window.leafletMap.getZoom === 'function') 
+                        ? window.leafletMap.getZoom() 
+                        : 14;
+                    const baseRadius = layerInfo.searchRadius || searchRadiusMeters || 320;
+                    const searchRadius = getAdaptiveSearchRadius(currentZoom, baseRadius);
 
                     let numerator = 0;
                     let denominator = 0;
+                    let nearestPt = null;
+                    let minDistance = Infinity;
                     
                     // Converte a posição do clique para o objeto nativo do Leaflet
                     const clickLatLng = L.latLng(lat, lng);
@@ -452,39 +552,61 @@
                         const ptLatLng = L.latLng(pt.lat, pt.lng);
                         const dist = ptLatLng.distanceTo(clickLatLng);
 
-                        // Só faz a interpolação se o clique estiver DENTRO do raio de cor daquele ponto
-                        if (dist <= searchRadius) {
-                            const weight = 1 / Math.pow(Math.max(dist, 1), 2);
+                        // Só faz a interpolação se o clique estiver DENTRO do raio de alcance do sensor
+                        // Usa exatamente a mesma fórmula Shepard Modificado da renderização visual
+                        if (dist < searchRadius) {
+                            const u = dist / searchRadius;
+                            const oneMinusU = 1.0 - u;
+                            const weight = (oneMinusU * oneMinusU) / Math.max(u, 0.005);
                             numerator += pt.value * weight;
                             denominator += weight;
+
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                nearestPt = pt;
+                            }
                         }
                     });
 
                     // Se nenhum sensor estiver no alcance do raio visual, retorna null (oculta o PIN)
                     if (denominator === 0) return null;
-                    return Math.round(numerator / denominator);
+                    return {
+                        value: Math.round(numerator / denominator),
+                        dataHora: nearestPt ? (nearestPt.data_hora || null) : null
+                    };
+                }
+
+                function getInterpolatedValue(lat, lng, layerKey) {
+                    const res = getInterpolatedData(lat, lng, layerKey);
+                    return res ? res.value : null;
                 }
 
                 // Função auxiliar para definir o texto e a cor com base no valor da camada
                 function getStatusInfo(val, layerKey) {
                     if (layerKey === 'iqa') {
-                        if (val <= 50) return { text: 'Bom', color: 'bg-emerald-500' };
-                        if (val <= 100) return { text: 'Moderado', color: 'bg-corn-500' };
-                        if (val <= 300) return { text: 'Insalubre', color: 'bg-tahiti-gold-500' };
-                        return { text: 'Perigoso', color: 'bg-cinnabar-500' };
+                        if (val <= 50) return { text: 'Boa', color: '#2ecc71' };
+                        if (val <= 100) return { text: 'Moderada', color: '#f1c40f' };
+                        if (val <= 150) return { text: 'Insalubre', color: '#e67e22' };
+                        if (val <= 200) return { text: 'Perigoso', color: '#e74c3c' };
+                        if (val <= 400) return { text: 'Péssima', color: '#8e44ad' };
+                        return { text: 'Extrema', color: '#43110c' };
+                        
                     }
-                    // Para as outras camadas, exibe o nome da própria camada como subtítulo e uma cor neutra
-                    return { text: mapLayersData[layerKey].name, color: 'bg-blue-dianne-500' };
+                    const rgb = getColorForValue(val, layerKey);
+                    return { text: mapLayersData[layerKey].name, color: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` };
                 }
 
                 // Renderiza o marcador no estilo visual OpenAir Metrics
                 function updateClickMarker(latlng) {
-                    const val = getInterpolatedValue(latlng.lat, latlng.lng, currentLayerKey);
+                    const interpResult = getInterpolatedData(latlng.lat, latlng.lng, currentLayerKey);
                     
-                    if (val === null) {
+                    if (interpResult === null) {
                         removeClickMarker();
                         return; 
                     }
+
+                    const val = interpResult.value;
+                    const dataHora = interpResult.dataHora;
 
                     // Puxa as informações do Dicionário
                     const layerInfo = mapLayersData[currentLayerKey];
@@ -509,9 +631,17 @@
                         </div>
                     ` : '';
 
+                    const dataHoraHtml = dataHora ? `
+                        <!-- Data e Hora da Leitura -->
+                        <div class="text-[11px] text-[#cccccc] flex items-center gap-1.5 mt-1.5 font-normal tracking-normal border-t border-white/10 pt-1">
+                            <x-heroicon-o-clock class="w-3.5 h-3.5 text-[#b0b2b5] shrink-0" />
+                            <span class="whitespace-nowrap">${dataHora}</span>
+                        </div>
+                    ` : '';
+
                     const badgeHtml = isIqa ? `
                         <!-- Botão circular (Canto Inferior Direito) - Cor Dinâmica -->
-                        <div class="absolute -right-1 -bottom-2 w-8 h-8 ${badgeColor} rounded-full flex items-center justify-center border-[3.5px] border-[#4a4b4d] shadow-sm z-20">
+                        <div class="absolute -right-1 -bottom-2 w-8 h-8 rounded-full flex items-center justify-center border-[3.5px] border-[#4a4b4d] shadow-sm z-20" style="background-color: ${badgeColor};">
                             <x-heroicon-o-chevron-down class="w-4 h-4 text-white stroke-[3]" />
                         </div>
                     ` : '';
@@ -529,15 +659,18 @@
                             <div class="absolute flex flex-col items-center bottom-10 left-0 -translate-x-1/2">
                                 
                                 <!-- Caixa de Informação Cinza Escuro -->
-                                <div class="relative bg-[#4a4b4d] text-white pl-3.5 pr-8 py-2 rounded-r-[24px] rounded-tl-lg rounded-bl-sm shadow-[0_5px_15px_rgba(0,0,0,0.35)] min-w-[140px] border border-white/10">
+                                <div class="relative bg-[#4a4b4d] text-white pl-3.5 pr-8 py-2 rounded-r-[24px] rounded-tl-lg rounded-bl-sm shadow-[0_5px_15px_rgba(0,0,0,0.35)] min-w-[155px] border border-white/10">
                                     
-                                    <!-- Valor e Unidade (Adiciona pb-1 se não tiver legenda para manter as proporções) -->
-                                    <div class="text-[24px] font-semibold leading-none tracking-tight flex items-baseline gap-1.5 pt-1 ${!isIqa ? 'pb-1' : ''}">
+                                    <!-- Valor e Unidade (Adiciona pb-1 se não tiver legenda nem data para manter as proporções) -->
+                                    <div class="text-[24px] font-semibold leading-none tracking-tight flex items-baseline gap-1.5 pt-1 ${!isIqa && !dataHora ? 'pb-1' : ''}">
                                         ${val} <span class="text-[16px] font-normal">${unit}</span>
                                     </div>
                                     
                                     <!-- Exibe apenas no IQA -->
                                     ${statusHtml}
+
+                                    <!-- Data e Hora da Leitura -->
+                                    ${dataHoraHtml}
                                     
                                     <!-- Botão Fechar (X superior) -->
                                     <button onclick="removeClickMarker()" class="absolute -top-2.5 -right-2 bg-[#5c5d5f] rounded-full w-[26px] h-[26px] flex items-center justify-center border-2 border-[#4a4b4d] shadow hover:bg-athens-gray-400 transition cursor-pointer z-30">
@@ -603,38 +736,15 @@
                         unitSpan.innerText = layerInfo.unit;
                         valuesContainer.className = 'relative flex-1 h-full';
                         
-                        const min = layerInfo.data.min;
-                        const max = layerInfo.data.max;
-                        const gradientObj = layerInfo.config.gradient;
                         const legendData = layerInfo.legend;
-
-                        function getVisualPercent(val) {
-                            if (val <= legendData[0].val) return legendData[0].pos;
-                            if (val >= legendData[legendData.length - 1].val) return legendData[legendData.length - 1].pos;
-                            for (let i = 0; i < legendData.length - 1; i++) {
-                                const lower = legendData[i];
-                                const upper = legendData[i + 1];
-                                if (val >= lower.val && val <= upper.val) {
-                                    const ratio = (val - lower.val) / (upper.val - lower.val);
-                                    return lower.pos + ratio * (upper.pos - lower.pos);
-                                }
-                            }
-                            return 0;
-                        }
-
-                        const stops = Object.keys(gradientObj).sort((a, b) => parseFloat(a) - parseFloat(b));
-                        
-                        const cssStops = stops.map(key => {
-                            const k = parseFloat(key);
-                            const realValue = min + k * (max - min);
-                            const visualPos = getVisualPercent(realValue);
-                            return `${gradientObj[key]} ${visualPos.toFixed(2)}%`;
+                        const cssStops = legendData.map(item => {
+                            const rgb = getColorForValue(item.val, layerKey);
+                            return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]}) ${item.pos}%`;
                         });
-
-                        // Preenche o início (0%) e o fim (100%) para não deixar buracos transparentes
-                        const firstColor = gradientObj[stops[0]];
-                        const lastColor = gradientObj[stops[stops.length - 1]];
-                        const gradientString = `${firstColor} 0%, ${cssStops.join(', ')}, ${lastColor} 100%`;
+                        
+                        const firstRgb = getColorForValue(legendData[0].val, layerKey);
+                        const lastRgb = getColorForValue(legendData[legendData.length - 1].val, layerKey);
+                        const gradientString = `rgb(${firstRgb[0]}, ${firstRgb[1]}, ${firstRgb[2]}) 0%, ${cssStops.join(', ')}, rgb(${lastRgb[0]}, ${lastRgb[1]}, ${lastRgb[2]}) 100%`;
                         
                         gradientDiv.style.backgroundColor = 'transparent';
                         gradientDiv.style.backgroundImage = `linear-gradient(to right, ${gradientString})`;
@@ -658,30 +768,13 @@
                     
                     const layerInfo = mapLayersData[layerKey];
 
-                    // Inicialização do novo webGLHeatmap
-                    currentHeatmapLayer = L.webGLHeatmap({
-                        size: layerInfo.config.size || 1000, 
-                        units: 'm',
-                        opacity: 0.8,
-                        alphaRange: 1,
-                        gradientTexture: createGradientTexture(layerInfo.config.gradient)
+                    currentHeatmapLayer = L.idwSurfaceLayer({
+                        cellSize: 4,
+                        searchRadius: layerInfo.searchRadius || searchRadiusMeters || 320,
+                        opacity: 0.75
                     });
 
-                    // Normalizando dados para WebGL [lat, lng, intensidade entre 0 e 1]
-                    const min = layerInfo.data.min;
-                    const max = layerInfo.data.max;
-
-                    const webglData = layerInfo.data.data.map(pt => {
-                        // Normalização Pura: Os valores voltam a flutuar livremente entre 0.0 e 1.0
-                        // Isso garante que a cor certa seja resgatada no gradiente!
-                        let intensity = (pt.value - min) / (max - min);
-                        intensity = Math.max(0, Math.min(1, intensity)); 
-                        
-                        return [pt.lat, pt.lng, intensity];
-                    });
-                    
-                    // Injeta os dados normalizados
-                    currentHeatmapLayer.setData(webglData);
+                    currentHeatmapLayer.setData(layerInfo.data.data, (val) => getColorForValue(val, layerKey));
                     map.addLayer(currentHeatmapLayer);
                     
                     updateLegend(layerKey);
@@ -698,7 +791,108 @@
                 radios.forEach(radio => {
                     radio.addEventListener('change', (e) => renderLayer(e.target.value));
                 });
-            });
+
+                let frameAtualizacaoPendente = false;
+
+                // Atualiza suavemente a camada e o PIN aberto sem destruir/recriar camadas nem travar cliques
+                function atualizarHeatmapEMarcador() {
+                    if (currentHeatmapLayer && mapLayersData[currentLayerKey]) {
+                        const layerInfo = mapLayersData[currentLayerKey];
+                        currentHeatmapLayer.setData(layerInfo.data.data, (val) => getColorForValue(val, currentLayerKey));
+                    }
+
+                    if (window.clickMarker) {
+                        updateClickMarker(window.clickMarker.getLatLng());
+                    }
+                }
+
+                function agendarAtualizacaoVisual() {
+                    if (!frameAtualizacaoPendente) {
+                        frameAtualizacaoPendente = true;
+                        requestAnimationFrame(() => {
+                            atualizarHeatmapEMarcador();
+                            frameAtualizacaoPendente = false;
+                        });
+                    }
+                }
+
+                // Atualização em Tempo Real via WebSockets (Laravel Reverb + Echo)
+                function processarNovaMedicao(dados) {
+                    if (!dados) return;
+
+                    const lat = dados.lat != null ? parseFloat(dados.lat) : null;
+                    const lng = dados.lng != null ? parseFloat(dados.lng) : null;
+                    const dataHora = dados.data_hora;
+
+                    const metricasMap = {
+                        'iqa': dados.iqa,
+                        'temperatura': dados.temperatura,
+                        'umidade': dados.umidade,
+                        'pm': dados.poeira,
+                        'co2': dados.co2
+                    };
+
+                    // Atualiza os pontos de dados em memória para cada camada do mapa
+                    Object.keys(metricasMap).forEach(key => {
+                        if (!mapLayersData[key]) return;
+                        const dataArr = mapLayersData[key].data.data;
+                        const val = metricasMap[key];
+                        if (val == null) return;
+
+                        // 1. Procura primeiro por estacao_id (mais confiável e preciso)
+                        let idx = -1;
+                        if (dados.estacao_id) {
+                            idx = dataArr.findIndex(pt => pt.estacao_id && pt.estacao_id === dados.estacao_id);
+                        }
+
+                        // 2. Se não encontrou por ID, busca por proximidade geográfica das coordenadas
+                        if (idx < 0 && lat != null && lng != null) {
+                            idx = dataArr.findIndex(pt => Math.abs(pt.lat - lat) < 0.0001 && Math.abs(pt.lng - lng) < 0.0001);
+                        }
+
+                        if (idx >= 0) {
+                            dataArr[idx].value = val;
+                            dataArr[idx].data_hora = dataHora;
+                            if (dados.estacao_id && !dataArr[idx].estacao_id) {
+                                dataArr[idx].estacao_id = dados.estacao_id;
+                            }
+                            if (lat != null && lng != null) {
+                                dataArr[idx].lat = lat;
+                                dataArr[idx].lng = lng;
+                            }
+                        } else if (lat != null && lng != null) {
+                            dataArr.push({
+                                estacao_id: dados.estacao_id || null,
+                                lat: lat,
+                                lng: lng,
+                                value: val,
+                                data_hora: dataHora
+                            });
+                        }
+                    });
+
+                    // Atualiza a visualização sem recriar contextos WebGL nem travar cliques no mapa
+                    agendarAtualizacaoVisual();
+                }
+
+                // Inicialização resiliente da escuta do canal público 'medicoes'
+                function inicializarEcho() {
+                    if (window.Echo) {
+                        window.Echo.channel('medicoes')
+                            .listen('.NovaMedicaoRecebida', processarNovaMedicao)
+                            .listen('NovaMedicaoRecebida', processarNovaMedicao);
+                    } else {
+                        setTimeout(inicializarEcho, 250);
+                    }
+                }
+                inicializarEcho();
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', inicializarMapa);
+            } else {
+                inicializarMapa();
+            }
         </script>
     @endpush
 </x-layouts.app>

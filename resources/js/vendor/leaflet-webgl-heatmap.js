@@ -33,6 +33,7 @@ L.WebGLHeatMap = L.Renderer.extend({
         container.id = "webgl-leaflet-" + L.Util.stamp(this);
         container.style.opacity = options.opacity;
         container.style.position = "absolute";
+        container.style.pointerEvents = "none";
 
         try {
             this.gl = window.createWebGLHeatmap({

@@ -26,6 +26,10 @@ class PlanejamentoController extends Controller
     public function create(): View
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         if ($user && $user->cidade_id) {
             $user->load('cidade.estado');
         }
@@ -35,7 +39,7 @@ class PlanejamentoController extends Controller
 
         $query = Estacao::withCoordinates()->with(['bairro.cidade.estado', 'estacaoOrigem']);
         if ($cidade) {
-            $query->whereHas('bairro.cidade', fn ($q) => $q->where('id', $cidade->id));
+            $query->whereHas('bairro.cidade', fn($q) => $q->where('id', $cidade->id));
         }
 
         $estacoesExistentes = $query->get()
@@ -79,6 +83,10 @@ class PlanejamentoController extends Controller
         ]);
 
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         $lat = (float) $request->input('latitude');
         $lng = (float) $request->input('longitude');
         $quantidade = (int) $request->input('quantidade_satelites');
@@ -99,6 +107,11 @@ class PlanejamentoController extends Controller
      */
     public function snapToRoad(Request $request): JsonResponse
     {
+        $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
@@ -133,6 +146,10 @@ class PlanejamentoController extends Controller
     public function salvar(Request $request): RedirectResponse
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         if ($user && $user->cidade_id && $request->filled('cidade_id') && (int) $user->cidade_id !== (int) $request->input('cidade_id')) {
             abort(403, 'Você só tem permissão para planejar e salvar malhas na sua cidade de jurisdição municipal.');
         }
@@ -260,13 +277,13 @@ class PlanejamentoController extends Controller
 
             return redirect()
                 ->route('instalacoes.show', $matriz->public_id)
-                ->with('success', 'Malha com 1 Matriz e '.count($satelitesData).' Satélites planejada com sucesso! A ordem de instalação foi gerada.');
+                ->with('success', 'Malha com 1 Matriz e ' . count($satelitesData) . ' Satélites planejada com sucesso! A ordem de instalação foi gerada.');
         } catch (\Throwable $e) {
             DB::rollBack();
 
             return redirect()
                 ->back()
-                ->with('error', 'Erro ao salvar planejamento da malha: '.$e->getMessage())
+                ->with('error', 'Erro ao salvar planejamento da malha: ' . $e->getMessage())
                 ->withInput();
         }
     }

@@ -19,6 +19,10 @@ class PatrimonioController extends Controller
     public function index(Request $request): View
     {
         $user = Auth::user();
+        if ($user?->isSuperAdmin()) {
+            abort(403, 'O super-usuário só pode gerenciar administradores.');
+        }
+
         $statusFiltro = $request->input('status');
         $busca = trim((string) $request->input('busca'));
         $sort = (string) $request->input('sort', 'created_at');
@@ -36,7 +40,7 @@ class PatrimonioController extends Controller
             $query->where('cidade_id', $user->cidade_id);
         }
 
-        if ($statusFiltro && in_array($statusFiltro, ['Disponível', 'Alocado', 'Instalado', 'Instalada', 'Manutenção', 'Descartado'])) {
+        if ($statusFiltro && in_array($statusFiltro, ['Disponível', 'Instalada', 'Instalado', 'Descartado'], true)) {
             if ($statusFiltro === 'Instalado' || $statusFiltro === 'Instalada') {
                 $query->whereIn('status', ['Instalado', 'Instalada']);
             } else {
@@ -63,14 +67,14 @@ class PatrimonioController extends Controller
         $total = (clone $baseQuery)->count();
         $disponiveis = (clone $baseQuery)->where('status', 'Disponível')->count();
         $instalados = (clone $baseQuery)->whereIn('status', ['Instalado', 'Instalada'])->count();
-        $manutencao = (clone $baseQuery)->where('status', 'Manutenção')->count();
+        $descartados = (clone $baseQuery)->where('status', 'Descartado')->count();
 
         return view('patrimonios.index', [
             'patrimonios' => $patrimonios,
             'total' => $total,
             'disponiveis' => $disponiveis,
             'instalados' => $instalados,
-            'manutencao' => $manutencao,
+            'descartados' => $descartados,
             'statusFiltro' => $statusFiltro,
             'busca' => $busca,
             'sort' => $sort,
@@ -84,6 +88,10 @@ class PatrimonioController extends Controller
     public function create(): View
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         if ($user && $user->cidade_id) {
             $cidades = Cidade::where('id', $user->cidade_id)->with('estado')->get();
         } else {
@@ -102,6 +110,9 @@ class PatrimonioController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
 
         // Jurisdição municipal: se o usuário possui cidade vinculada, bloqueia tentativa de cadastro em outro município
         if ($user && $user->cidade_id && $request->filled('cidade_id') && (int) $user->cidade_id !== (int) $request->input('cidade_id')) {
@@ -148,6 +159,9 @@ class PatrimonioController extends Controller
     public function storeBatch(Request $request): RedirectResponse
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
 
         // Jurisdição municipal: bloqueia tentativa de cadastrar lote para outro município
         if ($user && $user->cidade_id && $request->filled('cidade_id') && (int) $user->cidade_id !== (int) $request->input('cidade_id')) {
@@ -228,26 +242,24 @@ class PatrimonioController extends Controller
     }
 
     /**
-     * Remove um item do patrimônio caso não esteja em uso ativo.
+     * Marca um item de patrimônio como Descartado sem excluir o registro do banco de dados.
      */
     public function destroy(Patrimonio $patrimonio): RedirectResponse
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         if ($user && $user->cidade_id && $patrimonio->cidade_id && (int) $patrimonio->cidade_id !== (int) $user->cidade_id) {
             abort(403, 'Acesso restrito ao município da sua jurisdição.');
         }
 
-        if ($patrimonio->estacao()->exists()) {
-            return redirect()
-                ->route('patrimonios.index')
-                ->with('error', 'Não é possível excluir um patrimônio que está vinculado a uma estação ativa.');
-        }
-
-        $patrimonio->delete();
+        $patrimonio->update(['status' => 'Descartado']);
 
         return redirect()
             ->route('patrimonios.index')
-            ->with('success', 'Patrimônio removido com sucesso!');
+            ->with('success', 'Patrimônio marcado como descartado com sucesso!');
     }
 
     /**

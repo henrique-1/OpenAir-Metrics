@@ -52,11 +52,13 @@
                         <div class="flex flex-col sm:items-end">
                             <span class="text-xs font-semibold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wider mb-1">Nível no Sistema</span>
                             <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold 
-                                @if($user->isAdministrador()) bg-ebony-clay-100 dark:bg-ebony-clay-950/70 text-ebony-clay-800 dark:text-ebony-clay-200 border border-ebony-clay-200 dark:border-ebony-clay-800
+                                @if($user->isSuperAdmin()) bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800
+                                @elseif($user->isAdministrador()) bg-ebony-clay-100 dark:bg-ebony-clay-950/70 text-ebony-clay-800 dark:text-ebony-clay-200 border border-ebony-clay-200 dark:border-ebony-clay-800
                                 @elseif($user->isInstalador()) bg-tahiti-gold-100 dark:bg-tahiti-gold-950/70 text-tahiti-gold-800 dark:text-tahiti-gold-200 border border-tahiti-gold-200 dark:border-tahiti-gold-800
                                 @else bg-blue-dianne-100 dark:bg-blue-dianne-950/70 text-blue-dianne-800 dark:text-blue-dianne-200 border border-blue-dianne-200 dark:border-blue-dianne-800 @endif">
                                 <span class="w-2 h-2 rounded-full 
-                                    @if($user->isAdministrador()) bg-ebony-clay-600
+                                    @if($user->isSuperAdmin()) bg-purple-600
+                                    @elseif($user->isAdministrador()) bg-ebony-clay-600
                                     @elseif($user->isInstalador()) bg-tahiti-gold-600
                                     @else bg-blue-dianne-600 @endif"></span>
                                 {{ $user->nivel_label }}
@@ -65,6 +67,10 @@
                                 <span class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mt-1">
                                     Jurisdição: <strong class="text-blue-dianne-950 dark:text-white">{{ $user->cidade->nome }} ({{ $user->cidade->estado->uf ?? 'UF' }})</strong>
                                 </span>
+                            @elseif($user->isSuperAdmin())
+                                <span class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mt-1">
+                                    Acesso: <strong class="text-blue-dianne-950 dark:text-white">Global / Todas as Jurisdições</strong>
+                                </span>
                             @endif
                         </div>
                     </div>
@@ -72,7 +78,7 @@
                     <!-- Explicação das Funções -->
                     <div class="mt-6">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400 mb-3">Guia de Níveis e Permissões</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             <!-- Administrador -->
                             <div class="p-3.5 rounded-lg border @if($user->isAdministrador()) border-ebony-clay-300 dark:border-ebony-clay-700 bg-ebony-clay-50/50 dark:bg-ebony-clay-950/50 @else border-athens-gray-200 dark:border-athens-gray-800 bg-athens-gray-50/50 dark:bg-athens-gray-800/50 @endif">
                                 <div class="flex items-center gap-2 mb-1">
@@ -80,7 +86,7 @@
                                     <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Administrador</span>
                                 </div>
                                 <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400">
-                                    Cadastra e gerencia novos usuários na prefeitura, além de solicitar substituição de sensores da cidade.
+                                    Cadastra e gerencia os usuários sob jurisdição municipal, além de gerar relatórios e configurar alertas.
                                 </p>
                             </div>
 
@@ -91,7 +97,7 @@
                                     <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Planejador Técnico</span>
                                 </div>
                                 <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400">
-                                    Cadastra estações, patrimônios físicos, planeja malhas e rotas de instalação em campo.
+                                    Cadastro e gestão de patrimônio físico (marca como descartado), solicita substituição de sensores e planeja malhas.
                                 </p>
                             </div>
 
@@ -102,7 +108,7 @@
                                     <span class="text-sm font-bold text-blue-dianne-950 dark:text-white">Instalador</span>
                                 </div>
                                 <p class="text-xs text-athens-gray-600 dark:text-athens-gray-400">
-                                    Acessa o roteiro em campo, localiza os pontos geográficos e vincula o MAC/Patrimônio físico à estação.
+                                    Acessa o roteiro de instalação, localiza pontos geográficos e vincula o MAC/Patrimônio à estação.
                                 </p>
                             </div>
                         </div>

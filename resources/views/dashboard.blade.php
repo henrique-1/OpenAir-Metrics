@@ -14,10 +14,12 @@
                         <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">Painel Analítico de Monitoramento</h1>
                         <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">Acompanhe as métricas e médias históricas de qualidade do ar por cidade ou bairro.</p>
                     </div>
-                    <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm self-start sm:self-auto">
-                        <x-heroicon-o-plus class="w-4 h-4" />
-                        Nova Estação
-                    </a>
+                    @if(!auth()->user()?->isInstalador())
+                        <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm self-start sm:self-auto">
+                            <x-heroicon-o-plus class="w-4 h-4" />
+                            Nova Estação
+                        </a>
+                    @endif
                 </div>
 
                 <!-- Grid de Métricas Gerais da Rede -->
@@ -81,10 +83,20 @@
                                 
                                 <!-- Toggle Cidade / Bairro -->
                                 <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-semibold">
-                                    <button type="button" id="btn-tipo-cidade" class="px-3 py-1.5 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white shadow-sm font-bold">
+                                    <button type="button" 
+                                        id="btn-tipo-cidade" 
+                                        data-tipo="cidade"
+                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white shadow-sm font-bold"
+                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                        class="btn-tipo px-3 py-1.5 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white shadow-sm font-bold cursor-pointer">
                                         Cidade
                                     </button>
-                                    <button type="button" id="btn-tipo-bairro" class="px-3 py-1.5 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white">
+                                    <button type="button" 
+                                        id="btn-tipo-bairro" 
+                                        data-tipo="bairro"
+                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white shadow-sm font-bold"
+                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                        class="btn-tipo px-3 py-1.5 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">
                                         Bairro
                                     </button>
                                 </div>
@@ -116,9 +128,21 @@
                             <div class="flex items-center gap-2 self-start lg:self-auto">
                                 <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Período:</span>
                                 <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-medium">
-                                    <button type="button" data-periodo="24h" class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm">24 Horas</button>
-                                    <button type="button" data-periodo="7d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white">7 Dias</button>
-                                    <button type="button" data-periodo="30d" class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white">30 Dias</button>
+                                    <button type="button" 
+                                        data-periodo="24h" 
+                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                        class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm cursor-pointer">24 Horas</button>
+                                    <button type="button" 
+                                        data-periodo="7d" 
+                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                        class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">7 Dias</button>
+                                    <button type="button" 
+                                        data-periodo="30d" 
+                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                        class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">30 Dias</button>
                                 </div>
                             </div>
                         </div>
@@ -126,32 +150,52 @@
                         <!-- Abas de Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2) -->
                         <div class="mt-6 flex flex-wrap gap-2 border-t border-athens-gray-100 dark:border-athens-gray-800 pt-5">
                             <!-- Qualidade do Ar (IQA) -->
-                            <button type="button" data-metrica="qualidade_ar" class="btn-metrica active flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 shadow-sm">
+                            <button type="button" 
+                                data-metrica="qualidade_ar" 
+                                data-active-classes="border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 shadow-sm font-bold active"
+                                data-inactive-classes="border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold"
+                                class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs transition-all border border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 shadow-sm font-bold active cursor-pointer">
                                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                                 Qualidade do Ar (IQA)
                             </button>
 
                             <!-- Temperatura -->
-                            <button type="button" data-metrica="temperatura" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                            <button type="button" 
+                                data-metrica="temperatura" 
+                                data-active-classes="border-tahiti-gold-500 dark:border-tahiti-gold-500 bg-tahiti-gold-50 dark:bg-tahiti-gold-950/60 text-tahiti-gold-900 dark:text-tahiti-gold-200 shadow-sm font-bold active"
+                                data-inactive-classes="border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold"
+                                class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold cursor-pointer">
                                 <span class="w-2.5 h-2.5 rounded-full bg-tahiti-gold-500"></span>
                                 Temperatura (°C)
                             </button>
 
                             <!-- Umidade Relativa -->
-                            <button type="button" data-metrica="umidade" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                            <button type="button" 
+                                data-metrica="umidade" 
+                                data-active-classes="border-dodger-blue-500 dark:border-dodger-blue-500 bg-dodger-blue-50 dark:bg-dodger-blue-950/60 text-dodger-blue-900 dark:text-dodger-blue-200 shadow-sm font-bold active"
+                                data-inactive-classes="border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold"
+                                class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold cursor-pointer">
                                 <span class="w-2.5 h-2.5 rounded-full bg-dodger-blue-500"></span>
                                 Umidade Relativa (%)
                             </button>
 
                             <!-- Material Particulado -->
-                            <button type="button" data-metrica="poeira" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
+                            <button type="button" 
+                                data-metrica="poeira" 
+                                data-active-classes="border-cinnabar-500 dark:border-cinnabar-500 bg-cinnabar-50 dark:bg-cinnabar-950/60 text-cinnabar-900 dark:text-cinnabar-200 shadow-sm font-bold active"
+                                data-inactive-classes="border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold"
+                                class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold cursor-pointer">
                                 <span class="w-2.5 h-2.5 rounded-full bg-cinnabar-500"></span>
                                 Material Particulado (µg/m³)
                             </button>
 
                             <!-- CO2 -->
-                            <button type="button" data-metrica="co2" class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700">
-                                <span class="w-2.5 h-2.5 rounded-full bg-athens-gray-700"></span>
+                            <button type="button" 
+                                data-metrica="co2" 
+                                data-active-classes="border-athens-gray-500 dark:border-athens-gray-400 bg-athens-gray-100 dark:bg-athens-gray-800/90 text-athens-gray-900 dark:text-athens-gray-100 shadow-sm font-bold active"
+                                data-inactive-classes="border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold"
+                                class="btn-metrica flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs transition-all border border-athens-gray-200 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-700 font-semibold cursor-pointer">
+                                <span class="w-2.5 h-2.5 rounded-full bg-athens-gray-700 dark:bg-athens-gray-400"></span>
                                 Dióxido de Carbono (CO₂)
                             </button>
                         </div>
@@ -172,7 +216,7 @@
                                 <span id="stat-media" class="text-2xl font-black text-blue-dianne-950 dark:text-white">--</span>
                                 <span id="stat-unidade-media" class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400">IQA</span>
                             </div>
-                            <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Média ponderada do período selecionado</p>
+                            <p id="stat-desc-media" class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Média ponderada do período selecionado</p>
                         </div>
 
                         <!-- Valor Máximo -->
@@ -185,7 +229,7 @@
                                 <span id="stat-maximo" class="text-2xl font-black text-cinnabar-600 dark:text-cinnabar-400">--</span>
                                 <span id="stat-unidade-max" class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400">IQA</span>
                             </div>
-                            <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Pico máximo registrado na localidade</p>
+                            <p id="stat-desc-max" class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Pico máximo registrado no período selecionado</p>
                         </div>
 
                         <!-- Valor Mínimo -->
@@ -198,7 +242,7 @@
                                 <span id="stat-minimo" class="text-2xl font-black text-dodger-blue-600 dark:text-dodger-blue-400">--</span>
                                 <span id="stat-unidade-min" class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400">IQA</span>
                             </div>
-                            <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Ponto mínimo observado no intervalo</p>
+                            <p id="stat-desc-min" class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400 mt-1">Ponto mínimo observado no período selecionado</p>
                         </div>
 
                         <!-- Estações Agregadas e Amostras -->
@@ -275,14 +319,42 @@
                 const statClassificacao = document.getElementById('stat-classificacao');
                 const statEstacoesAtivas = document.getElementById('stat-estacoes-ativas');
 
+                // Função auxiliar para alternar classes ativas/inativas dos botões (suporta Light e Dark Mode)
+                function aplicarEstadoBotao(elemento, ativo) {
+                    const activeClasses = (elemento.dataset.activeClasses || '').split(' ').filter(Boolean);
+                    const inactiveClasses = (elemento.dataset.inactiveClasses || '').split(' ').filter(Boolean);
+
+                    if (ativo) {
+                        if (inactiveClasses.length) elemento.classList.remove(...inactiveClasses);
+                        if (activeClasses.length) elemento.classList.add(...activeClasses);
+                    } else {
+                        if (activeClasses.length) elemento.classList.remove(...activeClasses);
+                        if (inactiveClasses.length) elemento.classList.add(...inactiveClasses);
+                    }
+                }
+
+                function atualizarBotoesTipo() {
+                    document.querySelectorAll('.btn-tipo').forEach(btn => {
+                        aplicarEstadoBotao(btn, btn.dataset.tipo === currentTipo);
+                    });
+                }
+
+                function atualizarBotoesPeriodo() {
+                    document.querySelectorAll('.btn-periodo').forEach(btn => {
+                        aplicarEstadoBotao(btn, btn.dataset.periodo === currentPeriodo);
+                    });
+                }
+
+                function atualizarBotoesMetrica() {
+                    document.querySelectorAll('.btn-metrica').forEach(btn => {
+                        aplicarEstadoBotao(btn, btn.dataset.metrica === currentMetrica);
+                    });
+                }
+
                 // Alternância de Agrupamento: Cidade vs Bairro
                 btnTipoCidade.addEventListener('click', function () {
                     currentTipo = 'cidade';
-                    btnTipoCidade.classList.add('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
-                    btnTipoCidade.classList.remove('text-athens-gray-600');
-                    btnTipoBairro.classList.remove('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
-                    btnTipoBairro.classList.add('text-athens-gray-600');
-
+                    atualizarBotoesTipo();
                     containerCidade.classList.remove('hidden');
                     containerBairro.classList.add('hidden');
                     carregarDadosGrafico();
@@ -290,11 +362,7 @@
 
                 btnTipoBairro.addEventListener('click', function () {
                     currentTipo = 'bairro';
-                    btnTipoBairro.classList.add('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
-                    btnTipoBairro.classList.remove('text-athens-gray-600');
-                    btnTipoCidade.classList.remove('bg-white', 'text-blue-dianne-950', 'shadow-sm', 'font-bold');
-                    btnTipoCidade.classList.add('text-athens-gray-600');
-
+                    atualizarBotoesTipo();
                     containerBairro.classList.remove('hidden');
                     containerCidade.classList.add('hidden');
                     carregarDadosGrafico();
@@ -307,50 +375,28 @@
                 // Seleção de Período (24h, 7d, 30d)
                 document.querySelectorAll('.btn-periodo').forEach(btn => {
                     btn.addEventListener('click', function () {
-                        document.querySelectorAll('.btn-periodo').forEach(b => {
-                            b.classList.remove('bg-white', 'text-blue-dianne-950', 'font-bold', 'shadow-sm');
-                            b.classList.add('text-athens-gray-600');
-                        });
-                        this.classList.add('bg-white', 'text-blue-dianne-950', 'font-bold', 'shadow-sm');
-                        this.classList.remove('text-athens-gray-600');
-
                         currentPeriodo = this.dataset.periodo;
+                        atualizarBotoesPeriodo();
                         carregarDadosGrafico();
                     });
                 });
 
                 // Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2)
-                const metricasCores = {
-                    qualidade_ar: { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-900' },
-                    temperatura: { border: 'border-tahiti-gold-500', bg: 'bg-tahiti-gold-50', text: 'text-tahiti-gold-900' },
-                    umidade: { border: 'border-dodger-blue-500', bg: 'bg-dodger-blue-50', text: 'text-dodger-blue-900' },
-                    poeira: { border: 'border-cinnabar-500', bg: 'bg-cinnabar-50', text: 'text-cinnabar-900' },
-                    co2: { border: 'border-athens-gray-500', bg: 'bg-athens-gray-100', text: 'text-athens-gray-900' }
-                };
-
                 document.querySelectorAll('.btn-metrica').forEach(btn => {
                     btn.addEventListener('click', function () {
-                        document.querySelectorAll('.btn-metrica').forEach(b => {
-                            const m = b.dataset.metrica;
-                            const estilo = metricasCores[m] || metricasCores.qualidade_ar;
-                            b.classList.remove(estilo.border, estilo.bg, estilo.text, 'shadow-sm', 'font-bold');
-                            b.classList.add('border-athens-gray-200', 'bg-white', 'text-athens-gray-700', 'font-semibold');
-                        });
-
                         currentMetrica = this.dataset.metrica;
-                        const estiloAtivo = metricasCores[currentMetrica] || metricasCores.qualidade_ar;
-                        this.classList.remove('border-athens-gray-200', 'bg-white', 'text-athens-gray-700', 'font-semibold');
-                        this.classList.add(estiloAtivo.border, estiloAtivo.bg, estiloAtivo.text, 'shadow-sm', 'font-bold');
-
+                        atualizarBotoesMetrica();
                         carregarDadosGrafico();
                     });
                 });
 
                 // Função de Carregamento AJAX dos Dados do Gráfico
-                function carregarDadosGrafico() {
+                function carregarDadosGrafico(silent = false) {
                     const localidadeId = currentTipo === 'cidade' ? selectCidade.value : selectBairro.value;
 
-                    chartLoading.classList.remove('hidden');
+                    if (!silent) {
+                        chartLoading.classList.remove('hidden');
+                    }
 
                     const url = new URL('{{ route('dashboard.graficos') }}', window.location.origin);
                     url.searchParams.append('tipo_agrupamento', currentTipo);
@@ -373,11 +419,24 @@
                         });
                 }
 
+                // Formata número respeitando inteiros para Qualidade do Ar e CO2, e 2 casas com vírgula para os demais
+                function formatarValorMetrica(val, metrica) {
+                    if (val === null || val === undefined || isNaN(val)) return '--';
+                    const isInteiro = (metrica === 'qualidade_ar' || metrica === 'co2');
+                    if (isInteiro) {
+                        return Math.round(val).toLocaleString('pt-BR');
+                    }
+                    return Number(val).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                }
+
                 // Atualização dos Cards de Média, Máximo e Mínimo
                 function atualizarCardsEstatisticos(data) {
-                    statMedia.textContent = data.media.toFixed(1);
-                    statMaximo.textContent = data.maximo.toFixed(1);
-                    statMinimo.textContent = data.minimo.toFixed(1);
+                    statMedia.textContent = formatarValorMetrica(data.media, data.metrica);
+                    statMaximo.textContent = formatarValorMetrica(data.maximo, data.metrica);
+                    statMinimo.textContent = formatarValorMetrica(data.minimo, data.metrica);
                     statAmostras.textContent = Number(data.total_leituras).toLocaleString('pt-BR');
 
                     statUnidadeMedia.textContent = data.unidade;
@@ -388,9 +447,84 @@
                     statClassificacao.className = `px-2 py-0.5 text-[11px] font-bold rounded-full border ${data.status_cor}`;
 
                     statEstacoesAtivas.textContent = `${data.estacoes_ativas} estação(ões) ativa(s) em ${data.localidade}`;
+
+                    // Atualiza a legenda descritiva dos blocos com o período selecionado
+                    const descPeriodo = data.periodo_rotulo || (currentPeriodo === '7d' ? 'nos últimos 7 dias' : (currentPeriodo === '30d' ? 'nos últimos 30 dias' : 'nas últimas 24 horas'));
+                    const statDescMedia = document.getElementById('stat-desc-media');
+                    const statDescMax = document.getElementById('stat-desc-max');
+                    const statDescMin = document.getElementById('stat-desc-min');
+
+                    if (statDescMedia) statDescMedia.textContent = `Média ponderada ${descPeriodo}`;
+                    if (statDescMax) statDescMax.textContent = `Pico máximo registrado ${descPeriodo}`;
+                    if (statDescMin) statDescMin.textContent = `Ponto mínimo observado ${descPeriodo}`;
                 }
 
                 let ultimoDadoCarregado = null;
+
+                // Criação dos datasets de Média, Máximo e Mínimo
+                function gerarDatasetsGrafico(data, isDark) {
+                    const corMedia = data.cor;
+                    const corMaximo = data.metrica === 'poeira' ? '#dc2626' : '#ef4444';
+                    const corMinimo = data.metrica === 'umidade' ? '#0284c7' : '#3b82f6';
+                    const isMuitosPontos = data.labels && data.labels.length > 30;
+
+                    return [
+                        {
+                            label: `Média (${data.unidade})`,
+                            data: data.valores || [],
+                            borderColor: corMedia,
+                            backgroundColor: corMedia,
+                            borderWidth: 2.5,
+                            borderDash: [],
+                            fill: false,
+                            tension: 0.35,
+                            pointBackgroundColor: isDark ? '#111827' : '#ffffff',
+                            pointBorderColor: corMedia,
+                            pointBorderWidth: 2,
+                            pointRadius: isMuitosPontos ? 2 : 4,
+                            pointHoverRadius: 6,
+                            pointHoverBackgroundColor: corMedia,
+                            pointHoverBorderColor: isDark ? '#111827' : '#ffffff',
+                            pointHoverBorderWidth: 2,
+                        },
+                        {
+                            label: `Máximo (${data.unidade})`,
+                            data: data.maximos || [],
+                            borderColor: corMaximo,
+                            backgroundColor: corMaximo,
+                            borderWidth: 1.8,
+                            borderDash: [5, 4],
+                            fill: false,
+                            tension: 0.35,
+                            pointBackgroundColor: isDark ? '#111827' : '#ffffff',
+                            pointBorderColor: corMaximo,
+                            pointBorderWidth: 1.5,
+                            pointRadius: isMuitosPontos ? 1.5 : 3,
+                            pointHoverRadius: 5,
+                            pointHoverBackgroundColor: corMaximo,
+                            pointHoverBorderColor: isDark ? '#111827' : '#ffffff',
+                            pointHoverBorderWidth: 2,
+                        },
+                        {
+                            label: `Mínimo (${data.unidade})`,
+                            data: data.minimos || [],
+                            borderColor: corMinimo,
+                            backgroundColor: corMinimo,
+                            borderWidth: 1.8,
+                            borderDash: [5, 4],
+                            fill: false,
+                            tension: 0.35,
+                            pointBackgroundColor: isDark ? '#111827' : '#ffffff',
+                            pointBorderColor: corMinimo,
+                            pointBorderWidth: 1.5,
+                            pointRadius: isMuitosPontos ? 1.5 : 3,
+                            pointHoverRadius: 5,
+                            pointHoverBackgroundColor: corMinimo,
+                            pointHoverBorderColor: isDark ? '#111827' : '#ffffff',
+                            pointHoverBorderWidth: 2,
+                        }
+                    ];
+                }
 
                 // Renderização do Gráfico de Linhas com Chart.js
                 function renderizarGrafico(data) {
@@ -410,41 +544,66 @@
                     chartEmpty.classList.add('hidden');
 
                     const ctx = chartCanvas.getContext('2d');
-
-                    if (chartInstance) {
-                        chartInstance.destroy();
-                    }
-
                     const isDark = document.documentElement.classList.contains('dark');
                     const gridColor = isDark ? '#233246' : '#edf1f5';
                     const tickColor = isDark ? '#99afc7' : '#7b96b6';
 
-                    // Criação do gradiente de preenchimento suave
-                    const gradient = ctx.createLinearGradient(0, 0, 0, 320);
-                    gradient.addColorStop(0, data.bgCor || 'rgba(16, 185, 129, 0.25)');
-                    gradient.addColorStop(1, isDark ? 'rgba(17, 24, 39, 0.0)' : 'rgba(255, 255, 255, 0.0)');
+                    const isInteiro = (data.metrica === 'qualidade_ar' || data.metrica === 'co2');
+                    const datasets = gerarDatasetsGrafico(data, isDark);
+
+                    const yAxisTicksCallback = function (val) {
+                        if (isInteiro) {
+                            if (Number.isInteger(Number(val))) {
+                                return `${Number(val).toLocaleString('pt-BR')} ${data.unidade}`;
+                            }
+                            return '';
+                        }
+                        const num = Number(val);
+                        const formatado = num.toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                        return `${formatado} ${data.unidade}`;
+                    };
+
+                    const tooltipLabelCallback = function (context) {
+                        const val = context.parsed.y;
+                        if (val === null || val === undefined) return '';
+                        let formatado;
+                        if (isInteiro) {
+                            formatado = Math.round(val).toLocaleString('pt-BR');
+                        } else {
+                            formatado = Number(val).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                            });
+                        }
+                        const datasetLabel = context.dataset.label || data.nome_metrica;
+                        return `${datasetLabel}: ${formatado} ${data.unidade}`;
+                    };
+
+                    if (chartInstance) {
+                        // Atualização in-place suave sem destruir o canvas (evita o reset visual do gráfico)
+                        chartInstance.data.labels = data.labels;
+                        chartInstance.data.datasets = datasets;
+                        
+                        chartInstance.options.plugins.legend.labels.color = tickColor;
+                        chartInstance.options.scales.x.ticks.color = tickColor;
+                        chartInstance.options.scales.y.ticks.color = tickColor;
+                        chartInstance.options.scales.y.grid.color = gridColor;
+                        chartInstance.options.scales.y.ticks.precision = isInteiro ? 0 : 2;
+                        chartInstance.options.scales.y.ticks.callback = yAxisTicksCallback;
+                        chartInstance.options.plugins.tooltip.callbacks.label = tooltipLabelCallback;
+
+                        chartInstance.update();
+                        return;
+                    }
 
                     chartInstance = new Chart(ctx, {
                         type: 'line',
                         data: {
                             labels: data.labels,
-                            datasets: [{
-                                label: `${data.nome_metrica} (${data.unidade})`,
-                                data: data.valores,
-                                borderColor: data.cor,
-                                backgroundColor: gradient,
-                                borderWidth: 2.5,
-                                fill: true,
-                                tension: 0.35,
-                                pointBackgroundColor: isDark ? '#111827' : '#ffffff',
-                                pointBorderColor: data.cor,
-                                pointBorderWidth: 2,
-                                pointRadius: data.labels.length > 30 ? 2 : 4,
-                                pointHoverRadius: 6,
-                                pointHoverBackgroundColor: data.cor,
-                                pointHoverBorderColor: isDark ? '#111827' : '#ffffff',
-                                pointHoverBorderWidth: 2,
-                            }]
+                            datasets: datasets
                         },
                         options: {
                             responsive: true,
@@ -455,19 +614,27 @@
                             },
                             plugins: {
                                 legend: {
-                                    display: false,
+                                    display: true,
+                                    position: 'top',
+                                    align: 'end',
+                                    labels: {
+                                        boxWidth: 10,
+                                        boxHeight: 10,
+                                        usePointStyle: true,
+                                        font: { size: 11, weight: '600' },
+                                        color: tickColor,
+                                        padding: 12,
+                                    }
                                 },
                                 tooltip: {
                                     backgroundColor: isDark ? 'rgba(4, 57, 72, 0.95)' : 'rgba(15, 76, 92, 0.95)',
                                     titleFont: { size: 12, weight: 'bold' },
-                                    bodyFont: { size: 13 },
+                                    bodyFont: { size: 12 },
                                     padding: 10,
                                     cornerRadius: 8,
-                                    displayColors: false,
+                                    displayColors: true,
                                     callbacks: {
-                                        label: function (context) {
-                                            return `${data.nome_metrica}: ${context.parsed.y} ${data.unidade}`;
-                                        }
+                                        label: tooltipLabelCallback
                                     }
                                 }
                             },
@@ -491,9 +658,8 @@
                                     ticks: {
                                         font: { size: 11 },
                                         color: tickColor,
-                                        callback: function (val) {
-                                            return `${val} ${data.unidade}`;
-                                        }
+                                        precision: isInteiro ? 0 : 2,
+                                        callback: yAxisTicksCallback
                                     }
                                 }
                             }
@@ -502,10 +668,60 @@
                 }
 
                 window.addEventListener('themechanged', function () {
+                    atualizarBotoesTipo();
+                    atualizarBotoesPeriodo();
+                    atualizarBotoesMetrica();
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                        chartInstance = null;
+                    }
                     if (ultimoDadoCarregado) {
                         renderizarGrafico(ultimoDadoCarregado);
                     }
                 });
+
+                let timerAtualizacaoDashboard = null;
+
+                // Atualização em Tempo Real dos Gráficos e Métricas via WebSockets (Laravel Reverb + Echo)
+                function processarNovaMedicaoDashboard(dados) {
+                    if (!dados) return;
+
+                    // Se estiver agrupando por cidade, verifica se pertence à cidade selecionada
+                    if (currentTipo === 'cidade') {
+                        const cidadeSelecionada = selectCidade.value;
+                        if (cidadeSelecionada && dados.cidade_id && String(dados.cidade_id) !== String(cidadeSelecionada)) {
+                            return;
+                        }
+                    }
+
+                    // Se estiver agrupando por bairro, verifica se pertence ao bairro selecionado
+                    if (currentTipo === 'bairro') {
+                        const bairroSelecionado = selectBairro.value;
+                        if (bairroSelecionado && dados.bairro_id && String(dados.bairro_id) !== String(bairroSelecionado)) {
+                            return;
+                        }
+                    }
+
+                    // Aplica debounce para agrupar rajadas de medições em uma única requisição ao servidor
+                    if (timerAtualizacaoDashboard) {
+                        clearTimeout(timerAtualizacaoDashboard);
+                    }
+                    timerAtualizacaoDashboard = setTimeout(() => {
+                        carregarDadosGrafico(true);
+                    }, 350);
+                }
+
+                // Inicialização resiliente da escuta do canal público 'medicoes'
+                function inicializarEchoDashboard() {
+                    if (window.Echo) {
+                        window.Echo.channel('medicoes')
+                            .listen('.NovaMedicaoRecebida', processarNovaMedicaoDashboard)
+                            .listen('NovaMedicaoRecebida', processarNovaMedicaoDashboard);
+                    } else {
+                        setTimeout(inicializarEchoDashboard, 250);
+                    }
+                }
+                inicializarEchoDashboard();
 
                 // Carregamento inicial do gráfico ao abrir a tela
                 carregarDadosGrafico();

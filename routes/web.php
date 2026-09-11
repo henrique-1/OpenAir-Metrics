@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EstacaoController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InstalacaoController;
 use App\Http\Controllers\LocalidadeController;
 use App\Http\Controllers\PatrimonioController;
@@ -11,9 +12,7 @@ use App\Http\Controllers\PlanejamentoController;
 use App\Http\Controllers\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('home');
-});
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // Agrupamos rotas que apenas visitantes (não logados) podem acessar
 Route::middleware('guest')->group(function () {
@@ -64,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/localidades/cidades/{cidade}/bairros', [LocalidadeController::class, 'bairros'])->name('localidades.cidades.bairros');
     Route::get('/geocoding/reverse', [LocalidadeController::class, 'reverse'])->name('geocoding.reverse');
     Route::post('/estacoes/{public_id}/solicitar-substituicao', [EstacaoController::class, 'solicitarSubstituicao'])->name('estacoes.solicitar-substituicao');
+    Route::post('/estacoes/{public_id}/substituir-sensor', [EstacaoController::class, 'substituirSensor'])->name('estacoes.substituir-sensor');
 
     // Módulo de Perfil de Usuário
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');

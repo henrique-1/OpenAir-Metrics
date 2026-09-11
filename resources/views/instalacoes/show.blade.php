@@ -43,28 +43,32 @@
 
                     @foreach ($estacoes as $index => $estacao)
                         @php
-                            $isInstalada = $estacao->status_instalacao === 'Instalada' && ! empty($estacao->mac_address);
+                            $temSubstituicaoPendente = (bool) $estacao->solicitacao_substituicao;
+                            $isInstalada = $estacao->status_instalacao === 'Instalada' && ! empty($estacao->mac_address) && ! $temSubstituicaoPendente;
                             $isMatriz = $estacao->tipo_estacao === 'Estação Matriz';
                             $origem = $isMatriz ? null : $estacao->estacaoOrigem;
                             $origemInstalada = $isMatriz || ($origem && $origem->status_instalacao === 'Instalada' && ! empty($origem->mac_address));
                             
-                            // Uma estação pendente fica bloqueada se a sua estação de origem ainda não foi instalada
-                            $bloqueada = ! $isInstalada && ! $origemInstalada;
+                            // Uma estação pendente de primeira instalação fica bloqueada se a sua estação de origem ainda não foi instalada
+                            // Estações com substituição pendente já estão liberadas diretamente para execução
+                            $bloqueada = ! $isInstalada && ! $origemInstalada && ! $temSubstituicaoPendente;
 
                             $isProxima = false;
-                            if (! $isInstalada && $origemInstalada && ! $primeiraPendenteDefinida) {
+                            if (! $isInstalada && ($origemInstalada || $temSubstituicaoPendente) && ! $primeiraPendenteDefinida) {
                                 $isProxima = true;
                                 $primeiraPendenteDefinida = true;
                             }
                         @endphp
 
-                        <div id="card-estacao-{{ $estacao->public_id }}" class="rounded-xl shadow-sm border {{ $isInstalada ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/20 dark:bg-emerald-950/20' : ($bloqueada ? 'border-athens-gray-200 dark:border-athens-gray-800 opacity-70 bg-athens-gray-50/60 dark:bg-athens-gray-900/40' : ($isProxima ? 'bg-white dark:bg-athens-gray-900 border-blue-dianne-300 dark:border-blue-dianne-700 ring-2 ring-blue-dianne-100 dark:ring-blue-dianne-950/60' : 'bg-white dark:bg-athens-gray-900 border-dodger-blue-300 dark:border-dodger-blue-700')) }} p-6 transition-all">
+                        <div id="card-estacao-{{ $estacao->public_id }}" class="rounded-xl shadow-sm border {{ $temSubstituicaoPendente ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-950/20 ring-2 ring-amber-200/50 dark:ring-amber-950/60' : ($isInstalada ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/20 dark:bg-emerald-950/20' : ($bloqueada ? 'border-athens-gray-200 dark:border-athens-gray-800 opacity-70 bg-athens-gray-50/60 dark:bg-athens-gray-900/40' : ($isProxima ? 'bg-white dark:bg-athens-gray-900 border-blue-dianne-300 dark:border-blue-dianne-700 ring-2 ring-blue-dianne-100 dark:ring-blue-dianne-950/60' : 'bg-white dark:bg-athens-gray-900 border-dodger-blue-300 dark:border-dodger-blue-700'))) }} p-6 transition-all">
                             <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
 
                                 <!-- Identificação e Número do Passo -->
                                 <div class="flex items-start gap-3.5">
-                                    <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base {{ $isInstalada ? 'bg-emerald-600 text-white' : ($isMatriz ? 'bg-blue-dianne-600 text-white' : 'bg-spindle-600 text-white') }} shadow-sm">
-                                        @if ($isInstalada)
+                                    <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base {{ $temSubstituicaoPendente ? 'bg-amber-500 text-white' : ($isInstalada ? 'bg-emerald-600 text-white' : ($isMatriz ? 'bg-blue-dianne-600 text-white' : 'bg-spindle-600 text-white')) }} shadow-sm">
+                                        @if ($temSubstituicaoPendente)
+                                            <x-heroicon-o-arrow-path class="w-6 h-6 stroke-[2.5]" />
+                                        @elseif ($isInstalada)
                                             <x-heroicon-o-check class="w-6 h-6 stroke-[2.5]" />
                                         @else
                                             #{{ $estacao->ordem_instalacao ?? ($index + 1) }}
@@ -77,7 +81,12 @@
                                                 Passo #{{ $estacao->ordem_instalacao ?? ($index + 1) }}: {{ $estacao->tipo_estacao }}
                                             </h2>
 
-                                            @if ($isInstalada)
+                                            @if ($temSubstituicaoPendente)
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 animate-pulse">
+                                                    <x-heroicon-o-arrow-path class="w-3.5 h-3.5" />
+                                                    Ordem de Substituição Aberta
+                                                </span>
+                                            @elseif ($isInstalada)
                                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                                                     Ativa e Instalada
@@ -170,88 +179,75 @@
                                         <span>Estação pendente de instalação em campo. Apenas técnicos com perfil de <strong>Instalador</strong> podem vincular o patrimônio e concluir a ativação.</span>
                                     </div>
                                 @else
-                                    <!-- Formulário Interativo de Ativação (Patrimônio ou MAC) -->
+                                    <!-- Formulário de Ativação / Substituição via Dropdown de Patrimônio/MAC -->
                                     <div class="bg-blue-dianne-50/60 dark:bg-blue-dianne-950/40 border border-blue-dianne-200 dark:border-blue-dianne-800 p-4 rounded-xl space-y-3">
-                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                            <div class="flex flex-wrap items-center gap-2">
-                                                <span class="text-xs font-bold text-blue-dianne-950 dark:text-white uppercase tracking-wide flex items-center gap-1.5">
-                                                    <x-heroicon-o-qr-code class="w-4 h-4 text-blue-dianne-600 dark:text-blue-dianne-400" />
-                                                    Registrar Estação:
-                                                </span>
-                                                <!-- Seletor de Modo: Patrimônio ou MAC -->
-                                                <div class="inline-flex p-0.5 bg-athens-gray-200/80 dark:bg-athens-gray-800 rounded-lg text-xs font-semibold">
-                                                    <button type="button" onclick="setModoVinculacao('{{ $estacao->public_id }}', 'patrimonio')" id="tab-patrimonio-{{ $estacao->public_id }}" class="px-2.5 py-1 rounded-md transition bg-white dark:bg-athens-gray-700 text-blue-dianne-950 dark:text-white shadow-xs cursor-pointer">
-                                                        Por Patrimônio
-                                                    </button>
-                                                    <button type="button" onclick="setModoVinculacao('{{ $estacao->public_id }}', 'mac')" id="tab-mac-{{ $estacao->public_id }}" class="px-2.5 py-1 rounded-md transition text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white cursor-pointer">
-                                                        Por MAC Address
-                                                    </button>
+                                        @if ($temSubstituicaoPendente)
+                                            <div class="p-3 rounded-lg bg-amber-100/70 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-xs text-amber-900 dark:text-amber-200 flex flex-col gap-1">
+                                                <div class="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-100">
+                                                    <x-heroicon-o-arrow-path class="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                                    Ordem de Substituição de Sensor em Aberto
                                                 </div>
+                                                <p class="text-amber-800 dark:text-amber-300">
+                                                    Equipamento anterior: <strong>{{ $estacao->patrimonio?->numero_patrimonio ? 'Patrimônio #' . $estacao->patrimonio->numero_patrimonio : 'MAC ' . ($estacao->mac_address ?? 'S/N') }}</strong>. Ao vincular a nova placa, este item anterior será automaticamente marcado como <strong>Descartado</strong>.
+                                                </p>
+                                                @if($estacao->motivo_substituicao)
+                                                    <p class="text-[11px] text-amber-700 dark:text-amber-400 italic mt-0.5">Motivo: {{ $estacao->motivo_substituicao }}</p>
+                                                @endif
                                             </div>
-                                            <span class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400">Informe o tombamento/patrimônio ou endereço MAC</span>
+                                        @endif
+
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <span class="text-xs font-bold text-blue-dianne-950 dark:text-white uppercase tracking-wide flex items-center gap-1.5">
+                                                <x-heroicon-o-qr-code class="w-4 h-4 text-blue-dianne-600 dark:text-blue-dianne-400" />
+                                                {{ $temSubstituicaoPendente ? 'Executar Substituição:' : 'Ativação em Campo:' }}
+                                            </span>
+                                            <span class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400">
+                                                {{ $temSubstituicaoPendente ? 'Selecione o novo equipamento para substituir o sensor antigo' : 'Selecione o equipamento disponível no estoque municipal' }}
+                                            </span>
                                         </div>
 
-                                        <!-- Container Modo Patrimônio -->
-                                        <div id="container-patrimonio-{{ $estacao->public_id }}" class="space-y-2">
+                                        <div class="space-y-2">
                                             <div class="flex flex-col sm:flex-row gap-2.5">
                                                 <div class="relative flex-1">
-                                                    <input 
-                                                        type="text" 
-                                                        id="patrimonio-input-{{ $estacao->public_id }}" 
-                                                        placeholder="Digite o Nº do Patrimônio (ex: PAT-00123)" 
-                                                        class="w-full text-sm font-semibold px-3.5 py-2.5 bg-white dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
+                                                    <select 
+                                                        id="select-patrimonio-{{ $estacao->public_id }}" 
+                                                        class="w-full text-xs sm:text-sm font-semibold px-3.5 py-2.5 bg-white dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 text-athens-gray-900 dark:text-athens-gray-100 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition cursor-pointer"
+                                                        @disabled($patrimoniosDisponiveis->isEmpty())
                                                     >
-                                                </div>
-
-                                                @if ($patrimoniosDisponiveis->isNotEmpty())
-                                                    <select onchange="selecionarPatrimonioEstoque('{{ $estacao->public_id }}', this)" id="select-estoque-{{ $estacao->public_id }}" class="text-xs border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg px-2.5 py-2.5 bg-white dark:bg-athens-gray-800 text-athens-gray-700 dark:text-athens-gray-200 max-w-[220px]">
-                                                        <option value="">Escolher do Estoque</option>
+                                                        <option value="">{{ $temSubstituicaoPendente ? 'Selecione o novo equipamento (Patrimônio / MAC)...' : 'Selecione o equipamento (Patrimônio / MAC)...' }}</option>
                                                         @foreach ($patrimoniosDisponiveis as $pat)
-                                                            <option value="{{ $pat->public_id }}" data-numero="{{ $pat->numero_patrimonio }}" data-mac="{{ $pat->mac_address }}">
-                                                                {{ $pat->numero_patrimonio ? 'Pat: ' . $pat->numero_patrimonio . ($pat->mac_address ? ' - ' . $pat->mac_address : '') : 'MAC: ' . $pat->mac_address }}
+                                                            <option value="{{ $pat->public_id }}">
+                                                                Patrimônio: {{ $pat->numero_patrimonio ?? 'S/N' }}{{ $pat->mac_address ? ' — MAC: ' . $pat->mac_address : '' }}
                                                             </option>
                                                         @endforeach
                                                     </select>
-                                                @endif
+                                                </div>
 
                                                 <button 
                                                     type="button" 
                                                     onclick="vincularEstacao('{{ $estacao->public_id }}')" 
                                                     id="btn-vincular-{{ $estacao->public_id }}"
-                                                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg text-xs transition shadow-sm hover:shadow active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                                                    @disabled($patrimoniosDisponiveis->isEmpty())
+                                                    class="{{ $temSubstituicaoPendente ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700' }} disabled:bg-athens-gray-300 dark:disabled:bg-athens-gray-700 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-lg text-xs transition shadow-sm hover:shadow active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
                                                 >
-                                                    <x-heroicon-o-check-circle class="w-4 h-4" />
-                                                    Ativar Estação
+                                                    @if($temSubstituicaoPendente)
+                                                        <x-heroicon-o-arrow-path class="w-4 h-4" />
+                                                        Concluir Substituição
+                                                    @else
+                                                        <x-heroicon-o-check-circle class="w-4 h-4" />
+                                                        Ativar Estação
+                                                    @endif
                                                 </button>
                                             </div>
+
+                                            @if ($patrimoniosDisponiveis->isEmpty())
+                                                <p class="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                                    Nenhum equipamento disponível no estoque municipal. Cadastre novas placas no módulo de Patrimônio para liberá-las para instalação.
+                                                </p>
+                                            @endif
+
+                                            <p id="msg-erro-{{ $estacao->public_id }}" class="text-xs text-cinnabar-600 dark:text-cinnabar-400 font-medium hidden"></p>
                                         </div>
-
-                                        <!-- Container Modo MAC Address -->
-                                        <div id="container-mac-{{ $estacao->public_id }}" class="space-y-2 hidden">
-                                            <div class="flex flex-col sm:flex-row gap-2.5">
-                                                <div class="relative flex-1">
-                                                    <input 
-                                                        type="text" 
-                                                        id="mac-input-{{ $estacao->public_id }}" 
-                                                        placeholder="AA:BB:CC:DD:EE:FF" 
-                                                        maxlength="17" 
-                                                        class="w-full font-mono text-sm font-bold uppercase px-3.5 py-2.5 bg-white dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
-                                                    >
-                                                </div>
-
-                                                <button 
-                                                    type="button" 
-                                                    onclick="vincularEstacao('{{ $estacao->public_id }}')" 
-                                                    id="btn-vincular-mac-{{ $estacao->public_id }}"
-                                                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg text-xs transition shadow-sm hover:shadow active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                                                >
-                                                    <x-heroicon-o-check-circle class="w-4 h-4" />
-                                                    Ativar Estação
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <p id="msg-erro-{{ $estacao->public_id }}" class="text-xs text-cinnabar-600 dark:text-cinnabar-400 font-medium hidden"></p>
                                     </div>
                                 @endif
                             </div>
@@ -265,116 +261,27 @@
 
     @push('scripts')
     <script>
-        // Estado do modo de ativação ('patrimonio' ou 'mac')
-        const modoAtivoPorEstacao = {};
-
-        function setModoVinculacao(publicId, modo) {
-            modoAtivoPorEstacao[publicId] = modo;
-            const containerPatrimonio = document.getElementById(`container-patrimonio-${publicId}`);
-            const containerMac = document.getElementById(`container-mac-${publicId}`);
-            const tabPatrimonio = document.getElementById(`tab-patrimonio-${publicId}`);
-            const tabMac = document.getElementById(`tab-mac-${publicId}`);
+        // Envio assíncrono para vincular e ativar estação em campo via seleção do dropdown de Patrimônio
+        function vincularEstacao(publicId) {
+            const select = document.getElementById(`select-patrimonio-${publicId}`);
+            const btn = document.getElementById(`btn-vincular-${publicId}`);
             const msgErro = document.getElementById(`msg-erro-${publicId}`);
 
-            if (msgErro) msgErro.classList.add('hidden');
-
-            if (modo === 'mac') {
-                containerPatrimonio.classList.add('hidden');
-                containerMac.classList.remove('hidden');
-
-                tabMac.classList.add('bg-white', 'dark:bg-athens-gray-700', 'text-blue-dianne-950', 'dark:text-white', 'shadow-xs');
-                tabMac.classList.remove('text-athens-gray-600', 'dark:text-athens-gray-400');
-
-                tabPatrimonio.classList.remove('bg-white', 'dark:bg-athens-gray-700', 'text-blue-dianne-950', 'dark:text-white', 'shadow-xs');
-                tabPatrimonio.classList.add('text-athens-gray-600', 'dark:text-athens-gray-400');
-            } else {
-                containerPatrimonio.classList.remove('hidden');
-                containerMac.classList.add('hidden');
-
-                tabPatrimonio.classList.add('bg-white', 'dark:bg-athens-gray-700', 'text-blue-dianne-950', 'dark:text-white', 'shadow-xs');
-                tabPatrimonio.classList.remove('text-athens-gray-600', 'dark:text-athens-gray-400');
-
-                tabMac.classList.remove('bg-white', 'dark:bg-athens-gray-700', 'text-blue-dianne-950', 'dark:text-white', 'shadow-xs');
-                tabMac.classList.add('text-athens-gray-600', 'dark:text-athens-gray-400');
+            if (msgErro) {
+                msgErro.classList.add('hidden');
+                msgErro.textContent = '';
             }
-        }
-        window.setModoVinculacao = setModoVinculacao;
 
-        function selecionarPatrimonioEstoque(publicId, selectEl) {
-            const opt = selectEl.options[selectEl.selectedIndex];
-            const inputPatrimonio = document.getElementById(`patrimonio-input-${publicId}`);
-            const inputMac = document.getElementById(`mac-input-${publicId}`);
+            const selectedPatId = select ? select.value.trim() : '';
 
-            if (!opt || !opt.value) {
+            if (!selectedPatId) {
+                if (msgErro) {
+                    msgErro.textContent = 'Por favor, selecione um equipamento da lista para ativar a estação.';
+                    msgErro.classList.remove('hidden');
+                }
                 return;
             }
 
-            const numPat = opt.getAttribute('data-numero');
-            const mac = opt.getAttribute('data-mac');
-
-            if (numPat && inputPatrimonio) {
-                inputPatrimonio.value = numPat;
-            } else if (mac && inputPatrimonio) {
-                inputPatrimonio.value = mac;
-            }
-
-            if (mac && inputMac) {
-                inputMac.value = mac;
-            }
-        }
-        window.selecionarPatrimonioEstoque = selecionarPatrimonioEstoque;
-
-        // Formatação com máscara automática do MAC Address (XX:XX:XX:XX:XX:XX)
-        document.querySelectorAll('input[id^="mac-input-"]').forEach(input => {
-            input.addEventListener('input', function(e) {
-                let v = e.target.value.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
-                let formatted = '';
-                for (let i = 0; i < v.length && i < 12; i++) {
-                    if (i > 0 && i % 2 === 0) formatted += ':';
-                    formatted += v[i];
-                }
-                e.target.value = formatted;
-            });
-        });
-
-        // Envio assíncrono para vincular e ativar estação em campo
-        function vincularEstacao(publicId) {
-            const modo = modoAtivoPorEstacao[publicId] || 'patrimonio';
-            const inputPatrimonio = document.getElementById(`patrimonio-input-${publicId}`);
-            const inputMac = document.getElementById(`mac-input-${publicId}`);
-            const selectEstoque = document.getElementById(`select-estoque-${publicId}`);
-            const btn = document.getElementById(modo === 'mac' ? `btn-vincular-mac-${publicId}` : `btn-vincular-${publicId}`) || document.getElementById(`btn-vincular-${publicId}`);
-            const msgErro = document.getElementById(`msg-erro-${publicId}`);
-
-            const payload = {};
-
-            if (modo === 'mac') {
-                const mac = inputMac ? inputMac.value.trim() : '';
-                if (!mac || mac.length < 17) {
-                    msgErro.textContent = 'Por favor, informe um endereço MAC válido no formato AA:BB:CC:DD:EE:FF.';
-                    msgErro.classList.remove('hidden');
-                    return;
-                }
-                payload.mac_address = mac;
-            } else {
-                const patVal = inputPatrimonio ? inputPatrimonio.value.trim() : '';
-                const selectedPatId = selectEstoque ? selectEstoque.value : '';
-
-                if (!patVal && !selectedPatId) {
-                    msgErro.textContent = 'Por favor, digite o Número de Patrimônio ou escolha um item do estoque.';
-                    msgErro.classList.remove('hidden');
-                    return;
-                }
-
-                if (selectedPatId) {
-                    payload.patrimonio_id = selectedPatId;
-                }
-                if (patVal) {
-                    payload.numero_patrimonio = patVal;
-                }
-            }
-
-            msgErro.classList.add('hidden');
             let originalBtnHtml = '';
             if (btn) {
                 originalBtnHtml = btn.innerHTML;
@@ -388,7 +295,9 @@
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    patrimonio_id: selectedPatId
+                })
             })
             .then(res => res.json().then(data => ({ status: res.status, body: data })))
             .then(({ status, body }) => {
@@ -399,8 +308,10 @@
                         btn.disabled = false;
                         btn.innerHTML = originalBtnHtml || 'Ativar Estação';
                     }
-                    msgErro.textContent = body.message || 'Erro ao registrar a estação.';
-                    msgErro.classList.remove('hidden');
+                    if (msgErro) {
+                        msgErro.textContent = body.message || 'Erro ao registrar a estação.';
+                        msgErro.classList.remove('hidden');
+                    }
                 }
             })
             .catch(err => {
@@ -408,8 +319,10 @@
                     btn.disabled = false;
                     btn.innerHTML = originalBtnHtml || 'Ativar Estação';
                 }
-                msgErro.textContent = 'Erro de comunicação com o servidor. Tente novamente.';
-                msgErro.classList.remove('hidden');
+                if (msgErro) {
+                    msgErro.textContent = 'Erro de comunicação com o servidor. Tente novamente.';
+                    msgErro.classList.remove('hidden');
+                }
             });
         }
         window.vincularEstacao = vincularEstacao;

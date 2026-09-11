@@ -23,11 +23,25 @@ class PatrimonioFactory extends Factory
         return [
             'public_id' => fake()->uuid(),
             'mac_address' => strtoupper(fake()->unique()->macAddress()),
-            'numero_patrimonio' => 'PAT-'.fake()->unique()->numberBetween(1000, 9999),
+            'numero_patrimonio' => 'PAT-' . fake()->unique()->numberBetween(1000, 9999),
             'status' => 'Disponível',
             'data_aquisicao' => fake()->dateTimeBetween('-6 months', 'now'),
             'observacoes' => fake()->optional()->sentence(),
             'created_by' => User::factory(),
         ];
+    }
+
+    public function instalada(): static
+    {
+        return $this->state(fn(array $attributes) => [
+            'status' => 'Instalada',
+        ]);
+    }
+
+    public function descartado(): static
+    {
+        return $this->state(fn(array $attributes) => [
+            'status' => 'Descartado',
+        ]);
     }
 }

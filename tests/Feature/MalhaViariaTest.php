@@ -71,8 +71,8 @@ test('job resolve reverse geocoding executa com rate limiter e atualiza estacao 
     ]);
 
     $user = User::factory()->create();
-    $estado = Estado::factory()->create(['uf' => 'SP', 'nome' => 'São Paulo']);
-    $cidade = Cidade::factory()->create(['estado_id' => $estado->id, 'nome' => 'São João da Boa Vista']);
+    $estado = Estado::firstOrCreate(['uf' => 'SP'], ['nome' => 'São Paulo']);
+    $cidade = Cidade::firstOrCreate(['estado_id' => $estado->id, 'nome' => 'São João da Boa Vista']);
 
     $estacao = Estacao::factory()->create([
         'created_by' => $user->id,

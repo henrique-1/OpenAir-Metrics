@@ -17,18 +17,21 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Garante que o usuário seja criado ou atualizado se já existir,
-        // evitando erros de violação de chave única (Unique Constraint).
+        // Administrador Municipal padrão
         User::updateOrCreate(
-            ['email' => 'admin@admin.com'], // Condição de busca
+            ['email' => 'admin@admin.com'],
             [
                 'name' => 'Administrador',
                 'password' => Hash::make('admin123'),
-                'email_verified_at' => now(), // Opcional: já marca o e-mail como verificado
+                'nivel' => 'administrador',
+                'ativo' => true,
+                'email_verified_at' => now(),
             ]
         );
 
-        $this->call(LocalidadesSeeder::class);
+        \Illuminate\Support\Facades\DB::transaction(function () {
+            $this->call(LocalidadesSeeder::class);
+        });
 
         try {
             if (MalhaViaria::doesntExist()) {

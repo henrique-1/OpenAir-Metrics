@@ -29,10 +29,12 @@
                         <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">Roteiros sequenciais para instalação e vinculação física de MAC Address em campo.</p>
                     </div>
 
+                    @if(!auth()->user()?->isInstalador())
                     <a href="{{ route('estacoes.planejar') }}" class="inline-flex items-center justify-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white font-semibold py-2.5 px-5 rounded-lg transition-all shadow-sm hover:shadow text-sm cursor-pointer">
                         <x-heroicon-o-plus class="w-5 h-5" />
                         Planejar Nova Malha
                     </a>
+                    @endif
                 </div>
 
                 <!-- Barra de Busca, Filtros e Ordenação -->
@@ -119,9 +121,11 @@
                                 @forelse ($matrizes as $m)
                                     @php
                                         $totalEstacoesCluster = $m->total_satelites + 1;
-                                        $instaladasCluster = ($m->status_instalacao === 'Instalada' ? 1 : 0) + $m->instaladas_satelites;
+                                        $matrizInstalada = ($m->status_instalacao === 'Instalada' && ! $m->solicitacao_substituicao);
+                                        $instaladasCluster = ($matrizInstalada ? 1 : 0) + ($m->instaladas_satelites ?? 0);
                                         $porcentagem = $totalEstacoesCluster > 0 ? round(($instaladasCluster / $totalEstacoesCluster) * 100) : 0;
-                                        $completa = $porcentagem === 100;
+                                        $temSubstituicaoCluster = $m->solicitacao_substituicao || ($m->substituicoes_pendentes ?? 0) > 0;
+                                        $completa = $porcentagem === 100 && ! $temSubstituicaoCluster;
                                     @endphp
                                     <tr class="hover:bg-athens-gray-50/60 dark:hover:bg-athens-gray-800/50 transition">
                                         <!-- Identificação da Matriz -->
@@ -154,7 +158,12 @@
 
                                         <!-- Status da Matriz -->
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            @if ($m->status_instalacao === 'Instalada')
+                                            @if ($m->solicitacao_substituicao)
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 animate-pulse">
+                                                    <x-heroicon-o-arrow-path class="w-3.5 h-3.5" />
+                                                    Substituição Pendente
+                                                </span>
+                                            @elseif ($m->status_instalacao === 'Instalada')
                                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                                     Instalada
@@ -163,6 +172,11 @@
                                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-tahiti-gold-50 dark:bg-tahiti-gold-950/50 text-tahiti-gold-700 dark:text-tahiti-gold-300 border border-tahiti-gold-200 dark:border-tahiti-gold-800">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-tahiti-gold-500"></span>
                                                     Pendente
+                                                </span>
+                                            @endif
+                                            @if(($m->substituicoes_pendentes ?? 0) > 0)
+                                                <span class="block mt-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                                    {{ $m->substituicoes_pendentes }} {{ $m->substituicoes_pendentes > 1 ? 'satélites aguardando troca' : 'satélite aguardando troca' }}
                                                 </span>
                                             @endif
                                         </td>
@@ -194,10 +208,12 @@
                                             <x-heroicon-o-clipboard-document-list class="w-12 h-12 mx-auto mb-3 text-athens-gray-300 dark:text-athens-gray-600" />
                                             <p class="font-medium text-base text-athens-gray-600 dark:text-athens-gray-300">Nenhuma ordem de instalação gerada.</p>
                                             <p class="text-xs mt-1">Utilize o Planejador de Malha para posicionar a Matriz e gerar as ordens automaticamente.</p>
+                                            @if(!auth()->user()?->isInstalador())
                                             <a href="{{ route('estacoes.planejar') }}" class="inline-flex items-center gap-1.5 mt-4 text-xs font-semibold bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white py-2 px-4 rounded-lg transition shadow-sm">
                                                 <x-heroicon-o-plus class="w-4 h-4" />
                                                 Planejar Primeira Malha
                                             </a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforelse

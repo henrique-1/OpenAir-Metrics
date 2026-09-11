@@ -11,6 +11,7 @@ use App\Services\GeocodingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class EstacaoController extends Controller
@@ -21,6 +22,10 @@ class EstacaoController extends Controller
     public function index(Request $request): View
     {
         $user = Auth::user();
+        if ($user?->isSuperAdmin()) {
+            abort(403, 'O super-usuário só pode gerenciar administradores.');
+        }
+
         $query = Estacao::with(['bairro.cidade.estado', 'patrimonio', 'solicitanteSubstituicao']);
 
         if ($user && $user->cidade_id) {
@@ -111,6 +116,10 @@ class EstacaoController extends Controller
     public function create(): View
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         if ($user && $user->cidade_id) {
             $user->load('cidade.estado');
         }
@@ -120,7 +129,7 @@ class EstacaoController extends Controller
 
         $query = Estacao::withCoordinates()->with(['bairro.cidade.estado', 'estacaoOrigem']);
         if ($cidade) {
-            $query->whereHas('bairro.cidade', fn ($q) => $q->where('id', $cidade->id));
+            $query->whereHas('bairro.cidade', fn($q) => $q->where('id', $cidade->id));
         }
 
         $estacoesExistentes = $query->get()
@@ -157,6 +166,10 @@ class EstacaoController extends Controller
     public function store(StoreEstacaoRequest $request): RedirectResponse
     {
         $user = Auth::user();
+        if (! $user?->isPlanejadorTecnico() && ! $user?->isAdministrador()) {
+            abort(403, 'Acesso restrito ao Planejador Técnico.');
+        }
+
         $data = $request->validated();
         $data['created_by'] = $user?->id;
 
@@ -238,12 +251,12 @@ class EstacaoController extends Controller
             $estacao->update(['matriz_pai_id' => $estacao->private_id]);
         }
 
-        // Se o MAC Address pertencer a um item em estoque no patrimônio, vincula e atualiza seu status para Instalado
+        // Se o MAC Address pertencer a um item em estoque no patrimônio, vincula e atualiza seu status para Instalada
         if (! empty($estacao->mac_address)) {
             $patrimonio = Patrimonio::where('mac_address', $estacao->mac_address)->first();
             if ($patrimonio) {
                 $estacao->update(['patrimonio_id' => $patrimonio->private_id]);
-                $patrimonio->update(['status' => 'Instalado']);
+                $patrimonio->update(['status' => 'Instalada']);
             }
         }
 
@@ -306,5 +319,77 @@ class EstacaoController extends Controller
         return redirect()
             ->route('estacoes.index')
             ->with('success', "Solicitação de substituição dos sensores registrada com sucesso para a {$identificador}!");
+    }
+
+    /**
+     * Efetiva a substituição do sensor de uma estação:
+     * O patrimônio anterior é marcado como 'Descartado', o novo patrimônio passa para 'Instalada',
+     * a estação é atualizada e a pendência de substituição é finalizada.
+     */
+    public function substituirSensor(Request $request, string $public_id): RedirectResponse
+    {
+        $user = Auth::user();
+        if (! $user || (! $user->isPlanejadorTecnico() && ! $user->isInstalador() && ! $user->isAdministrador())) {
+            abort(403, 'Acesso não autorizado para substituir sensores.');
+        }
+
+        $estacao = Estacao::where('public_id', $public_id)->firstOrFail();
+
+        if ($user->cidade_id && $estacao->bairro && $estacao->bairro->cidade_id !== $user->cidade_id) {
+            abort(403, 'Você só pode substituir sensores de estações do seu município.');
+        }
+
+        $validated = $request->validate([
+            'patrimonio_id' => ['required', 'exists:patrimonios,private_id'],
+        ], [
+            'patrimonio_id.required' => 'Selecione o novo equipamento de patrimônio.',
+        ]);
+
+        $novoPatrimonio = Patrimonio::findOrFail($validated['patrimonio_id']);
+
+        if ($novoPatrimonio->status !== 'Disponível') {
+            return redirect()
+                ->route('estacoes.index')
+                ->with('error', 'O equipamento selecionado não está com status Disponível.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Regra: assim que o sensor for substituído, o status do patrimônio deve ser alterado para descartado
+            if ($estacao->patrimonio_id && (int) $estacao->patrimonio_id !== (int) $novoPatrimonio->private_id) {
+                $antigoPatrimonio = Patrimonio::find($estacao->patrimonio_id);
+                if ($antigoPatrimonio) {
+                    $antigoPatrimonio->update(['status' => 'Descartado']);
+                }
+            }
+
+            // Atualiza o novo patrimônio para 'Instalada'
+            $novoPatrimonio->update(['status' => 'Instalada']);
+
+            // Atualiza a estação com o novo patrimônio e finaliza a pendência de substituição
+            $estacao->update([
+                'patrimonio_id' => $novoPatrimonio->private_id,
+                'mac_address' => $novoPatrimonio->mac_address ?: $estacao->mac_address,
+                'status_instalacao' => 'Instalada',
+                'data_instalacao' => now(),
+                'solicitacao_substituicao' => false,
+                'solicitacao_substituicao_em' => null,
+                'motivo_substituicao' => null,
+                'solicitado_por' => null,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('estacoes.index')
+                ->with('success', "Sensor da estação substituído com sucesso! O patrimônio anterior foi marcado como Descartado e o novo equipamento #{$novoPatrimonio->numero_patrimonio} está ativo.");
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return redirect()
+                ->route('estacoes.index')
+                ->with('error', 'Erro ao substituir sensor: ' . $e->getMessage());
+        }
     }
 }

@@ -61,32 +61,41 @@
         </div>
 
         <nav class="flex-1 p-3 space-y-1.5 overflow-y-auto">
-            <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 px-3 py-2.5 rounded-lg font-medium transition-colors">
-                <x-heroicon-o-map class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400" />
-                Voltar para o Mapa
-            </a>
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'dashboard' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
-                <x-heroicon-o-chart-pie class="w-5 h-5 {{ $active === 'dashboard' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-                Visão Geral
-            </a>
-            <a href="{{ route('estacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'estacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
-                <x-heroicon-o-signal class="w-5 h-5 {{ $active === 'estacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-                Minhas Estações
-            </a>
-            <a href="{{ route('patrimonios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'patrimonios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
-                <x-heroicon-o-server-stack class="w-5 h-5 {{ $active === 'patrimonios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-                Patrimônio
-            </a>
-            <a href="{{ route('instalacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'instalacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
-                <x-heroicon-o-clipboard-document-check class="w-5 h-5 {{ $active === 'instalacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-                Ordens de Instalação
-            </a>
-
-            @if(Auth::user() && Auth::user()->isAdministrador())
+            @if(Auth::user() && Auth::user()->isSuperAdmin())
                 <a href="{{ route('usuarios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'usuarios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
                     <x-heroicon-o-users class="w-5 h-5 {{ $active === 'usuarios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-                    Usuários Municipais
+                    Administradores
                 </a>
+            @else
+                <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 px-3 py-2.5 rounded-lg font-medium transition-colors">
+                    <x-heroicon-o-map class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400" />
+                    Voltar para o Mapa
+                </a>
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'dashboard' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
+                    <x-heroicon-o-chart-pie class="w-5 h-5 {{ $active === 'dashboard' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                    Visão Geral
+                </a>
+                @if(Auth::user() && (Auth::user()->isAdministrador() || Auth::user()->isPlanejadorTecnico()))
+                    <a href="{{ route('estacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'estacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
+                        <x-heroicon-o-signal class="w-5 h-5 {{ $active === 'estacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                        Minhas Estações
+                    </a>
+                    <a href="{{ route('patrimonios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'patrimonios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
+                        <x-heroicon-o-server-stack class="w-5 h-5 {{ $active === 'patrimonios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                        Patrimônio
+                    </a>
+                @endif
+                <a href="{{ route('instalacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'instalacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
+                    <x-heroicon-o-clipboard-document-check class="w-5 h-5 {{ $active === 'instalacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                    Ordens de Instalação
+                </a>
+
+                @if(Auth::user() && Auth::user()->isAdministrador())
+                    <a href="{{ route('usuarios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'usuarios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
+                        <x-heroicon-o-users class="w-5 h-5 {{ $active === 'usuarios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                        Usuários Municipais
+                    </a>
+                @endif
             @endif
 
             <a href="{{ route('perfil.edit') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'perfil' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
@@ -132,32 +141,41 @@
     </div>
     
     <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-        <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white px-3 py-2.5 rounded-lg font-medium transition-colors">
-            <x-heroicon-o-map class="w-5 h-5" />
-            Voltar para o Mapa
-        </a>
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'dashboard' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
-            <x-heroicon-o-chart-pie class="w-5 h-5 {{ $active === 'dashboard' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-            Visão Geral
-        </a>
-        <a href="{{ route('estacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'estacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
-            <x-heroicon-o-signal class="w-5 h-5 {{ $active === 'estacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-            Minhas Estações
-        </a>
-        <a href="{{ route('patrimonios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'patrimonios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
-            <x-heroicon-o-server-stack class="w-5 h-5 {{ $active === 'patrimonios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-            Patrimônio
-        </a>
-        <a href="{{ route('instalacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'instalacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
-            <x-heroicon-o-clipboard-document-check class="w-5 h-5 {{ $active === 'instalacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-            Ordens de Instalação
-        </a>
-
-        @if(Auth::user() && Auth::user()->isAdministrador())
+        @if(Auth::user() && Auth::user()->isSuperAdmin())
             <a href="{{ route('usuarios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'usuarios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
                 <x-heroicon-o-users class="w-5 h-5 {{ $active === 'usuarios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
-                Usuários Municipais
+                Administradores
             </a>
+        @else
+            <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white px-3 py-2.5 rounded-lg font-medium transition-colors">
+                <x-heroicon-o-map class="w-5 h-5" />
+                Voltar para o Mapa
+            </a>
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'dashboard' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
+                <x-heroicon-o-chart-pie class="w-5 h-5 {{ $active === 'dashboard' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                Visão Geral
+            </a>
+            @if(Auth::user() && (Auth::user()->isAdministrador() || Auth::user()->isPlanejadorTecnico()))
+                <a href="{{ route('estacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'estacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
+                    <x-heroicon-o-signal class="w-5 h-5 {{ $active === 'estacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                    Minhas Estações
+                </a>
+                <a href="{{ route('patrimonios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'patrimonios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
+                    <x-heroicon-o-server-stack class="w-5 h-5 {{ $active === 'patrimonios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                    Patrimônio
+                </a>
+            @endif
+            <a href="{{ route('instalacoes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'instalacoes' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
+                <x-heroicon-o-clipboard-document-check class="w-5 h-5 {{ $active === 'instalacoes' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                Ordens de Instalação
+            </a>
+
+            @if(Auth::user() && Auth::user()->isAdministrador())
+                <a href="{{ route('usuarios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'usuarios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
+                    <x-heroicon-o-users class="w-5 h-5 {{ $active === 'usuarios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                    Usuários Municipais
+                </a>
+            @endif
         @endif
 
         <a href="{{ route('perfil.edit') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'perfil' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">

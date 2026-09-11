@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -353,6 +354,14 @@ class Estacao extends Model
     public function medicoes(): HasMany
     {
         return $this->hasMany(Medicao::class, 'estacao_id', 'private_id');
+    }
+
+    /**
+     * Relacionamento: Última medição registrada para esta estação.
+     */
+    public function ultimaMedicao(): HasOne
+    {
+        return $this->hasOne(Medicao::class, 'estacao_id', 'private_id')->latestOfMany('data_hora');
     }
 
     /**

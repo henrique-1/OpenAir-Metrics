@@ -2,30 +2,49 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cidade;
+use App\Models\Estado;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class UsuarioController extends Controller
 {
     /**
-     * Lista os usuários municipais da cidade do administrador logado com busca, filtros e ordenação.
+     * Lista os usuários municipais da cidade do administrador ou todos os administradores se for super-usuário.
      */
     public function index(Request $request): View
     {
         $currentUser = $request->user();
-        if (! $currentUser->isAdministrador()) {
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
             abort(403, 'Acesso restrito a administradores.');
         }
 
         $query = User::with('cidade.estado');
 
-        if ($currentUser->cidade_id) {
-            $query->where('cidade_id', $currentUser->cidade_id);
+        $cidades = null;
+        if ($currentUser->isSuperAdmin()) {
+            // Super-usuário gerencia administradores municipais em todo o sistema
+            $query->where('nivel', 'administrador');
+
+            if ($request->filled('cidade_id')) {
+                $query->where('cidade_id', $request->input('cidade_id'));
+            }
+
+            $cidades = Cidade::with('estado')->orderBy('nome')->get();
+        } else {
+            // Administrador municipal gerencia apenas os usuários da sua jurisdição (Planejador Técnico e Instalador)
+            $query->where('cidade_id', $currentUser->cidade_id)
+                ->whereIn('nivel', ['cadastrador', 'instalador']);
+
+            // Filtro por nível de acesso para admin municipal
+            $nivel = $request->input('nivel');
+            if ($nivel && in_array($nivel, ['cadastrador', 'instalador'], true)) {
+                $query->where('nivel', $nivel);
+            }
         }
 
         // Filtro de busca textual (nome ou email)
@@ -35,12 +54,6 @@ class UsuarioController extends Controller
                 $q->where('name', 'like', "%{$busca}%")
                     ->orWhere('email', 'like', "%{$busca}%");
             });
-        }
-
-        // Filtro por nível de acesso
-        $nivel = $request->input('nivel');
-        if ($nivel && in_array($nivel, ['administrador', 'cadastrador', 'instalador'], true)) {
-            $query->where('nivel', $nivel);
         }
 
         // Filtro por status
@@ -67,10 +80,12 @@ class UsuarioController extends Controller
         return view('usuarios.index', [
             'usuarios' => $usuarios,
             'currentUser' => $currentUser,
+            'cidades' => $cidades,
             'filtros' => [
                 'busca' => $busca,
-                'nivel' => $nivel,
+                'nivel' => $request->input('nivel'),
                 'status' => $status,
+                'cidade_id' => $request->input('cidade_id'),
                 'sort' => $sort,
                 'direction' => $direction,
             ],
@@ -78,33 +93,81 @@ class UsuarioController extends Controller
     }
 
     /**
-     * Exibe o formulário de cadastro de novo usuário para o município.
+     * Exibe o formulário de cadastro de novo usuário.
      */
     public function create(Request $request): View
     {
         $currentUser = $request->user();
-        if (! $currentUser->isAdministrador()) {
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
             abort(403, 'Acesso restrito a administradores.');
         }
 
         $currentUser->load('cidade.estado');
 
+        $estados = null;
+        $cidades = null;
+        $selectedEstadoId = null;
+        if ($currentUser->isSuperAdmin()) {
+            $estados = Estado::orderBy('nome')->get();
+            $selectedEstadoId = old('estado_id');
+            if (! $selectedEstadoId && old('cidade_id')) {
+                $cidadeOld = Cidade::find(old('cidade_id'));
+                $selectedEstadoId = $cidadeOld?->estado_id;
+            }
+            $cidades = $selectedEstadoId ? Cidade::where('estado_id', $selectedEstadoId)->orderBy('nome')->get() : collect();
+        }
+
         return view('usuarios.create', [
             'currentUser' => $currentUser,
             'cidade' => $currentUser->cidade,
+            'estados' => $estados,
+            'cidades' => $cidades,
+            'selectedEstadoId' => $selectedEstadoId,
         ]);
     }
 
     /**
-     * Salva o novo usuário e executa a regra de transição de gestão se for um novo administrador.
+     * Salva o novo usuário conforme o nível do usuário logado.
      */
     public function store(Request $request): RedirectResponse
     {
         $currentUser = $request->user();
-        if (! $currentUser->isAdministrador()) {
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
             abort(403, 'Acesso restrito a administradores.');
         }
 
+        if ($currentUser->isSuperAdmin()) {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+                'password' => ['required', 'string', 'min:8', 'confirmed'],
+                'estado_id' => ['nullable', 'exists:estados,id'],
+                'cidade_id' => [
+                    'required',
+                    'exists:cidades,id',
+                    Rule::exists('cidades', 'id')->when(
+                        $request->filled('estado_id'),
+                        fn($q) => $q->where('estado_id', $request->input('estado_id'))
+                    ),
+                ],
+                'logradouro' => ['nullable', 'string', 'max:255'],
+                'numero' => ['nullable', 'string', 'max:20'],
+                'complemento' => ['nullable', 'string', 'max:255'],
+                'bairro' => ['nullable', 'string', 'max:255'],
+                'estado' => ['nullable', 'string', 'max:2'],
+                'cep' => ['nullable', 'string', 'max:9'],
+            ]);
+
+            $validated['nivel'] = 'administrador';
+            $validated['ativo'] = true;
+            unset($validated['estado_id']);
+
+            User::create($validated);
+
+            return redirect()->route('usuarios.index')->with('success', 'Administrador municipal cadastrado com sucesso!');
+        }
+
+        // Administrador municipal: cadastra técnicos, instaladores ou um sucessor administrador
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -121,42 +184,44 @@ class UsuarioController extends Controller
         $validated['cidade_id'] = $currentUser->cidade_id;
         $validated['ativo'] = true;
 
-        if ($validated['nivel'] === 'administrador') {
-            DB::transaction(function () use ($validated, $currentUser) {
-                User::create($validated);
-                // O administrador original perde acesso ao sistema e tem sua conta desabilitada (transição de gestão)
-                $currentUser->update(['ativo' => false]);
-            });
+        User::create($validated);
 
+        if ($validated['nivel'] === 'administrador') {
+            $currentUser->update(['ativo' => false]);
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')->with('info', 'Novo administrador municipal cadastrado com sucesso. Conforme a regra de transição da prefeitura, sua conta de administrador anterior foi transferida e desativada.');
+            return redirect()->route('login')->with('info', 'Novo administrador municipal cadastrado com sucesso. Conforme a regra de sucessão administrativa municipal, sua conta foi desativada e você foi desconectado.');
         }
 
-        User::create($validated);
-
-        return redirect()->route('usuarios.index')->with('success', 'Usuário municipal cadastrado com sucesso!');
+        return redirect()->route('usuarios.index')->with('success', 'Usuário cadastrado com sucesso!');
     }
 
     /**
-     * Alterna o status (ativo / desativado) de um usuário municipal.
+     * Alterna o status (ativo/inativo) de um usuário.
      */
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
         $currentUser = $request->user();
-        if (! $currentUser->isAdministrador()) {
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
             abort(403, 'Acesso restrito a administradores.');
         }
 
-        if ($currentUser->cidade_id && $user->cidade_id !== $currentUser->cidade_id) {
-            abort(403, 'Acesso restrito à sua jurisdição municipal.');
-        }
-
-        // Regra de segurança: o administrador logado não pode desativar a própria conta
-        if ($user->id === $currentUser->id) {
-            return back()->with('error', 'Você não pode desativar sua própria conta de administrador.');
+        if ($currentUser->isSuperAdmin()) {
+            if ($user->id === $currentUser->id || $user->isSuperAdmin()) {
+                return back()->with('error', 'Você não pode desativar seu próprio acesso.');
+            }
+            if (! $user->isAdministrador()) {
+                abort(403, 'Super-usuário só pode gerenciar administradores municipais.');
+            }
+        } else {
+            if ($user->id === $currentUser->id) {
+                return back()->with('error', 'Você não pode desativar sua própria conta.');
+            }
+            if ($user->cidade_id !== $currentUser->cidade_id || ! in_array($user->nivel, ['cadastrador', 'instalador'], true)) {
+                abort(403, 'Acesso restrito a usuários sob sua jurisdição municipal.');
+            }
         }
 
         $novoStatus = ! $user->ativo;
@@ -170,17 +235,32 @@ class UsuarioController extends Controller
     }
 
     /**
-     * Exibe o formulário de edição de um usuário municipal.
+     * Exibe o formulário de edição de um usuário.
      */
     public function edit(Request $request, User $user): View
     {
         $currentUser = $request->user();
-        if (! $currentUser->isAdministrador()) {
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
             abort(403, 'Acesso restrito a administradores.');
         }
 
-        if ($currentUser->cidade_id && $user->cidade_id !== $currentUser->cidade_id) {
-            abort(403, 'Acesso restrito à sua jurisdição municipal.');
+        $estados = null;
+        $cidades = null;
+        $selectedEstadoId = null;
+        if ($currentUser->isSuperAdmin()) {
+            if (! $user->isAdministrador()) {
+                abort(403, 'Super-usuário só pode gerenciar administradores municipais.');
+            }
+            $estados = Estado::orderBy('nome')->get();
+            $selectedEstadoId = old('estado_id', $user->cidade?->estado_id);
+            $cidades = $selectedEstadoId ? Cidade::where('estado_id', $selectedEstadoId)->orderBy('nome')->get() : collect();
+        } else {
+            if ($user->cidade_id !== $currentUser->cidade_id) {
+                abort(403, 'Acesso restrito a usuários sob sua jurisdição municipal.');
+            }
+            if ($user->id !== $currentUser->id && ! in_array($user->nivel, ['cadastrador', 'instalador'], true)) {
+                abort(403, 'Acesso restrito a usuários sob sua jurisdição municipal.');
+            }
         }
 
         $user->load('cidade.estado');
@@ -189,28 +269,71 @@ class UsuarioController extends Controller
             'usuario' => $user,
             'currentUser' => $currentUser,
             'cidade' => $user->cidade ?? $currentUser->cidade,
+            'estados' => $estados,
+            'cidades' => $cidades,
+            'selectedEstadoId' => $selectedEstadoId,
         ]);
     }
 
     /**
-     * Atualiza os dados de um usuário municipal.
+     * Atualiza os dados de um usuário.
      */
     public function update(Request $request, User $user): RedirectResponse
     {
         $currentUser = $request->user();
-        if (! $currentUser->isAdministrador()) {
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
             abort(403, 'Acesso restrito a administradores.');
         }
 
-        if ($currentUser->cidade_id && $user->cidade_id !== $currentUser->cidade_id) {
-            abort(403, 'Acesso restrito à sua jurisdição municipal.');
+        if ($currentUser->isSuperAdmin()) {
+            if (! $user->isAdministrador()) {
+                abort(403, 'Super-usuário só pode gerenciar administradores municipais.');
+            }
+
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+                'estado_id' => ['nullable', 'exists:estados,id'],
+                'cidade_id' => [
+                    'required',
+                    'exists:cidades,id',
+                    Rule::exists('cidades', 'id')->when(
+                        $request->filled('estado_id'),
+                        fn($q) => $q->where('estado_id', $request->input('estado_id'))
+                    ),
+                ],
+                'logradouro' => ['nullable', 'string', 'max:255'],
+                'numero' => ['nullable', 'string', 'max:20'],
+                'complemento' => ['nullable', 'string', 'max:255'],
+                'bairro' => ['nullable', 'string', 'max:255'],
+                'cep' => ['nullable', 'string', 'max:9'],
+                'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            ]);
+
+            unset($validated['estado_id']);
+
+            if (empty($validated['password'])) {
+                unset($validated['password']);
+            }
+
+            $user->update($validated);
+
+            return redirect()->route('usuarios.index')->with('success', "Administrador {$user->name} atualizado com sucesso!");
+        }
+
+        // Administrador municipal
+        if ($user->cidade_id !== $currentUser->cidade_id) {
+            abort(403, 'Acesso restrito a usuários sob sua jurisdição municipal.');
         }
 
         $isSelf = ($user->id === $currentUser->id);
 
+        if (! $isSelf && ! in_array($user->nivel, ['cadastrador', 'instalador'], true)) {
+            abort(403, 'Acesso restrito a usuários sob sua jurisdição municipal.');
+        }
+
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'nivel' => ['required', 'in:administrador,cadastrador,instalador'],
             'logradouro' => ['nullable', 'string', 'max:255'],
             'numero' => ['nullable', 'string', 'max:20'],
             'complemento' => ['nullable', 'string', 'max:255'],
@@ -219,34 +342,16 @@ class UsuarioController extends Controller
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ];
 
-        // Regra estrita: Nenhum usuário pode trocar o próprio e-mail
-        if (! $isSelf) {
-            $rules['email'] = ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)];
-        }
-
-        $validated = $request->validate($rules);
-
-        // Se estiver editando a si mesmo, preserva o e-mail original intocado
         if ($isSelf) {
-            $validated['email'] = $user->email;
+            $validated = $request->validate($rules);
+        } else {
+            $rules['email'] = ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)];
+            $rules['nivel'] = ['required', 'in:cadastrador,instalador'];
+            $validated = $request->validate($rules);
         }
 
         if (empty($validated['password'])) {
             unset($validated['password']);
-        }
-
-        // Se promover outro usuário a administrador municipal, aciona a regra de sucessão
-        if ($validated['nivel'] === 'administrador' && ! $isSelf) {
-            DB::transaction(function () use ($user, $validated, $currentUser) {
-                $user->update($validated);
-                $currentUser->update(['ativo' => false]);
-            });
-
-            Auth::logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-
-            return redirect()->route('login')->with('info', "Administração municipal transferida para {$user->name}. Sua conta anterior foi desativada.");
         }
 
         $user->update($validated);

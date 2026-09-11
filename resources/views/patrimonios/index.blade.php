@@ -44,10 +44,12 @@
                     </div>
 
                     <!-- Botão de Ação Primária -->
+                    @if(!auth()->user()?->isInstalador())
                     <a href="{{ route('patrimonios.create') }}" class="inline-flex items-center justify-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white font-semibold py-2.5 px-5 rounded-lg transition-all shadow-sm hover:shadow active:scale-98 text-sm cursor-pointer">
                         <x-heroicon-o-plus class="w-5 h-5" />
                         Cadastrar Equipamentos
                     </a>
+                    @endif
                 </div>
 
                 <!-- Cards de Resumo Rápido -->
@@ -83,12 +85,12 @@
                     </div>
 
                     <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
-                        <div class="p-3 bg-tahiti-gold-50 dark:bg-tahiti-gold-950/50 rounded-lg text-tahiti-gold-600 dark:text-tahiti-gold-400">
-                            <x-heroicon-o-wrench-screwdriver class="w-6 h-6" />
+                        <div class="p-3 bg-cinnabar-50 dark:bg-cinnabar-950/50 rounded-lg text-cinnabar-600 dark:text-cinnabar-400">
+                            <x-heroicon-o-trash class="w-6 h-6" />
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Em Manutenção</p>
-                            <p class="text-2xl font-bold text-tahiti-gold-600 dark:text-tahiti-gold-400">{{ $manutencao }}</p>
+                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Descartados</p>
+                            <p class="text-2xl font-bold text-cinnabar-600 dark:text-cinnabar-400">{{ $descartados }}</p>
                         </div>
                     </div>
                 </div>
@@ -105,9 +107,7 @@
                             <select name="status" onchange="this.form.submit()" class="w-full sm:w-auto border border-athens-gray-300 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 rounded-lg px-3 py-2 text-xs text-athens-gray-700 dark:text-athens-gray-200 focus:ring-2 focus:ring-blue-dianne-500">
                                 <option value="">Todos os Status</option>
                                 <option value="Disponível" @selected(($statusFiltro ?? '') === 'Disponível')>Disponível</option>
-                                <option value="Instalado" @selected(($statusFiltro ?? '') === 'Instalado' || ($statusFiltro ?? '') === 'Instalada')>Instalada</option>
-                                <option value="Alocado" @selected(($statusFiltro ?? '') === 'Alocado')>Alocado</option>
-                                <option value="Manutenção" @selected(($statusFiltro ?? '') === 'Manutenção')>Manutenção</option>
+                                <option value="Instalada" @selected(($statusFiltro ?? '') === 'Instalada' || ($statusFiltro ?? '') === 'Instalado')>Instalada</option>
                                 <option value="Descartado" @selected(($statusFiltro ?? '') === 'Descartado')>Descartado</option>
                             </select>
                         </div>
@@ -218,15 +218,10 @@
                                                     <span class="w-1.5 h-1.5 rounded-full bg-dodger-blue-500"></span>
                                                     Instalada
                                                 </span>
-                                            @elseif ($item->status === 'Alocado')
-                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-dodger-blue-50 dark:bg-dodger-blue-950/50 text-dodger-blue-700 dark:text-dodger-blue-300 border border-dodger-blue-200 dark:border-dodger-blue-800">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-dodger-blue-500"></span>
-                                                    Alocado
-                                                </span>
-                                            @elseif ($item->status === 'Manutenção')
-                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-tahiti-gold-50 dark:bg-tahiti-gold-950/50 text-tahiti-gold-700 dark:text-tahiti-gold-300 border border-tahiti-gold-200 dark:border-tahiti-gold-800">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-tahiti-gold-500"></span>
-                                                    Manutenção
+                                            @elseif ($item->status === 'Descartado')
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cinnabar-50 dark:bg-cinnabar-950/50 text-cinnabar-700 dark:text-cinnabar-300 border border-cinnabar-200 dark:border-cinnabar-800">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-cinnabar-500"></span>
+                                                    Descartado
                                                 </span>
                                             @else
                                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-athens-gray-100 dark:bg-athens-gray-800 text-athens-gray-600 dark:text-athens-gray-300 border border-athens-gray-300 dark:border-athens-gray-700">
@@ -254,17 +249,21 @@
 
                                         <!-- Ações -->
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-xs">
-                                            @if (! $item->estacao)
-                                                <form action="{{ route('patrimonios.destroy', $item->private_id) }}" method="POST" onsubmit="return confirm('Deseja realmente remover este patrimônio?')" class="inline-block">
+                                            @if ($item->status !== 'Descartado')
+                                                @if(!auth()->user()?->isInstalador())
+                                                <form action="{{ route('patrimonios.destroy', $item->private_id) }}" method="POST" onsubmit="return confirm('Deseja realmente marcar este patrimônio como Descartado? O registro permanecerá no sistema para fins de histórico.')" class="inline-block">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="text-cinnabar-600 dark:text-cinnabar-400 hover:text-cinnabar-800 dark:hover:text-cinnabar-200 font-semibold transition cursor-pointer p-1 hover:bg-cinnabar-50 dark:hover:bg-cinnabar-950/50 rounded">
+                                                    <button type="submit" title="Marcar como Descartado" class="text-cinnabar-600 dark:text-cinnabar-400 hover:text-cinnabar-800 dark:hover:text-cinnabar-200 font-semibold transition cursor-pointer p-1 hover:bg-cinnabar-50 dark:hover:bg-cinnabar-950/50 rounded">
                                                         <x-heroicon-o-trash class="w-4 h-4" />
                                                     </button>
                                                 </form>
+                                                @else
+                                                    <span class="text-athens-gray-400 dark:text-athens-gray-500">-</span>
+                                                @endif
                                             @else
-                                                <span class="text-athens-gray-300 dark:text-athens-gray-600">
-                                                    <x-heroicon-o-lock-closed class="w-4 h-4 inline" />
+                                                <span class="text-athens-gray-400 dark:text-athens-gray-500 italic text-[11px]">
+                                                    Descartado
                                                 </span>
                                             @endif
                                         </td>
@@ -275,10 +274,12 @@
                                             <x-heroicon-o-server-stack class="w-12 h-12 mx-auto mb-3 text-athens-gray-300 dark:text-athens-gray-600" />
                                             <p class="font-medium text-base text-athens-gray-600 dark:text-athens-gray-300">Nenhum equipamento de patrimônio cadastrado.</p>
                                             <p class="text-xs mt-1">Cadastre as placas compradas para que os instaladores possam vinculá-las em campo.</p>
+                                            @if(!auth()->user()?->isInstalador())
                                             <a href="{{ route('patrimonios.create') }}" class="inline-flex items-center gap-1.5 mt-4 text-xs font-semibold bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white py-2 px-4 rounded-lg transition shadow-sm">
                                                 <x-heroicon-o-plus class="w-4 h-4" />
                                                 Cadastrar Primeiro Equipamento
                                             </a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforelse

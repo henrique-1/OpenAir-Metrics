@@ -37,8 +37,16 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
 
+            if (Auth::user()?->isSuperAdmin()) {
+                return redirect()->intended(route('usuarios.index'));
+            }
+
+            if (Auth::user()?->isInstalador()) {
+                return redirect()->intended(route('instalacoes.index'));
+            }
+
             // Redireciona para o dashboard ou para a página que o usuário tentou acessar antes
-            return redirect()->intended('dashboard');
+            return redirect()->intended(route('dashboard'));
         }
 
         // 3. Em caso de falha, retorna para a tela de login com erro

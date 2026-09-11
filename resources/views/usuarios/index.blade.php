@@ -11,7 +11,9 @@
                 <div class="flex items-center gap-2 text-sm text-athens-gray-500 dark:text-athens-gray-400">
                     <span class="hover:text-blue-dianne-600 transition">Administração</span>
                     <x-heroicon-o-chevron-right class="w-4 h-4" />
-                    <span class="text-blue-dianne-950 dark:text-white font-medium">Usuários Municipais</span>
+                    <span class="text-blue-dianne-950 dark:text-white font-medium">
+                        {{ $currentUser->isSuperAdmin() ? 'Administradores Municipais' : 'Usuários Municipais' }}
+                    </span>
                 </div>
 
                 <!-- Alertas -->
@@ -39,23 +41,33 @@
                 <!-- Cabeçalho -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">Equipe Municipal</h1>
+                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">
+                            {{ $currentUser->isSuperAdmin() ? 'Gestão de Administradores' : 'Equipe Municipal' }}
+                        </h1>
                         <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">
-                            Usuários cadastrados para a gestão de sensores em 
-                            <strong class="text-blue-dianne-950 dark:text-white">{{ $currentUser->cidade->nome ?? 'Sua Cidade' }} ({{ $currentUser->cidade->estado->uf ?? '' }})</strong>.
+                            @if($currentUser->isSuperAdmin())
+                                Administradores responsáveis pela gestão dos municípios no OpenAir Metrics.
+                            @else
+                                Usuários cadastrados para a gestão de sensores em 
+                                <strong class="text-blue-dianne-950 dark:text-white">{{ $currentUser->cidade->nome ?? 'Sua Cidade' }} ({{ $currentUser->cidade->estado->uf ?? '' }})</strong>.
+                            @endif
                         </p>
                     </div>
                     <a href="{{ route('usuarios.create') }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
                         <x-heroicon-o-user-plus class="w-4 h-4" />
-                        Novo Usuário
+                        {{ $currentUser->isSuperAdmin() ? 'Novo Administrador' : 'Novo Usuário' }}
                     </a>
                 </div>
 
-                <!-- Aviso de Regra Municipal -->
+                <!-- Aviso de Perfil -->
                 <div class="bg-blue-dianne-50 dark:bg-blue-dianne-950/50 border border-blue-dianne-200 dark:border-blue-dianne-800 rounded-xl p-4 flex items-start gap-3">
                     <x-heroicon-o-information-circle class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400 flex-shrink-0 mt-0.5" />
                     <div class="text-xs text-blue-dianne-900 dark:text-blue-dianne-200 leading-relaxed">
-                        <strong>Regra de Gestão Pública Municipal:</strong> Cada município opera de forma autônoma. O Administrador pode gerenciar os membros da equipe, ativar/desativar acessos e editar cadastros. Caso transfira a titularidade para um <em>novo Administrador</em>, sua conta atual será imediatamente desativada por transição administrativa da prefeitura.
+                        @if($currentUser->isSuperAdmin())
+                            <strong>Painel Central do Super-usuário:</strong> Você gerencia exclusivamente os Administradores Municipais cadastrados para cada município.
+                        @else
+                            <strong>Regra de Gestão Municipal:</strong> O Administrador Municipal cadastra e gerencia a equipe operacional (Planejadores Técnicos e Instaladores) sob sua jurisdição municipal.
+                        @endif
                     </div>
                 </div>
 
@@ -74,15 +86,26 @@
                             >
                         </div>
 
-                        <!-- Filtro Nível -->
-                        <div class="w-full sm:w-auto">
-                            <select name="nivel" onchange="this.form.submit()" class="w-full sm:w-auto border border-athens-gray-300 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 rounded-lg px-3 py-2 text-xs text-athens-gray-700 dark:text-athens-gray-200 focus:ring-2 focus:ring-blue-dianne-500">
-                                <option value="">Todos os Níveis</option>
-                                <option value="administrador" @selected(($filtros['nivel'] ?? '') === 'administrador')>Administrador</option>
-                                <option value="cadastrador" @selected(($filtros['nivel'] ?? '') === 'cadastrador')>Planejador Técnico</option>
-                                <option value="instalador" @selected(($filtros['nivel'] ?? '') === 'instalador')>Instalador</option>
-                            </select>
-                        </div>
+                        @if($currentUser->isSuperAdmin() && !empty($cidades))
+                            <!-- Filtro Cidade para SuperAdmin -->
+                            <div class="w-full sm:w-auto">
+                                <select name="cidade_id" onchange="this.form.submit()" class="w-full sm:w-auto border border-athens-gray-300 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 rounded-lg px-3 py-2 text-xs text-athens-gray-700 dark:text-athens-gray-200 focus:ring-2 focus:ring-blue-dianne-500">
+                                    <option value="">Todas as Cidades</option>
+                                    @foreach($cidades as $c)
+                                        <option value="{{ $c->id }}" @selected(($filtros['cidade_id'] ?? '') == $c->id)>{{ $c->nome }} ({{ $c->estado->uf ?? '' }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                            <!-- Filtro Nível para Administrador Municipal -->
+                            <div class="w-full sm:w-auto">
+                                <select name="nivel" onchange="this.form.submit()" class="w-full sm:w-auto border border-athens-gray-300 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 rounded-lg px-3 py-2 text-xs text-athens-gray-700 dark:text-athens-gray-200 focus:ring-2 focus:ring-blue-dianne-500">
+                                    <option value="">Todos os Níveis</option>
+                                    <option value="cadastrador" @selected(($filtros['nivel'] ?? '') === 'cadastrador')>Planejador Técnico</option>
+                                    <option value="instalador" @selected(($filtros['nivel'] ?? '') === 'instalador')>Instalador</option>
+                                </select>
+                            </div>
+                        @endif
 
                         <!-- Filtro Status -->
                         <div class="w-full sm:w-auto">
@@ -123,7 +146,7 @@
                             <button type="submit" class="px-3.5 py-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
                                 Filtrar
                             </button>
-                            @if(!empty($filtros['busca']) || !empty($filtros['nivel']) || !empty($filtros['status']) || ($filtros['sort'] ?? 'name') !== 'name' || ($filtros['direction'] ?? 'asc') !== 'asc')
+                            @if(!empty($filtros['busca']) || !empty($filtros['nivel']) || !empty($filtros['status']) || !empty($filtros['cidade_id']) || ($filtros['sort'] ?? 'name') !== 'name' || ($filtros['direction'] ?? 'asc') !== 'asc')
                                 <a href="{{ route('usuarios.index') }}" class="px-3 py-2 bg-athens-gray-100 hover:bg-athens-gray-200 dark:bg-athens-gray-800 dark:hover:bg-athens-gray-700 text-athens-gray-700 dark:text-athens-gray-300 rounded-lg text-xs font-medium transition">
                                     Limpar
                                 </a>

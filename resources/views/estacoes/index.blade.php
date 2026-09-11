@@ -45,6 +45,7 @@
                     </div>
 
                     <!-- Botões de Ação Primária -->
+                    @if(!auth()->user()?->isInstalador())
                     <div class="flex flex-wrap items-center gap-2.5">
                         <a href="{{ route('estacoes.planejar') }}" class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all shadow-sm hover:shadow active:scale-98 text-xs sm:text-sm cursor-pointer">
                             <x-heroicon-o-sparkles class="w-4 h-4" />
@@ -55,6 +56,7 @@
                             Cadastrar Nova Estação
                         </a>
                     </div>
+                    @endif
                 </div>
 
                 <!-- Cards de Resumo Rápido -->
@@ -351,10 +353,12 @@
                                                 </div>
                                                 <h4 class="text-base font-bold text-blue-dianne-950 dark:text-white mb-1">Nenhuma estação encontrada</h4>
                                                 <p class="text-xs text-athens-gray-500 dark:text-athens-gray-400 mb-5">Nenhum registro corresponde aos filtros selecionados.</p>
-                                                <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm">
-                                                    <x-heroicon-o-plus class="w-4 h-4" />
-                                                    Cadastrar Nova Estação
-                                                </a>
+                                                 @if(!auth()->user()?->isInstalador())
+                                                 <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm">
+                                                     <x-heroicon-o-plus class="w-4 h-4" />
+                                                     Cadastrar Nova Estação
+                                                 </a>
+                                                 @endif
                                             </div>
                                         </td>
                                     </tr>

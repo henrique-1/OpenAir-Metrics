@@ -62,6 +62,11 @@ class User extends Authenticatable
         return $this->hasMany(Estacao::class, 'created_by');
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->nivel === 'superadmin' || $this->nivel === 'super_administrador';
+    }
+
     public function isAdministrador(): bool
     {
         return $this->nivel === 'administrador';
@@ -90,8 +95,9 @@ class User extends Authenticatable
     public function getNivelLabelAttribute(): string
     {
         return match ($this->nivel) {
+            'superadmin', 'super_administrador' => 'Super-usuário',
             'administrador' => 'Administrador',
-            'cadastrador' => 'Planejador Técnico',
+            'cadastrador', 'planejador' => 'Planejador Técnico',
             'instalador' => 'Instalador',
             default => ucfirst($this->nivel ?? 'Usuário'),
         };

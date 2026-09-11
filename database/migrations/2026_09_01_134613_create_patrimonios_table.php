@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('mac_address', 17)->unique();
             $table->string('numero_patrimonio', 50)->nullable();
             $table->enum('tipo_sugerido', ['Indefinido', 'Estação Matriz', 'Estação Satélite'])->default('Indefinido');
-            $table->enum('status', ['Disponível', 'Alocado', 'Instalado', 'Manutenção', 'Descartado'])->default('Disponível');
+            $table->enum('status', ['Disponível', 'Instalada', 'Instalado', 'Alocado', 'Manutenção', 'Descartado'])->default('Disponível');
             $table->date('data_aquisicao')->nullable();
             $table->text('observacoes')->nullable();
             $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();

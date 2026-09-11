@@ -33,6 +33,7 @@ class Medicao extends Model
         'umidade',
         'co2',
         'poeira',
+        'iqa',
         'data_hora',
     ];
 
@@ -44,17 +45,26 @@ class Medicao extends Model
         'umidade' => 'float',
         'co2' => 'integer',
         'poeira' => 'float',
+        'iqa' => 'integer',
         'data_hora' => 'datetime',
     ];
 
     /**
-     * O método "booted" do modelo para geração automática de UUIDv4.
+     * O método "booted" do modelo para geração automática de UUIDv4, data_hora e cálculo de IQA.
      */
     protected static function booted(): void
     {
         static::creating(function (Medicao $medicao) {
             if (empty($medicao->public_id)) {
                 $medicao->public_id = (string) Str::uuid();
+            }
+
+            if (empty($medicao->data_hora)) {
+                $medicao->data_hora = now();
+            }
+
+            if (! isset($medicao->attributes['iqa']) && $medicao->poeira !== null && $medicao->co2 !== null) {
+                $medicao->attributes['iqa'] = self::calcularIqa((float) $medicao->poeira, (int) $medicao->co2);
             }
         });
     }
@@ -70,36 +80,71 @@ class Medicao extends Model
     /**
      * Accessor para o Índice de Qualidade do Ar (IQA).
      */
-    public function getIqaAttribute(): int
+    public function getIqaAttribute(?int $value): int
     {
+        if ($value !== null) {
+            return $value;
+        }
+
         return self::calcularIqa((float) $this->poeira, (int) $this->co2);
     }
 
     /**
-     * Helper estático para cálculo do IQA / AQI com base em Material Particulado e CO₂.
-     * Escala: 0 a 50 (Boa), 51 a 100 (Moderada), 101 a 150 (Ruim), 151 a 200 (Muito Ruim), > 200 (Péssima).
+     * Cálculo do IQA pela fórmula de Interpolação Linear para Material Particulado (PM2.5) e Dióxido de Carbono (CO₂):
+     * Ip = Iinf + [ (Isup - Iinf) / (Csup - Cinf) ] * (Cp - Cinf)
+     *
+     * Faixas de corte:
+     * - Boa:        I = 0 a 50    | PM2.5 = 0 a 25.0       | CO2 = 0 a 700
+     * - Moderada:   I = 51 a 100  | PM2.5 = >25.0 a 60.0   | CO2 = >700 a 1000
+     * - Ruim:       I = 101 a 150 | PM2.5 = >60.0 a 125.0  | CO2 = >1000 a 1500
+     * - Muito Ruim: I = 151 a 200 | PM2.5 = >125.0 a 210.0 | CO2 = >1500 a 2500
+     * - Péssima:    I > 200       | PM2.5 = >210.0         | CO2 = >2500
      */
     public static function calcularIqa(float $poeira, int $co2): int
     {
-        // Normalização baseada em faixas de PM2.5 (poeira em µg/m³)
-        if ($poeira <= 12.0) {
-            $aqiPm = ($poeira / 12.0) * 50;
-        } elseif ($poeira <= 35.4) {
-            $aqiPm = 50 + (($poeira - 12.0) / (35.4 - 12.0)) * 50;
-        } elseif ($poeira <= 55.4) {
-            $aqiPm = 100 + (($poeira - 35.4) / (55.4 - 35.4)) * 50;
-        } elseif ($poeira <= 150.4) {
-            $aqiPm = 150 + (($poeira - 55.4) / (150.4 - 55.4)) * 50;
-        } else {
-            $aqiPm = 200 + min(100, (($poeira - 150.4) / 100.0) * 100);
+        $iqaPm = self::calcularIqaPoluente($poeira, [
+            ['c_inf' => 0.0, 'c_sup' => 25.0, 'i_inf' => 0, 'i_sup' => 50],
+            ['c_inf' => 25.0, 'c_sup' => 60.0, 'i_inf' => 51, 'i_sup' => 100],
+            ['c_inf' => 60.0, 'c_sup' => 125.0, 'i_inf' => 101, 'i_sup' => 150],
+            ['c_inf' => 125.0, 'c_sup' => 210.0, 'i_inf' => 151, 'i_sup' => 200],
+            ['c_inf' => 210.0, 'c_sup' => 500.0, 'i_inf' => 201, 'i_sup' => 500],
+        ]);
+
+        $iqaCo2 = self::calcularIqaPoluente($co2, [
+            ['c_inf' => 0.0, 'c_sup' => 700.0, 'i_inf' => 0, 'i_sup' => 50],
+            ['c_inf' => 700.0, 'c_sup' => 1000.0, 'i_inf' => 51, 'i_sup' => 100],
+            ['c_inf' => 1000.0, 'c_sup' => 1500.0, 'i_inf' => 101, 'i_sup' => 150],
+            ['c_inf' => 1500.0, 'c_sup' => 2500.0, 'i_inf' => 151, 'i_sup' => 200],
+            ['c_inf' => 2500.0, 'c_sup' => 5000.0, 'i_inf' => 201, 'i_sup' => 500],
+        ]);
+
+        return (int) round(max($iqaPm, $iqaCo2));
+    }
+
+    /**
+     * Aplica a interpolação linear do poluente para uma dada concentração e tabela de faixas.
+     *
+     * @param  array<int, array{c_inf: float, c_sup: float, i_inf: int, i_sup: int}>  $faixas
+     */
+    public static function calcularIqaPoluente(float $concentracao, array $faixas): float
+    {
+        if ($concentracao <= 0.0) {
+            return 0.0;
         }
 
-        // Penalidade por excesso de CO2 (> 1000 ppm)
-        $penalidadeCo2 = 0;
-        if ($co2 > 1000) {
-            $penalidadeCo2 = min(50, ($co2 - 1000) / 40);
+        foreach ($faixas as $faixa) {
+            if ($concentracao <= $faixa['c_sup']) {
+                $cInf = $faixa['c_inf'];
+                $cSup = $faixa['c_sup'];
+                $iInf = $faixa['i_inf'];
+                $iSup = $faixa['i_sup'];
+
+                return $iInf + (($iSup - $iInf) / ($cSup - $cInf)) * ($concentracao - $cInf);
+            }
         }
 
-        return (int) round($aqiPm + $penalidadeCo2);
+        $ultima = end($faixas);
+
+        return min(500.0, (float) $ultima['i_sup']);
     }
 }

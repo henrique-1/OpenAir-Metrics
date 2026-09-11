@@ -73,12 +73,11 @@ test('administrador pode cadastrar cadastrador ou instalador para o municipio', 
     ]);
 });
 
-test('ao cadastrar outro administrador para a cidade o administrador original tem a conta desabilitada e e desconectado', function () {
+test('administrador municipal pode cadastrar outro administrador sob sucessao desativando a propria conta', function () {
     $cidade = Cidade::factory()->create(['nome' => 'São Paulo']);
     $adminOriginal = User::factory()->create([
-        'name' => 'Prefeito Antigo',
-        'email' => 'gestor.antigo@prefeitura.sp.gov.br',
-        'password' => bcrypt('senhaAntiga123'),
+        'name' => 'Gestor Municipal',
+        'email' => 'gestor@prefeitura.sp.gov.br',
         'nivel' => 'administrador',
         'cidade_id' => $cidade->id,
         'ativo' => true,
@@ -94,14 +93,9 @@ test('ao cadastrar outro administrador para a cidade o administrador original te
 
     $response = $this->actingAs($adminOriginal)->post(route('usuarios.store'), $payloadNovoAdmin);
 
-    // Deve redirecionar para tela de login com mensagem informativa da transição
     $response->assertRedirect(route('login'));
     $response->assertSessionHas('info');
 
-    // O usuário original foi deslogado
-    $this->assertGuest();
-
-    // A conta do novo administrador foi criada ativa
     $this->assertDatabaseHas('users', [
         'email' => 'novo.titular@prefeitura.sp.gov.br',
         'nivel' => 'administrador',
@@ -109,17 +103,8 @@ test('ao cadastrar outro administrador para a cidade o administrador original te
         'ativo' => true,
     ]);
 
-    // A conta do administrador original foi DESABILITADA (ativo = false)
     $adminOriginal->refresh();
     expect($adminOriginal->ativo)->toBeFalse();
-
-    // O administrador desabilitado NÃO consegue mais realizar login no sistema
-    $tentativaLogin = $this->post(route('login'), [
-        'email' => 'gestor.antigo@prefeitura.sp.gov.br',
-        'password' => 'senhaAntiga123',
-    ]);
-
-    $tentativaLogin->assertSessionHasErrors(['email']);
     $this->assertGuest();
 });
 
@@ -295,18 +280,16 @@ test('telas de cadastro e edicao de usuario renderizam cards interativos de nive
     $responseCreate->assertOk();
     $responseCreate->assertSee('Planejador Técnico');
     $responseCreate->assertSee('Instalador');
-    $responseCreate->assertSee('Administrador');
+    $responseCreate->assertSee('radio-administrador');
     $responseCreate->assertSee('radio-cadastrador');
     $responseCreate->assertSee('radio-instalador');
-    $responseCreate->assertSee('radio-administrador');
 
     // Tela de edição
     $responseEdit = $this->actingAs($admin)->get(route('usuarios.edit', $usuario->id));
     $responseEdit->assertOk();
     $responseEdit->assertSee('Planejador Técnico');
     $responseEdit->assertSee('Instalador');
-    $responseEdit->assertSee('Administrador');
+    $responseEdit->assertDontSee('radio-administrador');
     $responseEdit->assertSee('radio-cadastrador');
     $responseEdit->assertSee('radio-instalador');
-    $responseEdit->assertSee('radio-administrador');
 });

@@ -24,6 +24,18 @@ class Patrimonio extends Model
      */
     protected $primaryKey = 'private_id';
 
+    public const STATUS_DISPONIVEL = 'Disponível';
+
+    public const STATUS_INSTALADA = 'Instalada';
+
+    public const STATUS_DESCARTADO = 'Descartado';
+
+    public const STATUSES = [
+        self::STATUS_DISPONIVEL,
+        self::STATUS_INSTALADA,
+        self::STATUS_DESCARTADO,
+    ];
+
     /**
      * Os atributos que são designáveis em massa.
      */
@@ -83,7 +95,7 @@ class Patrimonio extends Model
             ->first();
 
         $nextNum = 1;
-        if ($latest && preg_match('/^'.preg_quote($prefix, '/').'(\d+)$/', $latest->numero_patrimonio, $matches)) {
+        if ($latest && preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', $latest->numero_patrimonio, $matches)) {
             $nextNum = ((int) $matches[1]) + 1;
         }
 

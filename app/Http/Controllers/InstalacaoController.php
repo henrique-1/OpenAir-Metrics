@@ -18,6 +18,11 @@ class InstalacaoController extends Controller
      */
     public function index(Request $request): View
     {
+        $user = Auth::user();
+        if ($user?->isSuperAdmin()) {
+            abort(403, 'O super-usuário só pode gerenciar administradores.');
+        }
+
         $busca = trim((string) $request->input('busca'));
         $status = $request->input('status');
         $sort = (string) $request->input('sort', 'created_at');
@@ -34,7 +39,11 @@ class InstalacaoController extends Controller
             ->withCount([
                 'satelitesMalha as total_satelites',
                 'satelitesMalha as instaladas_satelites' => function ($q) {
-                    $q->where('status_instalacao', 'Instalada');
+                    $q->where('status_instalacao', 'Instalada')
+                        ->where('solicitacao_substituicao', false);
+                },
+                'satelitesMalha as substituicoes_pendentes' => function ($q) {
+                    $q->where('solicitacao_substituicao', true);
                 },
             ]);
 
@@ -88,6 +97,10 @@ class InstalacaoController extends Controller
     public function show(string $public_id): View
     {
         $user = Auth::user();
+        if ($user?->isSuperAdmin()) {
+            abort(403, 'O super-usuário só pode gerenciar administradores.');
+        }
+
         $matriz = Estacao::withCoordinates()->where('public_id', $public_id)->firstOrFail();
 
         if ($user && $user->cidade_id && $matriz->bairro?->cidade_id && $matriz->bairro->cidade_id !== $user->cidade_id) {
@@ -223,7 +236,7 @@ class InstalacaoController extends Controller
                     'cidade_id' => $estacao->bairro?->cidade_id ?? Auth::user()?->cidade_id,
                     'numero_patrimonio' => $patrimonioInformado ?: null,
                     'mac_address' => $macInformado ?: null,
-                    'status' => 'Instalado',
+                    'status' => 'Instalada',
                     'data_aquisicao' => now()->toDateString(),
                     'observacoes' => 'Cadastrado automaticamente durante a instalação em campo.',
                     'created_by' => Auth::id(),
@@ -241,7 +254,7 @@ class InstalacaoController extends Controller
                     ], 422);
                 }
 
-                $updates = ['status' => 'Instalado'];
+                $updates = ['status' => 'Instalada'];
                 if ($macInformado && empty($patrimonio->mac_address)) {
                     $updates['mac_address'] = $macInformado;
                 }
@@ -251,22 +264,38 @@ class InstalacaoController extends Controller
                 $patrimonio->update($updates);
             }
 
+            // Regra: Assim que o sensor for substituído, o status do patrimônio anterior deve ser alterado para descartado
+            $patrimonioAntigo = null;
+            if ($estacao->patrimonio_id && (int) $estacao->patrimonio_id !== (int) $patrimonio->private_id) {
+                $patrimonioAntigo = Patrimonio::find($estacao->patrimonio_id);
+            } elseif (! $estacao->patrimonio_id && $estacao->mac_address) {
+                $patrimonioAntigo = Patrimonio::where('mac_address', $estacao->mac_address)->first();
+            }
+
+            if ($patrimonioAntigo && (int) $patrimonioAntigo->private_id !== (int) $patrimonio->private_id) {
+                $patrimonioAntigo->update(['status' => 'Descartado']);
+            }
+
             // Define o MAC que será gravado na estação
             $macFinal = $macInformado ?: $patrimonio->mac_address;
 
-            // 3. Atualiza a Estação com o MAC Address, status Instalada e dados do instalador
+            // 3. Atualiza a Estação com o MAC Address, status Instalada e finaliza qualquer solicitação de substituição pendente
             $estacao->update([
                 'mac_address' => $macFinal,
                 'patrimonio_id' => $patrimonio->private_id,
                 'status_instalacao' => 'Instalada',
                 'data_instalacao' => now(),
                 'instalado_por' => Auth::id(),
+                'solicitacao_substituicao' => false,
+                'solicitacao_substituicao_em' => null,
+                'motivo_substituicao' => null,
+                'solicitado_por' => null,
             ]);
 
             DB::commit();
 
             $identificadorSucesso = $patrimonio->numero_patrimonio
-                ? "Patrimônio #{$patrimonio->numero_patrimonio}".($macFinal ? " (MAC: {$macFinal})" : '')
+                ? "Patrimônio #{$patrimonio->numero_patrimonio}" . ($macFinal ? " (MAC: {$macFinal})" : '')
                 : "MAC {$macFinal}";
 
             return response()->json([
@@ -286,7 +315,7 @@ class InstalacaoController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro interno ao registrar instalação: '.$e->getMessage(),
+                'message' => 'Erro interno ao registrar instalação: ' . $e->getMessage(),
             ], 500);
         }
     }
