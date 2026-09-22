@@ -36,3 +36,6 @@ AGENTS.md
 
 # Arquivos brutos do OpenStreetMap
 /storage/app/osm/*.osm.pbf
+
+# Relatórios da Cloudflare Security Audit Skill
+/security-audits/

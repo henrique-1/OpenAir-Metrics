@@ -95,7 +95,7 @@ class Patrimonio extends Model
             ->first();
 
         $nextNum = 1;
-        if ($latest && preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', $latest->numero_patrimonio, $matches)) {
+        if ($latest && preg_match('/^'.preg_quote($prefix, '/').'(\d+)$/', $latest->numero_patrimonio, $matches)) {
             $nextNum = ((int) $matches[1]) + 1;
         }
 

@@ -1159,3 +1159,44 @@ OpenAir-Metrics/
 - `php artisan test --compact tests/Feature/ExampleTest.php`: 2 testes da página inicial executados com 100% de aprovação (14 asserções).
 - `php artisan test --compact`: Suíte completa com 159 testes automatizados aprovados (785 asserções), 0 falhas.
 - `vendor/bin/pint --dirty --format agent`: Código PHP 100% formatado e em conformidade com as regras do Laravel Pint.
+
+---
+
+### Sessão: 22 de Setembro de 2026 (Remediação de Vulnerabilidades de Segurança - High e Medium)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Correção da Vulnerabilidade SEC-OAIR-001 (High - IDOR no Módulo de Substituição de Sensores)**:
+    - Identificada vulnerabilidade em `EstacaoController::substituirSensor` onde a seleção do novo equipamento (`Patrimonio`) não validava a pertinência municipal (`cidade_id`) com o usuário autenticado ou a estação de destino, permitindo sequestro e alteração de status de patrimônios de municípios vizinhos.
+    - Implementada checagem estrita de isolamento municipal: `$user->cidade_id && $novoPatrimonio->cidade_id && (int) $novoPatrimonio->cidade_id !== (int) $user->cidade_id`, retornando redirecionamento com mensagem de erro amigável caso a placa pertença a outra jurisdição.
+    - Criado teste de regressão automatizado `tests/Feature/EstacaoTenantIsolationTest.php` comprovando que tentativas cross-tenant são bloqueadas e preservam o status do equipamento.
+- **Correção da Vulnerabilidade SEC-OAIR-002 (High - Ausência de Rate Limiting na Ingestão de Telemetria)**:
+    - O endpoint `POST /api/medicoes` operava sem limitação de taxa de requisições, expondo o banco de dados e os broadcasts WebSockets a inundações de dados forjados.
+    - Aplicado o middleware de limitação `throttle:60,1` na rota em `routes/api.php`, restringindo a 60 requisições por minuto por IP/dispositivo.
+    - Criado teste de regressão automatizado `tests/Feature/MedicaoApiRateLimitTest.php` validando o bloqueio com status HTTP 429 na 61ª requisição.
+- **Correção da Vulnerabilidade SEC-OAIR-003 (Medium - Ausência de Rate Limiting no Formulário de Autenticação)**:
+    - A rota `POST /login` operava sem proteção contra ataques de força bruta ou credential stuffing.
+    - Aplicado middleware `throttle:5,1` e nomeação de rota `name('login.store')` em `routes/web.php`.
+    - Criado teste de regressão automatizado `tests/Feature/AuthThrottleTest.php` validando bloqueio com HTTP 429 após 5 tentativas consecutivas com credenciais incorretas.
+- **Correção da Vulnerabilidade SEC-OAIR-004 (Medium - Ingestão Irrestrita de Array no Planejamento de Malha / DoS)**:
+    - O endpoint `POST /estacoes/salvar-malha` (`PlanejamentoController::salvar`) validava apenas `min:1` para o array `satelites`, permitindo submissão de milhares de coordenadas e disparando inserções massivas e ordenação topológica recursiva DFS em memória dentro do ciclo da requisição HTTP.
+    - Adicionada regra `max:20` na validação de `satelites` em `PlanejamentoController.php`, alinhando a persistência com o limite do cálculo geométrico em `PlanejamentoMalhaService`.
+    - Criado teste de regressão automatizado `tests/Feature/PlanejamentoMaxSatelitesTest.php` validando rejeição com erro de validação na sessão.
+
+#### 2. Arquivos Modificados e Criados
+
+- `app/Http/Controllers/EstacaoController.php`: Validação de jurisdição municipal no método `substituirSensor` para prevenir IDOR cross-tenant (SEC-OAIR-001).
+- `routes/api.php`: Inclusão de `throttle:60,1` na rota `api.medicoes.store` para mitigar injeção em massa e DoS na telemetria (SEC-OAIR-002).
+- `routes/web.php`: Inclusão de `throttle:5,1` e nome `login.store` na rota de login contra ataques de dicionário e brute force (SEC-OAIR-003).
+- `app/Http/Controllers/PlanejamentoController.php`: Inclusão do limite `max:20` no array de satélites no método `salvar` (SEC-OAIR-004).
+- `tests/Feature/EstacaoTenantIsolationTest.php`: Teste de regressão para garantia de isolamento municipal na substituição de sensores.
+- `tests/Feature/MedicaoApiRateLimitTest.php`: Teste de regressão para validação do rate limiting na API de telemetria.
+- `tests/Feature/AuthThrottleTest.php`: Teste de regressão para validação do rate limiting de 5 tentativas no login.
+- `tests/Feature/PlanejamentoMaxSatelitesTest.php`: Teste de regressão para validação do limite máximo de 20 satélites no planejamento de malha.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --format agent`: Formatação de código executada em conformidade com as regras do Laravel Pint.
+- `php artisan test tests/Feature/EstacaoTenantIsolationTest.php tests/Feature/MedicaoApiRateLimitTest.php tests/Feature/AuthThrottleTest.php tests/Feature/PlanejamentoMaxSatelitesTest.php --compact`: 4 testes de regressão executados com 100% de aprovação (72 asserções).
+- `php artisan test [suíte principal de features e units] --compact`: 128 testes executados com 100% de aprovação (616 asserções).

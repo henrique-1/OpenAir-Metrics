@@ -39,7 +39,7 @@ class PlanejamentoController extends Controller
 
         $query = Estacao::withCoordinates()->with(['bairro.cidade.estado', 'estacaoOrigem']);
         if ($cidade) {
-            $query->whereHas('bairro.cidade', fn($q) => $q->where('id', $cidade->id));
+            $query->whereHas('bairro.cidade', fn ($q) => $q->where('id', $cidade->id));
         }
 
         $estacoesExistentes = $query->get()
@@ -173,7 +173,7 @@ class PlanejamentoController extends Controller
             'matriz' => ['required', 'array'],
             'matriz.latitude' => ['required', 'numeric'],
             'matriz.longitude' => ['required', 'numeric'],
-            'satelites' => ['required', 'array', 'min:1'],
+            'satelites' => ['required', 'array', 'min:1', 'max:20'],
             'satelites.*.latitude' => ['required', 'numeric'],
             'satelites.*.longitude' => ['required', 'numeric'],
         ]);
@@ -277,13 +277,13 @@ class PlanejamentoController extends Controller
 
             return redirect()
                 ->route('instalacoes.show', $matriz->public_id)
-                ->with('success', 'Malha com 1 Matriz e ' . count($satelitesData) . ' Satélites planejada com sucesso! A ordem de instalação foi gerada.');
+                ->with('success', 'Malha com 1 Matriz e '.count($satelitesData).' Satélites planejada com sucesso! A ordem de instalação foi gerada.');
         } catch (\Throwable $e) {
             DB::rollBack();
 
             return redirect()
                 ->back()
-                ->with('error', 'Erro ao salvar planejamento da malha: ' . $e->getMessage())
+                ->with('error', 'Erro ao salvar planejamento da malha: '.$e->getMessage())
                 ->withInput();
         }
     }

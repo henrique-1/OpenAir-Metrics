@@ -6,6 +6,7 @@ use App\Models\MalhaViaria;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -29,7 +30,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        \Illuminate\Support\Facades\DB::transaction(function () {
+        DB::transaction(function () {
             $this->call(LocalidadesSeeder::class);
         });
 

@@ -129,7 +129,7 @@ class EstacaoController extends Controller
 
         $query = Estacao::withCoordinates()->with(['bairro.cidade.estado', 'estacaoOrigem']);
         if ($cidade) {
-            $query->whereHas('bairro.cidade', fn($q) => $q->where('id', $cidade->id));
+            $query->whereHas('bairro.cidade', fn ($q) => $q->where('id', $cidade->id));
         }
 
         $estacoesExistentes = $query->get()
@@ -347,6 +347,12 @@ class EstacaoController extends Controller
 
         $novoPatrimonio = Patrimonio::findOrFail($validated['patrimonio_id']);
 
+        if ($user->cidade_id && $novoPatrimonio->cidade_id && (int) $novoPatrimonio->cidade_id !== (int) $user->cidade_id) {
+            return redirect()
+                ->route('estacoes.index')
+                ->with('error', 'O equipamento selecionado pertence a outro município fora da sua jurisdição.');
+        }
+
         if ($novoPatrimonio->status !== 'Disponível') {
             return redirect()
                 ->route('estacoes.index')
@@ -389,7 +395,7 @@ class EstacaoController extends Controller
 
             return redirect()
                 ->route('estacoes.index')
-                ->with('error', 'Erro ao substituir sensor: ' . $e->getMessage());
+                ->with('error', 'Erro ao substituir sensor: '.$e->getMessage());
         }
     }
 }

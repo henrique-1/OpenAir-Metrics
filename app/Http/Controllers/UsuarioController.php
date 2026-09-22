@@ -147,7 +147,7 @@ class UsuarioController extends Controller
                     'exists:cidades,id',
                     Rule::exists('cidades', 'id')->when(
                         $request->filled('estado_id'),
-                        fn($q) => $q->where('estado_id', $request->input('estado_id'))
+                        fn ($q) => $q->where('estado_id', $request->input('estado_id'))
                     ),
                 ],
                 'logradouro' => ['nullable', 'string', 'max:255'],
@@ -299,7 +299,7 @@ class UsuarioController extends Controller
                     'exists:cidades,id',
                     Rule::exists('cidades', 'id')->when(
                         $request->filled('estado_id'),
-                        fn($q) => $q->where('estado_id', $request->input('estado_id'))
+                        fn ($q) => $q->where('estado_id', $request->input('estado_id'))
                     ),
                 ],
                 'logradouro' => ['nullable', 'string', 'max:255'],

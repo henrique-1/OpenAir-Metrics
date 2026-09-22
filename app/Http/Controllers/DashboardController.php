@@ -30,8 +30,8 @@ class DashboardController extends Controller
         $bairrosQuery = Bairro::whereHas('estacoes')->with(['cidade.estado'])->orderBy('nome');
 
         if ($user && $user->cidade_id) {
-            $estacaoQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $user->cidade_id));
-            $medicaoQuery->whereHas('estacao.bairro', fn($q) => $q->where('cidade_id', $user->cidade_id));
+            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
             $cidadesQuery->where('id', $user->cidade_id);
             $bairrosQuery->where('cidade_id', $user->cidade_id);
         }
@@ -40,9 +40,9 @@ class DashboardController extends Controller
         $totalLeituras = (clone $medicaoQuery)->count();
 
         // Alertas reais computados a partir das medições
-        $alertasIqa = (clone $medicaoQuery)->where(fn($q) => $q->where('poeira', '>', 50)->orWhere('co2', '>', 1000))->count();
-        $alertasTemp = (clone $medicaoQuery)->where(fn($q) => $q->where('temperatura', '>', 35)->orWhere('temperatura', '<', 10))->count();
-        $alertasUmidade = (clone $medicaoQuery)->where(fn($q) => $q->where('umidade', '<', 30)->orWhere('umidade', '>', 85))->count();
+        $alertasIqa = (clone $medicaoQuery)->where(fn ($q) => $q->where('poeira', '>', 50)->orWhere('co2', '>', 1000))->count();
+        $alertasTemp = (clone $medicaoQuery)->where(fn ($q) => $q->where('temperatura', '>', 35)->orWhere('temperatura', '<', 10))->count();
+        $alertasUmidade = (clone $medicaoQuery)->where(fn ($q) => $q->where('umidade', '<', 30)->orWhere('umidade', '>', 85))->count();
         $alertasCo2 = (clone $medicaoQuery)->where('co2', '>', 1000)->count();
         $alertasPm = (clone $medicaoQuery)->where('poeira', '>', 50)->count();
 
@@ -85,7 +85,7 @@ class DashboardController extends Controller
         $estacoesQuery = Estacao::query();
 
         if ($user && $user->cidade_id) {
-            $estacoesQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $user->cidade_id));
+            $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
         }
 
         if ($tipoAgrupamento === 'bairro' && $localidadeId) {
@@ -106,7 +106,7 @@ class DashboardController extends Controller
             $cidade = $cidadeQuery->find($localidadeId);
             if ($cidade) {
                 $localidadeNome = "{$cidade->nome} - {$cidade->estado?->uf}";
-                $estacoesQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $cidade->id));
+                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidade->id));
             }
         } else {
             // Se nenhuma localidade foi informada, seleciona a primeira cidade disponível com estações
@@ -117,7 +117,7 @@ class DashboardController extends Controller
             $primeiraCidade = $primeiraCidadeQuery->first();
             if ($primeiraCidade) {
                 $localidadeNome = "{$primeiraCidade->nome} - {$primeiraCidade->estado?->uf}";
-                $estacoesQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $primeiraCidade->id));
+                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $primeiraCidade->id));
             }
         }
 
@@ -327,8 +327,8 @@ class DashboardController extends Controller
             $seg = str_pad((string) (intdiv($dt->second, 5) * 5), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:i:') . $seg,
-                $dt->format('H:i:') . $seg,
+                $dt->format('Y-m-d H:i:').$seg,
+                $dt->format('H:i:').$seg,
             ];
         }
 
@@ -337,8 +337,8 @@ class DashboardController extends Controller
             $seg = str_pad((string) (intdiv($dt->second, 15) * 15), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:i:') . $seg,
-                $dt->format('H:i:') . $seg,
+                $dt->format('Y-m-d H:i:').$seg,
+                $dt->format('H:i:').$seg,
             ];
         }
 
@@ -355,8 +355,8 @@ class DashboardController extends Controller
             $min = str_pad((string) (intdiv($dt->minute, 5) * 5), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:') . $min,
-                $dt->format('H:') . $min,
+                $dt->format('Y-m-d H:').$min,
+                $dt->format('H:').$min,
             ];
         }
 
@@ -365,8 +365,8 @@ class DashboardController extends Controller
             $min = str_pad((string) (intdiv($dt->minute, 15) * 15), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:') . $min,
-                $dt->format('H:') . $min,
+                $dt->format('Y-m-d H:').$min,
+                $dt->format('H:').$min,
             ];
         }
 

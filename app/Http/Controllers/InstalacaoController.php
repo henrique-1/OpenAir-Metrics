@@ -295,7 +295,7 @@ class InstalacaoController extends Controller
             DB::commit();
 
             $identificadorSucesso = $patrimonio->numero_patrimonio
-                ? "Patrimônio #{$patrimonio->numero_patrimonio}" . ($macFinal ? " (MAC: {$macFinal})" : '')
+                ? "Patrimônio #{$patrimonio->numero_patrimonio}".($macFinal ? " (MAC: {$macFinal})" : '')
                 : "MAC {$macFinal}";
 
             return response()->json([
@@ -315,7 +315,7 @@ class InstalacaoController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro interno ao registrar instalação: ' . $e->getMessage(),
+                'message' => 'Erro interno ao registrar instalação: '.$e->getMessage(),
             ], 500);
         }
     }
