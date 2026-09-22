@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'telemetry' => [
+        'key' => env('TELEMETRY_API_KEY'),
+    ],
+
 ];

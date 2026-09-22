@@ -1200,3 +1200,85 @@ OpenAir-Metrics/
 - `vendor/bin/pint --format agent`: Formatação de código executada em conformidade com as regras do Laravel Pint.
 - `php artisan test tests/Feature/EstacaoTenantIsolationTest.php tests/Feature/MedicaoApiRateLimitTest.php tests/Feature/AuthThrottleTest.php tests/Feature/PlanejamentoMaxSatelitesTest.php --compact`: 4 testes de regressão executados com 100% de aprovação (72 asserções).
 - `php artisan test [suíte principal de features e units] --compact`: 128 testes executados com 100% de aprovação (616 asserções).
+
+---
+
+### Sessão: 22 de Setembro de 2026 (Auditoria Completa de Segurança Pós-Patches em Português Brasileiro)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Execução de Nova Auditoria de Segurança Completa (Commit 20fe202)**:
+    - Realizada nova rodada de auditoria de segurança completa em conformidade com as fases 1 a 6 da metodologia de auditoria defensiva.
+    - Todos os relatórios, sumários executivos e documentações técnicas foram emitidos integralmente em **Português Brasileiro (PT-BR)** no subdiretório dedicado e com carimbo temporal: `security-audits/2026-09-22_11-35/`.
+- **Revalidação de Correções Anteriores**:
+    - **SEC-OAIR-001 (IDOR na Substituição de Sensores)**: Revalidado como **RESOLVIDO**. O código em `EstacaoController.php` protege o perímetro municipal contra usurpação de hardware.
+    - **SEC-OAIR-003 (Força Bruta no Login)**: Revalidado como **RESOLVIDO**. O middleware `throttle:5,1` impede ataques de força bruta.
+    - **SEC-OAIR-004 (Ingestão Irrestrita de Array / DoS)**: Revalidado como **RESOLVIDO**. O teto de `max:20` no array de satélites previne esgotamento de memória.
+    - **SEC-OAIR-002 (Telemetria IoT)**: Reclassificado para severidade **Média** devido à atenuação do risco volumétrico com o rate limit `throttle:60,1`, permanecendo ativo o risco residual de falsificação de dados por falta de chave de dispositivo.
+- **Artefatos e Validação de Esquemas**:
+    - Emitidos 7 artefatos obrigatórios: `run-metadata.json`, `architecture.md`, `coverage-ledger.json`, `findings.json`, `REPORT.md`, `FINDINGS-DETAIL.md` e `NEEDS-VALIDATION.md`.
+    - Os validadores oficiais `validate-findings.cjs` e `validate-coverage-ledger.cjs` foram executados e retornaram status de 100% de aprovação (7 achados válidos e 18 unidades de cobertura válidas).
+
+#### 2. Arquivos Modificados e Criados
+
+- `security-audits/2026-09-22_11-35/run-metadata.json`: Metadados da execução com referência ao commit `20fe202` e vínculo com a auditoria anterior.
+- `security-audits/2026-09-22_11-35/architecture.md`: Modelo de arquitetura, limites de confiança municipal e revalidação de superfícies em PT-BR.
+- `security-audits/2026-09-22_11-35/coverage-ledger.json`: Ledger determinístico de 18 unidades de cobertura com registro de revalidação dos patches.
+- `security-audits/2026-09-22_11-35/findings.json`: Catálogo de 7 achados com descrições e títulos em português.
+- `security-audits/2026-09-22_11-35/REPORT.md`: Relatório executivo completo em português.
+- `security-audits/2026-09-22_11-35/FINDINGS-DETAIL.md`: Detalhamento técnico da vulnerabilidade residual SEC-OAIR-002 e registro histórico das resoluções.
+- `security-audits/2026-09-22_11-35/NEEDS-VALIDATION.md`: Documentação de hipóteses dependentes de infraestrutura de produção em PT-BR.
+- `.agents/skills/historico.md`: Registro documental desta sessão de auditoria.
+
+#### 3. Testes, Formatação e Compilação
+
+- `node .agents/skills/security-audit/validate-findings.cjs security-audits/2026-09-22_11-35/findings.json`: Aprovado (7 achados válidos).
+- `node .agents/skills/security-audit/validate-coverage-ledger.cjs security-audits/2026-09-22_11-35/coverage-ledger.json`: Aprovado (18 unidades de cobertura válidas).
+
+---
+
+### Sessão: 22 de Setembro de 2026 (Remediação e Hardening de Vulnerabilidades Residuais da Auditoria)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Aplicação Integral dos Patches de Segurança Aprovados**:
+    - **SEC-OAIR-002 (Severidade Média - Ausência de Autenticação na Ingestão de Telemetria)**:
+        - Implementada checagem obrigatória de cabeçalho `X-Sensor-Key` contra o segredo configurado em `TELEMETRY_API_KEY` (utilizando comparação temporalmente segura `hash_equals`).
+        - Registrada a chave em `config/services.php` (`services.telemetry.key`) e adicionada a variável no `.env.example`.
+        - Adicionado teste de regressão automatizado em `tests/Feature/MedicaoApiTest.php` validando rejeição com HTTP 401 sem chave ou com chave inválida, e aceitação com HTTP 201 quando correta.
+    - **SEC-OAIR-005 (Severidade Baixa - Credenciais Pré-definidas em Seeders)**:
+        - Corrigidos `database/seeders/DatabaseSeeder.php` e `database/seeders/SuperAdminSeeder.php` para aceitar senhas das variáveis de ambiente `INITIAL_ADMIN_PASSWORD` e `INITIAL_SUPERADMIN_PASSWORD`.
+        - Em ambientes não-locais (produção/homologação), caso não informadas, o sistema gera senhas criptograficamente seguras aleatórias via `Str::random(32)`, eliminando credenciais previsíveis no banco.
+    - **SEC-OAIR-006 (Severidade Baixa - Enumeração de Inventário Cross-Tenant Sem Município)**:
+        - Atualizado o método `apiDisponiveis` em `app/Http/Controllers/PatrimonioController.php` para que usuários autenticados com `cidade_id: null` que não sejam `superadmin` recebam uma lista vazia `[]`.
+        - Adicionado teste de regressão em `tests/Feature/PatrimonioTest.php`.
+    - **SEC-OAIR-007 (Severidade Baixa - Configuração Permissiva de WebSocket no Reverb)**:
+        - Ajustado `config/reverb.php` para restringir origens autorizadas com base em `REVERB_ALLOWED_ORIGINS` e `APP_URL`, e ativado o rate limiting de conexões de socket por padrão (`REVERB_APP_RATE_LIMITING_ENABLED=true`).
+    - **SEC-OAIR-LEAD-001 & SEC-OAIR-LEAD-002 (Hardening de Ambiente e Cookies)**:
+        - Atualizado `.env.example` com `APP_DEBUG=false` por padrão seguro de produção.
+        - Atualizado `config/session.php` para ativar a flag `Secure` em cookies de sessão automaticamente quando `APP_ENV` for diferente de `local`.
+
+    - **Remoção de Administrador Padrão e Aprimoramento do SuperAdminSeeder**:
+        - Removida a criação do usuário `admin@admin.com` em `database/seeders/DatabaseSeeder.php`, delegando a criação inicial de credenciais exclusivamente ao `SuperAdminSeeder::class`.
+        - `SuperAdminSeeder.php` aprimorado para emitir feedback no console do Artisan: avisa se a senha veio de `INITIAL_SUPERADMIN_PASSWORD`, se usou o padrão local `'superadmin123'`, ou exibe em destaque a senha criptográfica aleatória de 24 caracteres gerada para primeiro acesso quando rodado em ambiente não-local.
+        - Adicionados testes em `tests/Feature/SuperUsuarioTest.php` validando a execução do seeder tanto com senha padrão quanto com `INITIAL_SUPERADMIN_PASSWORD`.
+
+#### 2. Arquivos Modificados
+
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Inclusão da validação `X-Sensor-Key`.
+- `config/services.php`: Adição do nó de configuração `services.telemetry.key`.
+- `.env.example`: Configurações de `APP_DEBUG=false`, `TELEMETRY_API_KEY=` e `INITIAL_SUPERADMIN_PASSWORD=`.
+- `database/seeders/DatabaseSeeder.php`: Remoção da criação de `admin@admin.com` e inclusão da chamada a `SuperAdminSeeder`.
+- `database/seeders/SuperAdminSeeder.php`: Exibição da senha no console e suporte a `INITIAL_SUPERADMIN_PASSWORD`.
+- `app/Http/Controllers/PatrimonioController.php`: Bloqueio de inventário cross-tenant para usuários sem jurisdição municipal.
+- `config/reverb.php`: Restrição de origens WebSocket e ativação de rate limit.
+- `config/session.php`: Habilitação condicional da flag `Secure` nos cookies de sessão.
+- `tests/Feature/MedicaoApiTest.php`: Teste de regressão para validação de `X-Sensor-Key`.
+- `tests/Feature/PatrimonioTest.php`: Teste de regressão para isolamento de patrimônio sem cidade vinculada.
+- `tests/Feature/SuperUsuarioTest.php`: Testes do seeder do Super Usuário com senha padrão e customizada.
+- `.agents/skills/historico.md`: Registro detalhado da sessão de remediação.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --dirty --format agent`: Formatação de código executada e aprovada sem violações.
+- `php artisan test tests/Feature/MedicaoApiTest.php tests/Feature/PatrimonioTest.php tests/Feature/EstacaoTenantIsolationTest.php tests/Feature/MedicaoApiRateLimitTest.php tests/Feature/AuthThrottleTest.php tests/Feature/PlanejamentoMaxSatelitesTest.php tests/Feature/SuperUsuarioTest.php tests/Feature/UsuarioMunicipalTest.php --compact`: 57 testes executados com 100% de sucesso e 302 asserções.

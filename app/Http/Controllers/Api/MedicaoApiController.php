@@ -47,6 +47,16 @@ class MedicaoApiController extends Controller
             ], 404);
         }
 
+        // Validação de autenticidade da telemetria (Chave de API / Segredo do Dispositivo)
+        $sensorKey = $request->header('X-Sensor-Key');
+        $expectedKey = config('services.telemetry.key') ?: env('TELEMETRY_API_KEY');
+        if ($expectedKey && (! $sensorKey || ! hash_equals((string) $expectedKey, (string) $sensorKey))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispositivo não autorizado. Chave de sensor inválida ou ausente.',
+            ], 401);
+        }
+
         if ($estacao->status_instalacao !== 'Instalada') {
             return response()->json([
                 'success' => false,

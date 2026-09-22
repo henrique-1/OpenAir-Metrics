@@ -3,7 +3,9 @@
 use App\Models\Cidade;
 use App\Models\Estado;
 use App\Models\User;
+use Database\Seeders\SuperAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 
 uses(RefreshDatabase::class);
 
@@ -251,4 +253,25 @@ test('super-usuario e redirecionado para listagem de administradores ao efetuar 
     ]);
 
     $response->assertRedirect(route('usuarios.index'));
+});
+
+test('superadmin seeder cria super usuario com sucesso', function () {
+    $this->seed(SuperAdminSeeder::class);
+
+    $user = User::where('email', 'superadmin@openair.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->nivel)->toBe('superadmin');
+    expect($user->ativo)->toBeTrue();
+    expect(Hash::check('superadmin123', $user->password))->toBeTrue();
+});
+
+test('superadmin seeder aceita senha customizada via INITIAL_SUPERADMIN_PASSWORD', function () {
+    putenv('INITIAL_SUPERADMIN_PASSWORD=SenhaCustomizada999!');
+
+    $this->seed(SuperAdminSeeder::class);
+
+    $user = User::where('email', 'superadmin@openair.com')->first();
+    expect(Hash::check('SenhaCustomizada999!', $user->password))->toBeTrue();
+
+    putenv('INITIAL_SUPERADMIN_PASSWORD');
 });

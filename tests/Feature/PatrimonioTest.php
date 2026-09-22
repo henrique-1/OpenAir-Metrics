@@ -145,9 +145,10 @@ test('ao excluir patrimonio status e alterado para descartado e registro e manti
 });
 
 test('endpoint de patrimonios disponiveis retorna apenas status disponivel', function () {
-    $user = User::factory()->create();
-    Patrimonio::factory()->create(['status' => 'Disponível', 'mac_address' => '00:11:22:33:44:55']);
-    Patrimonio::factory()->create(['status' => 'Instalada', 'mac_address' => '00:11:22:33:44:66']);
+    $cidade = Cidade::factory()->create();
+    $user = User::factory()->create(['cidade_id' => $cidade->id]);
+    Patrimonio::factory()->create(['cidade_id' => $cidade->id, 'status' => 'Disponível', 'mac_address' => '00:11:22:33:44:55']);
+    Patrimonio::factory()->create(['cidade_id' => $cidade->id, 'status' => 'Instalada', 'mac_address' => '00:11:22:33:44:66']);
 
     $response = $this->actingAs($user)->getJson(route('patrimonios.disponiveis'));
 
@@ -344,4 +345,21 @@ test('api de patrimonios disponiveis filtra por jurisdicao do usuario', function
     $data = $response->json();
     expect(count($data))->toBe(1);
     expect($data[0]['mac_address'])->toBe('AA:BB:CC:77:77:77');
+});
+
+test('api de patrimonios disponiveis retorna array vazio para usuario autenticado sem municipio vinculado', function () {
+    $cidade = Cidade::factory()->create();
+    $userSemCidade = User::factory()->create(['cidade_id' => null, 'nivel' => 'cadastrador']);
+
+    Patrimonio::factory()->create([
+        'cidade_id' => $cidade->id,
+        'status' => 'Disponível',
+        'mac_address' => 'AA:BB:CC:99:99:99',
+    ]);
+
+    $response = $this->actingAs($userSemCidade)->getJson(route('patrimonios.disponiveis'));
+
+    $response->assertOk();
+    $data = $response->json();
+    expect($data)->toBeArray()->toBeEmpty();
 });

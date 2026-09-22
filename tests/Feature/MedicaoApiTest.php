@@ -343,3 +343,25 @@ test('api dispara o evento NovaMedicaoRecebida para transmissao via websocket ao
         return true;
     });
 });
+
+test('rejeita medicao com 401 se TELEMETRY_API_KEY estiver configurada e header X-Sensor-Key for invalido ou ausente', function () {
+    config(['services.telemetry.key' => 'segredo-teste-123']);
+
+    $estacao = Estacao::factory()->create(['status_instalacao' => 'Instalada']);
+    $payload = [
+        'estacao_id' => $estacao->public_id,
+        'temperatura' => 24.5,
+        'umidade' => 65.0,
+        'co2' => 450,
+        'poeira' => 12.3,
+    ];
+
+    // Sem header
+    $this->postJson(route('api.medicoes.store'), $payload)->assertStatus(401);
+
+    // Com chave incorreta
+    $this->withHeader('X-Sensor-Key', 'chave-errada')->postJson(route('api.medicoes.store'), $payload)->assertStatus(401);
+
+    // Com chave correta
+    $this->withHeader('X-Sensor-Key', 'segredo-teste-123')->postJson(route('api.medicoes.store'), $payload)->assertStatus(201);
+});

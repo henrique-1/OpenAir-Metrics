@@ -272,6 +272,8 @@ class PatrimonioController extends Controller
 
         if ($user && $user->cidade_id) {
             $query->where('cidade_id', $user->cidade_id);
+        } elseif (! $user?->isSuperAdmin()) {
+            return response()->json([]);
         }
 
         $disponiveis = $query
