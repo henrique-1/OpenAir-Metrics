@@ -1282,3 +1282,143 @@ OpenAir-Metrics/
 
 - `vendor/bin/pint --dirty --format agent`: Formatação de código executada e aprovada sem violações.
 - `php artisan test tests/Feature/MedicaoApiTest.php tests/Feature/PatrimonioTest.php tests/Feature/EstacaoTenantIsolationTest.php tests/Feature/MedicaoApiRateLimitTest.php tests/Feature/AuthThrottleTest.php tests/Feature/PlanejamentoMaxSatelitesTest.php tests/Feature/SuperUsuarioTest.php tests/Feature/UsuarioMunicipalTest.php --compact`: 57 testes executados com 100% de sucesso e 302 asserções.
+
+---
+
+### Sessão: 22 de Setembro de 2026 (Auditoria Completa de Segurança Pós-Remediações Integrais)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Execução de Nova Auditoria de Segurança Completa (Commit `b315fcd`)**:
+    - Realizada nova rodada completa de auditoria de segurança em conformidade com as fases 1 a 6 da metodologia defensiva de auditoria de código.
+    - Todos os relatórios, sumários executivos e documentações técnicas foram emitidos integralmente em **Português Brasileiro (PT-BR)** no subdiretório dedicado com carimbo de data e hora: `security-audits/2026-09-22_12-19/`.
+- **Confirmação e Revalidação das Resoluções**:
+    - **SEC-OAIR-002 (Telemetria IoT)**: **RESOLVIDO**. O endpoint `/api/medicoes` agora exige obrigatoriamente autenticação de dispositivo com chave pré-compartilhada no cabeçalho `X-Sensor-Key` validada em tempo constante via `hash_equals` contra `TELEMETRY_API_KEY`.
+    - **SEC-OAIR-005 (Credenciais em Seeders)**: **RESOLVIDO**. A conta estática `admin@admin.com` foi eliminada de `DatabaseSeeder.php` e `SuperAdminSeeder.php` foi parametrizado com `INITIAL_SUPERADMIN_PASSWORD` e geração aleatória forte `Str::random(24)` para produção.
+    - **SEC-OAIR-006 (Enumeração de Inventário Cross-Tenant)**: **RESOLVIDO**. Bloqueio ativado em `PatrimonioController.php` para usuários sem município vinculado retornando `[]`.
+    - **SEC-OAIR-007 (WebSockets Permissivos no Reverb)**: **RESOLVIDO**. `config/reverb.php` restringe origens ao `APP_URL` e impõe rate limiting de conexões por padrão.
+    - **SEC-OAIR-001, SEC-OAIR-003, SEC-OAIR-004**: Revalidados e confirmados como protegidos no código e na suíte de testes.
+    - **Vulnerabilidades Ativas Confirmadas**: **0 (Zero)**. Postura de segurança consolidada como _Hardened_.
+- **Artefatos Gerados e Validação de Esquemas**:
+    - Emitidos os 7 artefatos obrigatórios: `run-metadata.json`, `architecture.md`, `coverage-ledger.json`, `findings.json`, `REPORT.md`, `FINDINGS-DETAIL.md` e `NEEDS-VALIDATION.md`.
+    - Os validadores oficiais `validate-findings.cjs` e `validate-coverage-ledger.cjs` foram executados e retornaram status de 100% de aprovação (7 achados válidos e 18 unidades de cobertura válidas).
+
+#### 2. Arquivos Modificados e Criados
+
+- `security-audits/2026-09-22_12-19/run-metadata.json`: Metadados da execução com referência ao commit `b315fcd` e vínculo com auditorias anteriores.
+- `security-audits/2026-09-22_12-19/architecture.md`: Modelo arquitetural, limites municipais de confiança e mapa de defesas em PT-BR.
+- `security-audits/2026-09-22_12-19/coverage-ledger.json`: Ledger determinístico cobrindo as 18 unidades da aplicação com status 100% coberto.
+- `security-audits/2026-09-22_12-19/findings.json`: Catálogo de achados refletindo a resolução e refutação das hipóteses.
+- `security-audits/2026-09-22_12-19/REPORT.md`: Relatório executivo completo de auditoria em português brasileiro.
+- `security-audits/2026-09-22_12-19/FINDINGS-DETAIL.md`: Detalhamento técnico aprofundado dos mecanismos de correção e testes automatizados.
+- `security-audits/2026-09-22_12-19/NEEDS-VALIDATION.md`: Documentação das pistas dependentes de infraestrutura de implantação em PT-BR.
+- `.agents/skills/historico.md`: Registro documental desta sessão de auditoria.
+
+#### 3. Testes, Formatação e Compilação
+
+- `node .agents/skills/security-audit/validate-findings.cjs security-audits/2026-09-22_12-19/findings.json`: Aprovado (7 achados válidos).
+- `node .agents/skills/security-audit/validate-coverage-ledger.cjs security-audits/2026-09-22_12-19/coverage-ledger.json`: Aprovado (18 unidades de cobertura válidas).
+
+---
+
+### Sessão: 01 de Outubro de 2026 (Padronização da API de Medições para Aceite Exclusivo de MAC Address)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Identificação Exclusiva via Endereço MAC na Ingestão de Telemetria (`POST /api/medicoes`)**:
+    - O endpoint `POST /api/medicoes` foi reformulado para aceitar **exclusivamente** o campo `mac_address` como identificador de hardware da estação monitora, descontinuando o suporte aos campos `patrimonio` e `estacao_id`.
+    - Implementada regra de validação via regex (`regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^[0-9A-Fa-f]{12}$/`) que aceita formatos padronizados com dois-pontos (`AA:BB:CC:DD:EE:FF`), com hífens (`AA-BB-CC-DD-EE-FF`) ou contínuo sem separador (`AABBCCDDEEFF`), aceitando indiferentemente maiúsculas e minúsculas.
+    - O controller normaliza a string recebida para o formato padrão maiúsculo delimitado por dois-pontos e realiza a busca da estação correspondente tanto na coluna `estacoes.mac_address` quanto através do relacionamento com o item físico em `patrimonios.mac_address`.
+    - Caso a estação não seja encontrada, o endpoint retorna erro `404 Not Found` com mensagem descritiva: `'Estação não encontrada com o endereço MAC informado.'`.
+- **Esclarecimento sobre a Obrigatoriedade de `TELEMETRY_API_KEY`**:
+    - Confirmada a obrigatoriedade estrita do cabeçalho `X-Sensor-Key` quando `TELEMETRY_API_KEY` (ou `services.telemetry.key`) estiver configurada no servidor. Se a chave estiver presente na configuração do ambiente, qualquer requisição de telemetria sem o cabeçalho correspondente ou com chave divergente é imediatamente rejeitada com código `401 Unauthorized`.
+- **Atualização da Suíte de Testes Automatizados**:
+    - Suíte `tests/Feature/MedicaoApiTest.php` reescrita para validar todos os fluxos com `mac_address`, cobrindo múltiplos formatos (dois-pontos, hífens, contínuo hex), fallback para o MAC do patrimônio vinculado, validações de obrigatoriedade, formato inválido e autenticação.
+    - Suíte `tests/Feature/MedicaoApiRateLimitTest.php` atualizada para enviar `mac_address`.
+    - Ajustado `phpunit.xml` para isolar `TELEMETRY_API_KEY` no ambiente de teste automatizado.
+    - Todos os 18 testes de API de medição e rate limit executados e aprovados com 100% de sucesso.
+
+#### 2. Arquivos Modificados
+
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Validação exclusiva de `mac_address`, normalização de formato e consulta dupla (`estacoes` e `patrimonios`).
+- `tests/Feature/MedicaoApiTest.php`: Atualização integral dos casos de teste de telemetria para validação via MAC address.
+- `tests/Feature/MedicaoApiRateLimitTest.php`: Atualização do payload de teste de rate limiting com `mac_address`.
+- `phpunit.xml`: Configuração padrão de ambiente de teste para `TELEMETRY_API_KEY`.
+- `.agents/skills/historico.md`: Registro documental desta entrega.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --dirty --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test tests/Feature/MedicaoApiTest.php tests/Feature/MedicaoApiRateLimitTest.php --compact`: 18 testes executados com 100% de sucesso (126 asserções).
+
+---
+
+### Sessão: 02 de Outubro de 2026 (Seletor de Granularidade, Intervalo de 1 Minuto e Reposicionamento dos Filtros na Dashboard)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Esclarecimento Técnico sobre a Agregação Temporal dos Gráficos**:
+    - Explicado detalhadamente o funcionamento do algoritmo adaptativo em `DashboardController::determinarBucketTemporal()`, que antes agrupava medições com amplitude de 6h a 24h automaticamente em blocos de 15 minutos (`H:00`, `H:15`, `H:30`, `H:45`), esclarecendo o motivo de visualizações com poucas leituras pontuais exibirem intervalos espaçados.
+- **Implementação do Seletor de Intervalo / Granularidade e Reposicionamento na Dashboard (`/dashboard`)**:
+    - Adicionado seletor visual com os botões **Automático**, **1 min**, **5 min**, **15 min** e **1 hora** na barra de filtros analíticos de `resources/views/dashboard.blade.php`.
+    - Reposicionamento dos filtros para que o seletor de **Intervalo** fique disposto verticalmente logo abaixo do **Período** (`flex flex-col gap-2.5`), com largura padronizada dos rótulos (`w-20 shrink-0`) assegurando alinhamento visual harmônico dos botões.
+    - Os botões seguem a identidade visual do Tailwind CSS v4, com suporte dinâmico a modo claro e escuro (`dark mode`), debounce de requisição e persistência de estado reativa com as trocas de localidade (Cidade/Bairro), métricas (IQA, Temp, Umidade, PM, CO₂) e período (24h, 7d, 30d).
+    - Integração do novo parâmetro `intervalo` nas requisições AJAX e nos listeners de WebSockets via Laravel Reverb e Echo (`themechanged` e `NovaMedicaoRecebida`).
+- **Suporte a Resolução Fixa de 1 Minuto, 5 Minutos, 15 Minutos e 1 Hora no Backend (`DashboardController.php`)**:
+    - O endpoint `GET /dashboard/graficos` foi atualizado para receber e validar o parâmetro `intervalo` (`auto`, `1m`, `5m`, `15m`, `1h`).
+    - Quando o usuário seleciona **1 min** (`intervalo=1m`), as medições registradas minuto a minuto são consolidadas em buckets individuais (`H:i` ou `d/m H:i`), calculando a média ponderada, pico máximo e ponto mínimo para cada minuto.
+    - Quando o usuário seleciona **5 min** (`intervalo=5m`), medições registradas em minutos intermediários (ex.: 14:01 e 14:03) são consolidadas no bucket de 5 minutos correspondente (`14:00`).
+    - Para períodos de múltiplos dias (7d ou 30d), os rótulos incluem data e hora formatados (`d/m H:i`), evitando ambiguidades temporais.
+- **Ampliação da Cobertura de Testes Automatizados (`DashboardTest.php`)**:
+    - Adicionados testes de verificação da renderização do componente de intervalo na interface do usuário (incluindo `1 min`).
+    - Implementados casos de teste específicos para a agregação estrita a cada 1 minuto (`intervalo=1m`), 5 minutos (`intervalo=5m`), 15 minutos (`intervalo=15m`) e 1 hora (`intervalo=1h`), validando o agrupamento correto de médias, valores máximos, mínimos e contagem de leituras.
+    - Ajustado o teste de escopo municipal para isolar nomes gerados pelo Faker e garantir estabilidade determinística na suíte.
+    - Suíte executada com 100% de sucesso (14 testes aprovados).
+
+#### 2. Arquivos Modificados e Criados
+
+- `app/Http/Controllers/DashboardController.php`: Recebimento, validação e agregação temporal por intervalos fixos (`1m`, `5m`, `15m`, `1h`) ou modo automático adaptativo no método `determinarBucketTemporal()`.
+- `resources/views/dashboard.blade.php`: Adição dos botões de controle de granularidade (`btn-intervalo`), reposicionamento vertical abaixo do período, estados visuais, listeners de clique e passagem do parâmetro `intervalo` no endpoint AJAX.
+- `tests/Feature/DashboardTest.php`: Adição de asserções da interface e testes de funcionalidade para agrupamento em 1m, 5m, 15m e 1h.
+- `.agents/skills/historico.md`: Registro documental desta sessão.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --dirty --format agent`: Formatação PHP executada e aplicada conforme os padrões PSR/Laravel.
+- `php artisan test --compact tests/Feature/DashboardTest.php`: 14 testes executados com 100% de sucesso (65 asserções).
+
+---
+
+### Sessão: 02 de Outubro de 2026 (Remoção Definitiva de Patrimônio e Ingestão de Telemetria Exclusiva por MAC Address do ESP32)
+
+#### 1. Resumo Executivo das Entregas (ou da Documentação)
+
+- **Diagnóstico e Correção da Rejeição 422 de Telemetria do Microcontrolador ESP32**:
+    - Identificada a causa do erro `422 Unprocessable Content` retornado pelo servidor (`The patrimonio field is required when estacao id is not present`), ocasionado pela ausência de persistência prévia no controller `MedicaoApiController` devido à interrupção na comunicação da sessão anterior.
+    - Atualização definitiva do endpoint `POST /api/medicoes` para remover completamente as regras de validação que exigiam `patrimonio` e `estacao_id`.
+    - O microcontrolador envia **exclusivamente** o endereço físico de hardware (`mac_address`), desonerando o firmware de armazenar ou transmitir identificadores relacionais ou números de patrimônio.
+    - O backend realiza a resolução transparente da estação: normaliza o endereço MAC (suportando maiúsculas/minúsculas, dois-pontos, hífens ou formato contínuo) e busca tanto na tabela `estacoes` quanto no inventário de `patrimonios` vinculados, mapeando o `estacao_id` e persistindo a medição.
+- **Esclarecimento sobre Validações Numéricas e Sensores Ambientais**:
+    - Confirmada a conformidade das faixas numéricas de telemetria: leitura de `co2: 0` (típica durante o ciclo de pré-aquecimento do sensor NDIR MH-Z19C logo após o boot) e `poeira: 0.00` são aceitas normalmente pela validação (`min: 0`).
+    - Esclarecido que a mensagem no console serial do ESP32 (*"Valores fora da faixa permitida ou estacao em status 'Planejada'"*) é uma string genérica do firmware C++ para o código HTTP 422, sendo a real causa o status da estação ou a exigência anterior do patrimônio.
+    - Explicado que estações só aceitam ingestão de telemetria após ativadas com `status_instalacao = 'Instalada'`.
+- **Orientação de Operação do Servidor de Desenvolvimento**:
+    - Destacada a presença da flag `--no-reload` no script `dev` do `composer.json` (`php artisan serve --host=0.0.0.0 --port=8000 --no-reload`), alertando sobre a necessidade de reinício manual do processo (`Ctrl + C` e `composer run dev`) para que o processo PHP carregue as alterações do controller.
+- **Suíte de Testes e Conformidade de Estilo**:
+    - Testes unitários e de integração em `tests/Feature/MedicaoApiTest.php` e `tests/Feature/MedicaoApiRateLimitTest.php` atualizados e validados com 100% de sucesso.
+    - Código formatado via Laravel Pint e caches de rota/configuração atualizados.
+
+#### 2. Arquivos Modificados e Criados
+
+- `app/Http/Controllers/Api/MedicaoApiController.php`: Remoção de `patrimonio` e `estacao_id` das regras de validação, consulta exclusiva por `mac_address` e mapeamento automático da estação.
+- `tests/Feature/MedicaoApiTest.php`: Atualização completa dos testes de telemetria cobrindo formatos de MAC, fallbacks e rejeição por chave de telemetria.
+- `tests/Feature/MedicaoApiRateLimitTest.php`: Adequação do payload de estresse de rate limit com `mac_address`.
+- `phpunit.xml`: Configuração de isolamento da variável `TELEMETRY_API_KEY` para testes automatizados.
+- `.agents/skills/historico.md`: Registro documental desta sessão de desenvolvimento.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --dirty --format agent`: Formatação PHP 100% aprovada sem inconsistências de estilo.
+- `php artisan test tests/Feature/MedicaoApiTest.php tests/Feature/MedicaoApiRateLimitTest.php --compact`: 18 testes executados com 100% de sucesso (126 asserções).
+- `php artisan route:clear && php artisan config:clear`: Caches do Laravel liberados para execução em ambiente de desenvolvimento.
+

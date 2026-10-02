@@ -17,44 +17,53 @@ class MedicaoApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'patrimonio' => ['required_without:estacao_id', 'nullable', 'string', 'max:50'],
-            'estacao_id' => ['required_without:patrimonio', 'nullable', 'string', 'max:50'],
+            'mac_address' => [
+                'required',
+                'string',
+                'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^[0-9A-Fa-f]{12}$/',
+            ],
             'temperatura' => ['required', 'numeric', 'between:-50,100'],
             'umidade' => ['required', 'numeric', 'between:0,100'],
             'co2' => ['required', 'integer', 'min:0', 'max:50000'],
             'poeira' => ['required', 'numeric', 'min:0', 'max:5000'],
         ]);
 
-        $query = Estacao::query()->withCoordinates()->with('patrimonio');
-
-        if (! empty($validated['patrimonio'])) {
-            $patrimonioValor = trim((string) $validated['patrimonio']);
-            $query->whereHas('patrimonio', function ($q) use ($patrimonioValor) {
-                $q->where('numero_patrimonio', $patrimonioValor)
-                    ->orWhere('public_id', $patrimonioValor);
-            });
-        } elseif (! empty($validated['estacao_id'])) {
-            $estacaoId = trim((string) $validated['estacao_id']);
-            $query->where('public_id', $estacaoId);
-        }
-
-        $estacao = $query->first();
-
-        if (! $estacao) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Estação não encontrada com o identificador ou patrimônio informado.',
-            ], 404);
-        }
-
         // Validação de autenticidade da telemetria (Chave de API / Segredo do Dispositivo)
         $sensorKey = $request->header('X-Sensor-Key');
         $expectedKey = config('services.telemetry.key') ?: env('TELEMETRY_API_KEY');
-        if ($expectedKey && (! $sensorKey || ! hash_equals((string) $expectedKey, (string) $sensorKey))) {
+        if (! empty($expectedKey) && (! $sensorKey || ! hash_equals((string) $expectedKey, (string) $sensorKey))) {
             return response()->json([
                 'success' => false,
                 'message' => 'Dispositivo não autorizado. Chave de sensor inválida ou ausente.',
             ], 401);
+        }
+
+        $macLimpo = strtoupper(trim((string) $validated['mac_address']));
+        $macLimpo = str_replace('-', ':', $macLimpo);
+        if (preg_match('/^[0-9A-F]{12}$/', $macLimpo)) {
+            $macLimpo = implode(':', str_split($macLimpo, 2));
+        }
+
+        $macSemSeparador = str_replace(':', '', $macLimpo);
+
+        $estacao = Estacao::query()
+            ->withCoordinates()
+            ->with('patrimonio')
+            ->where(function ($q) use ($macLimpo, $macSemSeparador) {
+                $q->whereRaw('UPPER(mac_address) = ?', [$macLimpo])
+                    ->orWhereRaw("UPPER(REPLACE(REPLACE(mac_address, ':', ''), '-', '')) = ?", [$macSemSeparador])
+                    ->orWhereHas('patrimonio', function ($pQ) use ($macLimpo, $macSemSeparador) {
+                        $pQ->whereRaw('UPPER(mac_address) = ?', [$macLimpo])
+                            ->orWhereRaw("UPPER(REPLACE(REPLACE(mac_address, ':', ''), '-', '')) = ?", [$macSemSeparador]);
+                    });
+            })
+            ->first();
+
+        if (! $estacao) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Estação não encontrada com o endereço MAC informado.',
+            ], 404);
         }
 
         if ($estacao->status_instalacao !== 'Instalada') {
@@ -91,7 +100,7 @@ class MedicaoApiController extends Controller
                 'id' => $medicao->public_id,
                 'estacao_id' => $estacao->public_id,
                 'patrimonio' => $estacao->patrimonio?->numero_patrimonio,
-                'mac_address' => $estacao->mac_address,
+                'mac_address' => $estacao->mac_address ?: $estacao->patrimonio?->mac_address,
                 'temperatura' => (float) $medicao->temperatura,
                 'umidade' => (float) $medicao->umidade,
                 'co2' => (int) $medicao->co2,

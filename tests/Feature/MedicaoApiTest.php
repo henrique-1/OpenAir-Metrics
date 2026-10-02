@@ -11,26 +11,23 @@ use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
-test('estacao em campo pode enviar medicoes com sucesso via patrimonio', function () {
+beforeEach(function () {
+    config(['services.telemetry.key' => null]);
+});
+
+test('estacao em campo pode enviar medicoes com sucesso via mac_address', function () {
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
-
-    $patrimonio = Patrimonio::factory()->create([
-        'cidade_id' => $bairro->cidade_id,
-        'numero_patrimonio' => 'OAir-Estacao-1-0001',
-        'status' => 'Instalado',
-        'created_by' => $user->id,
-    ]);
 
     $estacao = Estacao::factory()->create([
         'created_by' => $user->id,
         'bairro_id' => $bairro->id,
-        'patrimonio_id' => $patrimonio->private_id,
+        'mac_address' => '24:6F:28:AB:CD:EF',
         'status_instalacao' => 'Instalada',
     ]);
 
     $payload = [
-        'patrimonio' => 'OAir-Estacao-1-0001',
+        'mac_address' => '24:6F:28:AB:CD:EF',
         'temperatura' => 24.5,
         'umidade' => 65.0,
         'co2' => 450,
@@ -45,7 +42,7 @@ test('estacao em campo pode enviar medicoes com sucesso via patrimonio', functio
         'message' => 'Medição registrada com sucesso.',
         'data' => [
             'estacao_id' => $estacao->public_id,
-            'patrimonio' => 'OAir-Estacao-1-0001',
+            'mac_address' => '24:6F:28:AB:CD:EF',
             'temperatura' => 24.5,
             'umidade' => 65.0,
             'co2' => 450,
@@ -60,13 +57,46 @@ test('estacao em campo pode enviar medicoes com sucesso via patrimonio', functio
     expect($medicao->data_hora->diffInSeconds(now()))->toBeLessThan(5);
 });
 
-test('estacao em campo pode enviar medicoes via public_id do patrimonio', function () {
+test('estacao em campo pode enviar medicoes com mac_address em diferentes formatos (hifen, minusculas, sem separador)', function (string $macEnviado) {
+    $user = User::factory()->create();
+    $bairro = Bairro::factory()->create();
+
+    $estacao = Estacao::factory()->create([
+        'created_by' => $user->id,
+        'bairro_id' => $bairro->id,
+        'mac_address' => 'A1:B2:C3:D4:E5:F6',
+        'status_instalacao' => 'Instalada',
+    ]);
+
+    $payload = [
+        'mac_address' => $macEnviado,
+        'temperatura' => 22.0,
+        'umidade' => 60.0,
+        'co2' => 400,
+        'poeira' => 10.0,
+    ];
+
+    $response = $this->postJson(route('api.medicoes.store'), $payload);
+
+    $response->assertCreated();
+    expect(Medicao::where('estacao_id', $estacao->private_id)->count())->toBe(1);
+})->with([
+    'formato com dois pontos minusculo' => 'a1:b2:c3:d4:e5:f6',
+    'formato com hifens' => 'A1-B2-C3-D4-E5-F6',
+    'formato com hifens minusculo' => 'a1-b2-c3-d4-e5-f6',
+    'formato continuo sem separador' => 'A1B2C3D4E5F6',
+    'formato continuo sem separador minusculo' => 'a1b2c3d4e5f6',
+]);
+
+test('estacao em campo pode ser identificada pelo mac_address do patrimonio vinculado', function () {
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
 
     $patrimonio = Patrimonio::factory()->create([
         'cidade_id' => $bairro->cidade_id,
-        'status' => 'Instalado',
+        'numero_patrimonio' => 'OAir-Estacao-1-0001',
+        'mac_address' => '11:22:33:44:55:66',
+        'status' => 'Instalada',
         'created_by' => $user->id,
     ]);
 
@@ -74,11 +104,12 @@ test('estacao em campo pode enviar medicoes via public_id do patrimonio', functi
         'created_by' => $user->id,
         'bairro_id' => $bairro->id,
         'patrimonio_id' => $patrimonio->private_id,
+        'mac_address' => null,
         'status_instalacao' => 'Instalada',
     ]);
 
     $payload = [
-        'patrimonio' => $patrimonio->public_id,
+        'mac_address' => '11:22:33:44:55:66',
         'temperatura' => 22.0,
         'umidade' => 60.0,
         'co2' => 400,
@@ -95,22 +126,15 @@ test('data_hora no payload e ignorada e cadastrada automaticamente pelo servidor
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
 
-    $patrimonio = Patrimonio::factory()->create([
-        'cidade_id' => $bairro->cidade_id,
-        'numero_patrimonio' => 'OAir-Estacao-1-0002',
-        'status' => 'Instalado',
-        'created_by' => $user->id,
-    ]);
-
     $estacao = Estacao::factory()->create([
         'created_by' => $user->id,
         'bairro_id' => $bairro->id,
-        'patrimonio_id' => $patrimonio->private_id,
+        'mac_address' => '24:6F:28:00:00:02',
         'status_instalacao' => 'Instalada',
     ]);
 
     $payload = [
-        'patrimonio' => 'OAir-Estacao-1-0002',
+        'mac_address' => '24:6F:28:00:00:02',
         'temperatura' => 23.0,
         'umidade' => 55.0,
         'co2' => 420,
@@ -126,41 +150,9 @@ test('data_hora no payload e ignorada e cadastrada automaticamente pelo servidor
     expect($medicao->data_hora->toDateString())->not->toBe('2020-01-01');
 });
 
-test('estacao em campo pode enviar medicoes via estacao_id publico', function () {
-    $user = User::factory()->create();
-    $bairro = Bairro::factory()->create();
-
-    $patrimonio = Patrimonio::factory()->create([
-        'cidade_id' => $bairro->cidade_id,
-        'numero_patrimonio' => 'OAir-Estacao-1-0003',
-        'status' => 'Instalado',
-        'created_by' => $user->id,
-    ]);
-
-    $estacao = Estacao::factory()->create([
-        'created_by' => $user->id,
-        'bairro_id' => $bairro->id,
-        'patrimonio_id' => $patrimonio->private_id,
-        'status_instalacao' => 'Instalada',
-    ]);
-
+test('envio de medicao retorna 404 se estacao nao for encontrada por mac_address', function () {
     $payload = [
-        'estacao_id' => $estacao->public_id,
-        'temperatura' => 26.0,
-        'umidade' => 70.0,
-        'co2' => 500,
-        'poeira' => 15.0,
-    ];
-
-    $response = $this->postJson(route('api.medicoes.store'), $payload);
-
-    $response->assertCreated();
-    expect(Medicao::where('estacao_id', $estacao->private_id)->count())->toBe(1);
-});
-
-test('envio de medicao retorna 404 se estacao nao for encontrada por patrimonio', function () {
-    $payload = [
-        'patrimonio' => 'PATRIMONIO-INEXISTENTE',
+        'mac_address' => 'FF:EE:DD:CC:BB:AA',
         'temperatura' => 20.0,
         'umidade' => 50.0,
         'co2' => 400,
@@ -172,7 +164,7 @@ test('envio de medicao retorna 404 se estacao nao for encontrada por patrimonio'
     $response->assertNotFound();
     $response->assertJson([
         'success' => false,
-        'message' => 'Estação não encontrada com o identificador ou patrimônio informado.',
+        'message' => 'Estação não encontrada com o endereço MAC informado.',
     ]);
 });
 
@@ -180,22 +172,15 @@ test('envio de medicao retorna 422 se estacao ainda nao estiver com status Insta
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
 
-    $patrimonio = Patrimonio::factory()->create([
-        'cidade_id' => $bairro->cidade_id,
-        'numero_patrimonio' => 'OAir-Estacao-1-0004',
-        'status' => 'Disponível',
-        'created_by' => $user->id,
-    ]);
-
-    Estacao::factory()->create([
+    $estacao = Estacao::factory()->create([
         'created_by' => $user->id,
         'bairro_id' => $bairro->id,
-        'patrimonio_id' => $patrimonio->private_id,
+        'mac_address' => '24:6F:28:00:00:04',
         'status_instalacao' => 'Planejada',
     ]);
 
     $payload = [
-        'patrimonio' => 'OAir-Estacao-1-0004',
+        'mac_address' => '24:6F:28:00:00:04',
         'temperatura' => 25.0,
         'umidade' => 55.0,
         'co2' => 420,
@@ -210,11 +195,24 @@ test('envio de medicao retorna 422 se estacao ainda nao estiver com status Insta
     ]);
 });
 
-test('envio de medicao valida campos obrigatorios', function () {
+test('envio de medicao valida campos obrigatorios incluindo mac_address', function () {
     $response = $this->postJson(route('api.medicoes.store'), []);
 
     $response->assertUnprocessable();
-    $response->assertJsonValidationErrors(['patrimonio', 'temperatura', 'umidade', 'co2', 'poeira']);
+    $response->assertJsonValidationErrors(['mac_address', 'temperatura', 'umidade', 'co2', 'poeira']);
+});
+
+test('envio de medicao rejeita formato invalido de mac_address', function () {
+    $response = $this->postJson(route('api.medicoes.store'), [
+        'mac_address' => 'formato-invalido',
+        'temperatura' => 25.0,
+        'umidade' => 50.0,
+        'co2' => 400,
+        'poeira' => 10.0,
+    ]);
+
+    $response->assertUnprocessable();
+    $response->assertJsonValidationErrors(['mac_address']);
 });
 
 test('model Medicao preenche data_hora automaticamente ao ser criado sem ela', function () {
@@ -259,22 +257,15 @@ test('api armazena o valor de iqa calculado diretamente na coluna da tabela medi
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
 
-    $patrimonio = Patrimonio::factory()->create([
-        'cidade_id' => $bairro->cidade_id,
-        'numero_patrimonio' => 'OAir-Estacao-1-9999',
-        'status' => 'Instalado',
-        'created_by' => $user->id,
-    ]);
-
     $estacao = Estacao::factory()->create([
         'created_by' => $user->id,
         'bairro_id' => $bairro->id,
-        'patrimonio_id' => $patrimonio->private_id,
+        'mac_address' => '24:6F:28:99:99:99',
         'status_instalacao' => 'Instalada',
     ]);
 
     $payload = [
-        'patrimonio' => 'OAir-Estacao-1-9999',
+        'mac_address' => '24:6F:28:99:99:99',
         'temperatura' => 25.0,
         'umidade' => 50.0,
         'co2' => 850, // Moderada: 51 + (49/300)*150 = 51 + 24.5 = 75.5 -> 76
@@ -307,13 +298,14 @@ test('api dispara o evento NovaMedicaoRecebida para transmissao via websocket ao
         'created_by' => $user->id,
         'bairro_id' => $bairro->id,
         'patrimonio_id' => $patrimonio->private_id,
+        'mac_address' => '24:6F:28:AA:BB:CC',
         'status_instalacao' => 'Instalada',
         'latitude' => -21.967194,
         'longitude' => -46.812740,
     ]);
 
     $payload = [
-        'patrimonio' => 'OAir-Estacao-WS-001',
+        'mac_address' => '24:6F:28:AA:BB:CC',
         'temperatura' => 22.8,
         'umidade' => 58.0,
         'co2' => 420,
@@ -347,9 +339,12 @@ test('api dispara o evento NovaMedicaoRecebida para transmissao via websocket ao
 test('rejeita medicao com 401 se TELEMETRY_API_KEY estiver configurada e header X-Sensor-Key for invalido ou ausente', function () {
     config(['services.telemetry.key' => 'segredo-teste-123']);
 
-    $estacao = Estacao::factory()->create(['status_instalacao' => 'Instalada']);
+    $estacao = Estacao::factory()->create([
+        'mac_address' => '24:6F:28:11:22:33',
+        'status_instalacao' => 'Instalada',
+    ]);
     $payload = [
-        'estacao_id' => $estacao->public_id,
+        'mac_address' => '24:6F:28:11:22:33',
         'temperatura' => 24.5,
         'umidade' => 65.0,
         'co2' => 450,

@@ -124,25 +124,60 @@
                                 </div>
                             </div>
 
-                            <!-- Filtro de Período -->
-                            <div class="flex items-center gap-2 self-start lg:self-auto">
-                                <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400">Período:</span>
-                                <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-medium">
-                                    <button type="button" 
-                                        data-periodo="24h" 
-                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
-                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
-                                        class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm cursor-pointer">24 Horas</button>
-                                    <button type="button" 
-                                        data-periodo="7d" 
-                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
-                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
-                                        class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">7 Dias</button>
-                                    <button type="button" 
-                                        data-periodo="30d" 
-                                        data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
-                                        data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
-                                        class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">30 Dias</button>
+                            <!-- Controles de Período e Intervalo -->
+                            <div class="flex flex-col gap-2.5 self-start lg:self-auto">
+                                <!-- Filtro de Período -->
+                                <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400 w-20 shrink-0">Período:</span>
+                                    <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-medium">
+                                        <button type="button" 
+                                            data-periodo="24h" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-periodo px-2.5 py-1 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm cursor-pointer">24 Horas</button>
+                                        <button type="button" 
+                                            data-periodo="7d" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">7 Dias</button>
+                                        <button type="button" 
+                                            data-periodo="30d" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-periodo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">30 Dias</button>
+                                    </div>
+                                </div>
+
+                                <!-- Filtro de Intervalo (Granularidade) -->
+                                <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400 w-20 shrink-0">Intervalo:</span>
+                                    <div class="inline-flex p-1 bg-athens-gray-100 dark:bg-athens-gray-800 rounded-lg border border-athens-gray-200 dark:border-athens-gray-700 text-xs font-medium">
+                                        <button type="button" 
+                                            data-intervalo="auto" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-intervalo px-2.5 py-1 rounded-md transition-all bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm cursor-pointer">Automático</button>
+                                        <button type="button" 
+                                            data-intervalo="1m" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-intervalo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">1 min</button>
+                                        <button type="button" 
+                                            data-intervalo="5m" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-intervalo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">5 min</button>
+                                        <button type="button" 
+                                            data-intervalo="15m" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-intervalo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">15 min</button>
+                                        <button type="button" 
+                                            data-intervalo="1h" 
+                                            data-active-classes="bg-white dark:bg-athens-gray-900 text-blue-dianne-950 dark:text-white font-bold shadow-sm"
+                                            data-inactive-classes="text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal"
+                                            class="btn-intervalo px-2.5 py-1 rounded-md transition-all text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white font-normal cursor-pointer">1 hora</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -297,6 +332,7 @@
                 let currentTipo = 'cidade';
                 let currentMetrica = 'qualidade_ar';
                 let currentPeriodo = '24h';
+                let currentIntervalo = 'auto';
 
                 const btnTipoCidade = document.getElementById('btn-tipo-cidade');
                 const btnTipoBairro = document.getElementById('btn-tipo-bairro');
@@ -345,6 +381,12 @@
                     });
                 }
 
+                function atualizarBotoesIntervalo() {
+                    document.querySelectorAll('.btn-intervalo').forEach(btn => {
+                        aplicarEstadoBotao(btn, btn.dataset.intervalo === currentIntervalo);
+                    });
+                }
+
                 function atualizarBotoesMetrica() {
                     document.querySelectorAll('.btn-metrica').forEach(btn => {
                         aplicarEstadoBotao(btn, btn.dataset.metrica === currentMetrica);
@@ -381,6 +423,15 @@
                     });
                 });
 
+                // Seleção de Intervalo (auto, 1m, 5m, 15m, 1h)
+                document.querySelectorAll('.btn-intervalo').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        currentIntervalo = this.dataset.intervalo;
+                        atualizarBotoesIntervalo();
+                        carregarDadosGrafico();
+                    });
+                });
+
                 // Seleção de Métricas (Qualidade do Ar, Temp, Umidade, PM, CO2)
                 document.querySelectorAll('.btn-metrica').forEach(btn => {
                     btn.addEventListener('click', function () {
@@ -405,6 +456,7 @@
                     }
                     url.searchParams.append('metrica', currentMetrica);
                     url.searchParams.append('periodo', currentPeriodo);
+                    url.searchParams.append('intervalo', currentIntervalo);
 
                     fetch(url)
                         .then(res => res.json())
@@ -670,6 +722,7 @@
                 window.addEventListener('themechanged', function () {
                     atualizarBotoesTipo();
                     atualizarBotoesPeriodo();
+                    atualizarBotoesIntervalo();
                     atualizarBotoesMetrica();
                     if (chartInstance) {
                         chartInstance.destroy();

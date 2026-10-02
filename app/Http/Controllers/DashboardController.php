@@ -30,8 +30,8 @@ class DashboardController extends Controller
         $bairrosQuery = Bairro::whereHas('estacoes')->with(['cidade.estado'])->orderBy('nome');
 
         if ($user && $user->cidade_id) {
-            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
-            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+            $estacaoQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $user->cidade_id));
+            $medicaoQuery->whereHas('estacao.bairro', fn($q) => $q->where('cidade_id', $user->cidade_id));
             $cidadesQuery->where('id', $user->cidade_id);
             $bairrosQuery->where('cidade_id', $user->cidade_id);
         }
@@ -40,9 +40,9 @@ class DashboardController extends Controller
         $totalLeituras = (clone $medicaoQuery)->count();
 
         // Alertas reais computados a partir das medições
-        $alertasIqa = (clone $medicaoQuery)->where(fn ($q) => $q->where('poeira', '>', 50)->orWhere('co2', '>', 1000))->count();
-        $alertasTemp = (clone $medicaoQuery)->where(fn ($q) => $q->where('temperatura', '>', 35)->orWhere('temperatura', '<', 10))->count();
-        $alertasUmidade = (clone $medicaoQuery)->where(fn ($q) => $q->where('umidade', '<', 30)->orWhere('umidade', '>', 85))->count();
+        $alertasIqa = (clone $medicaoQuery)->where(fn($q) => $q->where('poeira', '>', 50)->orWhere('co2', '>', 1000))->count();
+        $alertasTemp = (clone $medicaoQuery)->where(fn($q) => $q->where('temperatura', '>', 35)->orWhere('temperatura', '<', 10))->count();
+        $alertasUmidade = (clone $medicaoQuery)->where(fn($q) => $q->where('umidade', '<', 30)->orWhere('umidade', '>', 85))->count();
         $alertasCo2 = (clone $medicaoQuery)->where('co2', '>', 1000)->count();
         $alertasPm = (clone $medicaoQuery)->where('poeira', '>', 50)->count();
 
@@ -79,13 +79,18 @@ class DashboardController extends Controller
         $localidadeId = $request->input('localidade_id');
         $metrica = $request->input('metrica', 'qualidade_ar'); // 'qualidade_ar', 'temperatura', 'umidade', 'poeira', 'co2'
         $periodo = $request->input('periodo', '24h'); // '24h', '7d', '30d', 'todos'
+        $intervalo = $request->input('intervalo', 'auto'); // 'auto', '1m', '5m', '15m', '1h'
+
+        if (! in_array($intervalo, ['auto', '1m', '5m', '15m', '1h'], true)) {
+            $intervalo = 'auto';
+        }
 
         // 1. Identifica as estações vinculadas à localidade selecionada
         $localidadeNome = 'Geral';
         $estacoesQuery = Estacao::query();
 
         if ($user && $user->cidade_id) {
-            $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+            $estacoesQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $user->cidade_id));
         }
 
         if ($tipoAgrupamento === 'bairro' && $localidadeId) {
@@ -106,7 +111,7 @@ class DashboardController extends Controller
             $cidade = $cidadeQuery->find($localidadeId);
             if ($cidade) {
                 $localidadeNome = "{$cidade->nome} - {$cidade->estado?->uf}";
-                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidade->id));
+                $estacoesQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $cidade->id));
             }
         } else {
             // Se nenhuma localidade foi informada, seleciona a primeira cidade disponível com estações
@@ -117,7 +122,7 @@ class DashboardController extends Controller
             $primeiraCidade = $primeiraCidadeQuery->first();
             if ($primeiraCidade) {
                 $localidadeNome = "{$primeiraCidade->nome} - {$primeiraCidade->estado?->uf}";
-                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $primeiraCidade->id));
+                $estacoesQuery->whereHas('bairro', fn($q) => $q->where('cidade_id', $primeiraCidade->id));
             }
         }
 
@@ -189,6 +194,7 @@ class DashboardController extends Controller
                 'bgCor' => $infoMetrica['bgCor'],
                 'periodo' => $periodo,
                 'periodo_rotulo' => $periodoRotulo,
+                'intervalo' => $intervalo,
                 'media' => 0.0,
                 'maximo' => 0.0,
                 'minimo' => 0.0,
@@ -203,7 +209,7 @@ class DashboardController extends Controller
             ]);
         }
 
-        // 5. Extração e cálculo dos pontos temporais com granularidade adaptativa
+        // 5. Extração e cálculo dos pontos temporais com granularidade adaptativa ou intervalo fixo
         $primeiraMedicao = $medicoes->first();
         $ultimaMedicao = $medicoes->last();
 
@@ -224,7 +230,7 @@ class DashboardController extends Controller
             };
 
             $dt = $m->data_hora ? Carbon::parse($m->data_hora) : $m->created_at;
-            [$chaveTempo, $labelTempo] = $this->determinarBucketTemporal($dt, $spanMinutos, $periodo);
+            [$chaveTempo, $labelTempo] = $this->determinarBucketTemporal($dt, $spanMinutos, $periodo, $intervalo);
 
             $grupos[$chaveTempo]['label'] = $labelTempo;
             $grupos[$chaveTempo]['valores'][] = $val;
@@ -260,6 +266,7 @@ class DashboardController extends Controller
             'bgCor' => $infoMetrica['bgCor'],
             'periodo' => $periodo,
             'periodo_rotulo' => $periodoRotulo,
+            'intervalo' => $intervalo,
             'media' => $mediaGeral,
             'maximo' => $maxGeral,
             'minimo' => $minGeral,
@@ -320,15 +327,55 @@ class DashboardController extends Controller
      *
      * @return array{0: string, 1: string}
      */
-    protected function determinarBucketTemporal(Carbon $dt, int|float $spanMinutos, string $periodo): array
+    protected function determinarBucketTemporal(Carbon $dt, int|float $spanMinutos, string $periodo, string $intervalo = 'auto'): array
     {
+        // Se o usuário especificou um intervalo fixo, respeita a granularidade escolhida
+        if ($intervalo === '1m') {
+            $chave = $dt->format('Y-m-d H:i');
+            $label = ($spanMinutos > 1440 || $periodo === '7d' || $periodo === '30d')
+                ? $dt->format('d/m H:i')
+                : $dt->format('H:i');
+
+            return [$chave, $label];
+        }
+
+        if ($intervalo === '5m') {
+            $min = str_pad((string) (intdiv($dt->minute, 5) * 5), 2, '0', STR_PAD_LEFT);
+            $chave = $dt->format('Y-m-d H:') . $min;
+            $label = ($spanMinutos > 1440 || $periodo === '7d' || $periodo === '30d')
+                ? $dt->format('d/m H:') . $min
+                : $dt->format('H:') . $min;
+
+            return [$chave, $label];
+        }
+
+        if ($intervalo === '15m') {
+            $min = str_pad((string) (intdiv($dt->minute, 15) * 15), 2, '0', STR_PAD_LEFT);
+            $chave = $dt->format('Y-m-d H:') . $min;
+            $label = ($spanMinutos > 1440 || $periodo === '7d' || $periodo === '30d')
+                ? $dt->format('d/m H:') . $min
+                : $dt->format('H:') . $min;
+
+            return [$chave, $label];
+        }
+
+        if ($intervalo === '1h') {
+            $chave = $dt->format('Y-m-d H:00');
+            $label = ($spanMinutos > 1440 || $periodo === '7d' || $periodo === '30d')
+                ? $dt->format('d/m H:00')
+                : $dt->format('H:00');
+
+            return [$chave, $label];
+        }
+
+        // Modo Automático: Granularidade adaptativa conforme a amplitude temporal dos dados
         // Se todas as medições ocorreram em até 2 minutos, agrupa a cada 5 segundos
         if ($spanMinutos <= 2) {
             $seg = str_pad((string) (intdiv($dt->second, 5) * 5), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:i:').$seg,
-                $dt->format('H:i:').$seg,
+                $dt->format('Y-m-d H:i:') . $seg,
+                $dt->format('H:i:') . $seg,
             ];
         }
 
@@ -337,8 +384,8 @@ class DashboardController extends Controller
             $seg = str_pad((string) (intdiv($dt->second, 15) * 15), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:i:').$seg,
-                $dt->format('H:i:').$seg,
+                $dt->format('Y-m-d H:i:') . $seg,
+                $dt->format('H:i:') . $seg,
             ];
         }
 
@@ -355,8 +402,8 @@ class DashboardController extends Controller
             $min = str_pad((string) (intdiv($dt->minute, 5) * 5), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:').$min,
-                $dt->format('H:').$min,
+                $dt->format('Y-m-d H:') . $min,
+                $dt->format('H:') . $min,
             ];
         }
 
@@ -365,8 +412,8 @@ class DashboardController extends Controller
             $min = str_pad((string) (intdiv($dt->minute, 15) * 15), 2, '0', STR_PAD_LEFT);
 
             return [
-                $dt->format('Y-m-d H:').$min,
-                $dt->format('H:').$min,
+                $dt->format('Y-m-d H:') . $min,
+                $dt->format('H:') . $min,
             ];
         }
 

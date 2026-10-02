@@ -16,7 +16,7 @@ test('telemetry endpoint enforces rate limiting against unauthenticated flood', 
     // 60 requests should pass under standard throttle
     for ($i = 0; $i < 60; $i++) {
         $this->postJson(route('api.medicoes.store'), [
-            'estacao_id' => $estacao->public_id,
+            'mac_address' => $estacao->mac_address,
             'temperatura' => 24.0,
             'umidade' => 50.0,
             'co2' => 400,
@@ -26,7 +26,7 @@ test('telemetry endpoint enforces rate limiting against unauthenticated flood', 
 
     // 61st request within 1 minute must be rejected
     $response = $this->postJson(route('api.medicoes.store'), [
-        'estacao_id' => $estacao->public_id,
+        'mac_address' => $estacao->mac_address,
         'temperatura' => 24.0,
         'umidade' => 50.0,
         'co2' => 400,
