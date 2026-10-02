@@ -1422,3 +1422,87 @@ OpenAir-Metrics/
 - `php artisan test tests/Feature/MedicaoApiTest.php tests/Feature/MedicaoApiRateLimitTest.php --compact`: 18 testes executados com 100% de sucesso (126 asserções).
 - `php artisan route:clear && php artisan config:clear`: Caches do Laravel liberados para execução em ambiente de desenvolvimento.
 
+---
+
+### Sessão: 02 de Outubro de 2026 (Reversão do Seletor de Intervalo na Dashboard e Restauração da Granularidade Automática)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Reversão do Seletor Manual de Intervalo na Dashboard (`resources/views/dashboard.blade.php`)**:
+    - Conforme solicitado, foi revertido o sistema manual de seleção de intervalo (`Automático`, `1 min`, `5 min`, `15 min`, `1 hora`). O recurso, embora muito útil durante os testes de bancada e observabilidade da estação IoT física em desenvolvimento, foi removido para retornar a interface do painel ao seu estado limpo original.
+    - Removidos os botões de granularidade (`btn-intervalo`) e o agrupamento vertical secundário, restaurando o layout horizontal original do filtro de **Período** (`24 Horas`, `7 Dias`, `30 Dias`) alinhado à direita dos filtros de localidade.
+    - No script JavaScript, foram eliminados o estado `currentIntervalo`, a função `atualizarBotoesIntervalo`, os event listeners de clique correspondentes, a passagem do parâmetro `intervalo` na requisição AJAX e a sincronização no evento de troca de tema (`themechanged`).
+- **Restauração do Algoritmo Adaptativo Automático no Backend (`DashboardController.php`)**:
+    - O método `DashboardController::dadosGrafico` voltou a operar sem o parâmetro manual `intervalo`, simplificando as respostas JSON de dados preenchidos e de estado vazio.
+    - O método `determinarBucketTemporal` foi restaurado para seu comportamento adaptativo original totalmente automático baseado na amplitude total dos dados analisados (`$spanMinutos`):
+        - $\le 2\text{ min}$: agrupamento a cada 5 segundos.
+        - $\le 10\text{ min}$: agrupamento a cada 15 segundos.
+        - $\le 2\text{ horas}$ ($120\text{ min}$): agrupamento minuto a minuto (`H:i`), ideal para rajadas e testes recentes.
+        - $\le 6\text{ horas}$ ($360\text{ min}$): agrupamento a cada 5 minutos (`H:m`).
+        - $\le 24\text{ horas}$ ($1440\text{ min}$): agrupamento a cada 15 minutos (`H:m`).
+        - $\le 7\text{ dias}$ ($10080\text{ min}$): agrupamento por hora (`d/m H:00`).
+        - $> 7\text{ dias}$ (ex: 30 dias): agrupamento diário (`d/m`).
+- **Atualização da Suíte de Testes Automatizados (`DashboardTest.php`)**:
+    - Substituídas as asserções de renderização visual dos botões de intervalo por asserções negativas (`assertDontSee('Intervalo:')`), assegurando que a interface permaneça limpa.
+    - Substituídos os testes de granularidade manual fixa por testes que validam o agrupamento adaptativo automático em 5 minutos quando as medições cobrem entre 2 e 6 horas, complementando o teste existente de granularidade minuto a minuto para intervalos curtos.
+    - Suíte completa de testes aprovada com 100% de sucesso (173 testes, 885 asserções).
+
+#### 2. Arquivos Modificados
+
+- `resources/views/dashboard.blade.php`: Remoção da UI de intervalo, restauração do layout do período e limpeza do JavaScript.
+- `app/Http/Controllers/DashboardController.php`: Remoção de `intervalo` nos inputs/outputs e restauração de `determinarBucketTemporal` 100% automático.
+- `tests/Feature/DashboardTest.php`: Atualização das asserções da view e inclusão de teste para agrupamento adaptativo de 5 minutos.
+- `.agents/skills/historico.md`: Registro documental desta sessão.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --dirty --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact tests/Feature/DashboardTest.php`: 12 testes aprovados (45 asserções).
+- `php artisan test --compact`: Suíte completa com 173 testes aprovados (885 asserções).
+- `php artisan view:cache && php artisan view:clear`: Validação da compilação dos templates Blade.
+
+---
+
+### Sessão: 02 de Outubro de 2026 (Atualização do Cálculo do IQAr conforme CONAMA 506/2024 e ANVISA RE nº 09/2003)
+
+#### 1. Resumo Executivo das Entregas
+
+- **Diagnóstico da Fórmula Anterior**:
+    - O sistema utilizava pontos de corte e faixas de índice baseadas em um modelo híbrido legado/AQI internacional (faixas de índice $0-50$, $51-100$, $101-150$, $151-200$, $>200$ e limites de $PM_{2.5}$ de $25, 60, 125, 210\ \mu g/m^3$).
+- **Implementação dos Novos Padrões Nacionais de Qualidade do Ar (CONAMA 506/2024)**:
+    - Atualização do cálculo linear segmentado no modelo `Medicao::calcularIqa` para adotar rigorosamente a tabela oficial da Resolução CONAMA nº 506/2024:
+        - **N1 - Boa**: $I \in [0, 40]$ | $PM_{2.5} \in [0, 15]\ \mu g/m^3$
+        - **N2 - Moderada**: $I \in [41, 80]$ | $PM_{2.5} \in ]15, 50]\ \mu g/m^3$
+        - **N3 - Ruim**: $I \in [81, 120]$ | $PM_{2.5} \in ]50, 75]\ \mu g/m^3$
+        - **N4 - Muito Ruim**: $I \in [121, 200]$ | $PM_{2.5} \in ]75, 125]\ \mu g/m^3$
+        - **N5 - Péssima**: $I \in [201, 400]$ | $PM_{2.5} \in ]125, 300]\ \mu g/m^3$
+- **Integração do Sub-Índice de Dióxido de Carbono (CO₂) com a Norma ANVISA RE nº 09/2003**:
+    - Enquadramento do sensor MH-Z19C na escala dimensional unificada do IQAr com base no Valor Máximo Recomendável de $1000\text{ ppm}$:
+        - $\le 700\text{ ppm}$ (Ar Excelente / Alta Renovação) $\rightarrow$ N1 - Boa ($I \in [0, 40]$)
+        - $701 - 1000\text{ ppm}$ (Ar Aceitável / Limite ANVISA) $\rightarrow$ N2 - Moderada ($I \in [41, 80]$)
+        - $1001 - 1500\text{ ppm}$ (Ventilação Inadequada / Alerta) $\rightarrow$ N3 - Ruim ($I \in [81, 120]$)
+        - $1501 - 2500\text{ ppm}$ (Crítico / Abertura de janelas necessária) $\rightarrow$ N4 - Muito Ruim ($I \in [121, 200]$)
+        - $2501 - 5000\text{ ppm}$ (Péssima renovação de ar) $\rightarrow$ N5 - Péssima ($I \in [201, 400]$)
+    - Preservação da regra do maior sub-índice ($IQAr_{Geral} = \max(IQAr_{PM2.5}, IQAr_{CO2})$), garantindo que tanto partículas quanto ventilação insuficiente gerem o alerta correspondente.
+- **Harmonização Visual e Classificações (Dashboard e Mapa Público)**:
+    - Em `DashboardController::obterClassificacao`: os limiares de classificação foram alinhados às novas faixas ($valor \le 40 \rightarrow$ Boa, $\le 80 \rightarrow$ Moderada, $\le 120 \rightarrow$ Ruim, $\le 200 \rightarrow$ Muito Ruim, $> 200 \rightarrow$ Péssima).
+    - As faixas de `poeira` foram ajustadas para $\le 15\ \mu g/m^3$ (Baixo), $\le 50\ \mu g/m^3$ (Moderado) e $> 50$ (Elevado); e `co2` para $\le 700$ (Excelente), $\le 1000$ (Aceitável) e $> 1000$ (Alto).
+    - Em `home.blade.php`: paradas de cor (`layerColorStops`), legenda de segmentos e `getStatusInfo` atualizados para os cortes CONAMA ($40, 80, 120, 200, 400$).
+- **Suíte de Testes Atualizada**:
+    - Ajustados os casos de teste em `MedicaoApiTest.php` e `DashboardTest.php` para validar com precisão as novas faixas e a prevalência de sub-índices.
+    - 173 testes automatizados aprovados (889 asserções).
+
+#### 2. Arquivos Modificados
+
+- `app/Models/Medicao.php`: Atualização das tabelas de faixas de $PM_{2.5}$ e $CO_2$ em `calcularIqa`.
+- `app/Http/Controllers/DashboardController.php`: Atualização dos limiares de classificação em `obterClassificacao`.
+- `resources/views/home.blade.php`: Sincronização da escala cromática e legendas da camada de IQA.
+- `tests/Feature/MedicaoApiTest.php`: Atualização dos testes de interpolação e persistência do IQAr.
+- `tests/Feature/DashboardTest.php`: Ajuste do valor de referência de IQA.
+- `.agents/skills/historico.md`: Registro documental desta sessão.
+
+#### 3. Testes, Formatação e Compilação
+
+- `vendor/bin/pint --dirty --format agent`: Formatação PHP 100% aprovada.
+- `php artisan test --compact`: Suíte completa aprovada com 173 testes (889 asserções).
+

@@ -234,22 +234,28 @@ test('model Medicao preenche data_hora automaticamente ao ser criado sem ela', f
 });
 
 test('calculo do iqa por interpolacao linear segue os pontos de corte da tabela', function () {
-    // 1. Boa (0-50): PM2.5 = 12.5 (I=25), CO2 = 350 (I=25) -> IQA = 25
-    expect(Medicao::calcularIqa(12.5, 350))->toBe(25);
+    // 1. Boa (0-40): PM2.5 = 7.5 (I=20), CO2 = 350 (I=20) -> IQA = 20
+    expect(Medicao::calcularIqa(7.5, 350))->toBe(20);
+    // Limite superior de Boa: PM2.5 = 15.0 -> IQA = 40
+    expect(Medicao::calcularIqa(15.0, 500))->toBe(40);
 
-    // 2. Moderada (51-100): PM2.5 = 60.0 (limite sup, I=100), CO2 = 700 (I=50) -> IQA = 100
-    expect(Medicao::calcularIqa(60.0, 700))->toBe(100);
+    // 2. Moderada (41-80): PM2.5 = 25.0 (I=52), CO2 = 500 (I=29) -> IQA = 52
+    expect(Medicao::calcularIqa(25.0, 500))->toBe(52);
+    // Limite superior de Moderada: PM2.5 = 50.0 (I=80), CO2 = 700 (I=40) -> IQA = 80
+    expect(Medicao::calcularIqa(50.0, 700))->toBe(80);
 
-    // 3. Ruim (101-150): PM2.5 = 125.0 (limite sup, I=150), CO2 = 1000 (I=100) -> IQA = 150
-    expect(Medicao::calcularIqa(125.0, 1000))->toBe(150);
+    // 3. Ruim (81-120): PM2.5 = 75.0 (limite sup, I=120), CO2 = 1000 (I=80) -> IQA = 120
+    expect(Medicao::calcularIqa(75.0, 1000))->toBe(120);
 
-    // 4. Muito Ruim (151-200): PM2.5 = 210.0 (limite sup, I=200), CO2 = 1500 (I=150) -> IQA = 200
-    expect(Medicao::calcularIqa(210.0, 1500))->toBe(200);
+    // 4. Muito Ruim (121-200): PM2.5 = 125.0 (limite sup, I=200), CO2 = 1500 (I=120) -> IQA = 200
+    expect(Medicao::calcularIqa(125.0, 1500))->toBe(200);
 
-    // 5. Péssima (>200): PM2.5 = 250.0 (>210) -> IQA > 200
-    expect(Medicao::calcularIqa(250.0, 400))->toBeGreaterThan(200);
+    // 5. Péssima (201-400): PM2.5 = 200.0 (>125) -> IQA > 200; limite sup 300.0 -> IQA = 400
+    expect(Medicao::calcularIqa(200.0, 400))->toBeGreaterThan(200);
+    expect(Medicao::calcularIqa(300.0, 400))->toBe(400);
 
-    // 6. Prevalência do CO2 quando mais crítico: PM2.5 = 10.0 (Boa), CO2 = 2500 (limite Muito Ruim, I=200) -> IQA = 200
+    // 6. Prevalência do CO2 quando mais crítico (exemplo prático: PM2.5=25.0 => 52, CO2=1200 => 97)
+    expect(Medicao::calcularIqa(25.0, 1200))->toBe(97);
     expect(Medicao::calcularIqa(10.0, 2500))->toBe(200);
 });
 
@@ -268,17 +274,17 @@ test('api armazena o valor de iqa calculado diretamente na coluna da tabela medi
         'mac_address' => '24:6F:28:99:99:99',
         'temperatura' => 25.0,
         'umidade' => 50.0,
-        'co2' => 850, // Moderada: 51 + (49/300)*150 = 51 + 24.5 = 75.5 -> 76
-        'poeira' => 20.0, // Boa: (50/25)*20 = 40
+        'co2' => 850, // Moderada: 41 + (39/300)*150 = 41 + 19.5 = 60.5 -> 61
+        'poeira' => 20.0, // Moderada: 41 + (39/35)*5 = 46.57 -> 47
     ];
 
     $response = $this->postJson(route('api.medicoes.store'), $payload);
 
     $response->assertCreated();
-    $response->assertJsonPath('data.iqa', 76);
+    $response->assertJsonPath('data.iqa', 61);
 
     $medicao = Medicao::where('estacao_id', $estacao->private_id)->first();
-    expect($medicao->getRawOriginal('iqa'))->toBe(76);
+    expect($medicao->getRawOriginal('iqa'))->toBe(61);
 });
 
 test('api dispara o evento NovaMedicaoRecebida para transmissao via websocket ao receber medicao', function () {

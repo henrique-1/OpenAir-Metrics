@@ -37,12 +37,8 @@ test('usuario autenticado pode visualizar o dashboard com painel analitico', fun
     $response->assertSee('Painel Analítico de Monitoramento');
     $response->assertSee('São João da Boa Vista');
     $response->assertSee('Qualidade do Ar (IQA)');
-    $response->assertSee('Intervalo:');
-    $response->assertSee('Automático');
-    $response->assertSee('1 min');
-    $response->assertSee('5 min');
-    $response->assertSee('15 min');
-    $response->assertSee('1 hora');
+    $response->assertDontSee('Intervalo:');
+    $response->assertDontSee('Automático');
 });
 
 test('api de graficos do dashboard calcula media, maximo e minimo por cidade', function () {
@@ -171,7 +167,7 @@ test('api de graficos calcula indice de qualidade do ar (IQA)', function () {
 
     Medicao::factory()->create([
         'estacao_id' => $estacao->private_id,
-        'poeira' => 25.0, // IQA 50 (limite superior da faixa Boa: 0 - 25.0)
+        'poeira' => 15.0, // IQA 40 (limite superior da faixa N1 - Boa: 0 - 15.0)
         'co2' => 450,
         'data_hora' => now()->subHours(1),
     ]);
@@ -187,7 +183,7 @@ test('api de graficos calcula indice de qualidade do ar (IQA)', function () {
     $response->assertJson([
         'metrica' => 'qualidade_ar',
         'unidade' => 'IQA',
-        'media' => 50.0,
+        'media' => 40.0,
         'total_leituras' => 1,
     ]);
 });
@@ -356,38 +352,38 @@ test('api de graficos calcula blocos estatisticos estritamente para o periodo se
     ]);
 });
 
-test('api de graficos agrupa pontos a cada 5 minutos quando intervalo=5m e explicitamente selecionado', function () {
+test('api de graficos agrupa automaticamente a cada 5 minutos quando medicoes abrangem entre 2 e 6 horas', function () {
     $user = User::factory()->create();
     $cidade = Cidade::factory()->create();
     $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
     $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
 
-    $base = now()->startOfHour(); // Ex: 14:00
+    $baseTime = now()->startOfHour()->subHours(3);
 
-    // Duas medições no intervalo de 14:00 - 14:04 (mesmo bucket de 5m: 14:00)
+    // 14:01 e 14:03 caem no mesmo bucket de 5 minutos (14:00)
     Medicao::factory()->create([
         'estacao_id' => $estacao->private_id,
         'temperatura' => 20.0,
-        'data_hora' => (clone $base)->addMinute(), // 14:01
+        'data_hora' => (clone $baseTime)->addMinute(),
     ]);
     Medicao::factory()->create([
         'estacao_id' => $estacao->private_id,
         'temperatura' => 22.0,
-        'data_hora' => (clone $base)->addMinutes(3), // 14:03
+        'data_hora' => (clone $baseTime)->addMinutes(3),
     ]);
 
-    // Uma medição no bucket de 14:05 (14:05 - 14:09)
+    // Uma medição no bucket 14:05 (14:05 - 14:09)
     Medicao::factory()->create([
         'estacao_id' => $estacao->private_id,
         'temperatura' => 25.0,
-        'data_hora' => (clone $base)->addMinutes(7), // 14:07
+        'data_hora' => (clone $baseTime)->addMinutes(7),
     ]);
 
-    // Uma medição no bucket de 14:10 (14:10 - 14:14)
+    // Medição que estende o span para 3 horas (180 min, faixa <= 360 min)
     Medicao::factory()->create([
         'estacao_id' => $estacao->private_id,
         'temperatura' => 30.0,
-        'data_hora' => (clone $base)->addMinutes(12), // 14:12
+        'data_hora' => (clone $baseTime)->addHours(3),
     ]);
 
     $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
@@ -395,121 +391,11 @@ test('api de graficos agrupa pontos a cada 5 minutos quando intervalo=5m e expli
         'localidade_id' => $cidade->id,
         'metrica' => 'temperatura',
         'periodo' => '24h',
-        'intervalo' => '5m',
     ]));
 
     $response->assertOk();
-    $response->assertJson([
-        'intervalo' => '5m',
-        'total_leituras' => 4,
-    ]);
-
-    // Deve agrupar em exatamente 3 buckets de 5 minutos: 14:00, 14:05, 14:10
-    expect($response->json('labels'))->toHaveCount(3);
-    expect($response->json('valores'))->toEqual([21.0, 25.0, 30.0]); // 21.0 é a média de (20 + 22) / 2
-    expect($response->json('minimos'))->toEqual([20.0, 25.0, 30.0]);
-    expect($response->json('maximos'))->toEqual([22.0, 25.0, 30.0]);
-});
-
-test('api de graficos respeita intervalos 15m e 1h', function () {
-    $user = User::factory()->create();
-    $cidade = Cidade::factory()->create();
-    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
-    $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
-
-    $base = now()->startOfHour(); // 14:00
-
-    Medicao::factory()->create([
-        'estacao_id' => $estacao->private_id,
-        'temperatura' => 20.0,
-        'data_hora' => (clone $base)->addMinutes(5), // 14:05
-    ]);
-    Medicao::factory()->create([
-        'estacao_id' => $estacao->private_id,
-        'temperatura' => 24.0,
-        'data_hora' => (clone $base)->addMinutes(10), // 14:10
-    ]);
-    Medicao::factory()->create([
-        'estacao_id' => $estacao->private_id,
-        'temperatura' => 30.0,
-        'data_hora' => (clone $base)->addMinutes(35), // 14:35
-    ]);
-
-    // 1. Teste intervalo 15m
-    $res15m = $this->actingAs($user)->getJson(route('dashboard.graficos', [
-        'tipo_agrupamento' => 'cidade',
-        'localidade_id' => $cidade->id,
-        'metrica' => 'temperatura',
-        'periodo' => '24h',
-        'intervalo' => '15m',
-    ]));
-
-    $res15m->assertOk();
-    $res15m->assertJson(['intervalo' => '15m']);
-    // 14:05 e 14:10 caem no bucket 14:00; 14:35 cai no bucket 14:30 => 2 buckets
-    expect($res15m->json('labels'))->toHaveCount(2);
-    expect($res15m->json('valores'))->toEqual([22.0, 30.0]);
-
-    // 2. Teste intervalo 1h
-    $res1h = $this->actingAs($user)->getJson(route('dashboard.graficos', [
-        'tipo_agrupamento' => 'cidade',
-        'localidade_id' => $cidade->id,
-        'metrica' => 'temperatura',
-        'periodo' => '24h',
-        'intervalo' => '1h',
-    ]));
-
-    $res1h->assertOk();
-    $res1h->assertJson(['intervalo' => '1h']);
-    // Todas as 3 medições caem no bucket 14:00 => 1 bucket
-    expect($res1h->json('labels'))->toHaveCount(1);
-    expect($res1h->json('valores'))->toEqual([round((20 + 24 + 30) / 3, 2)]);
-});
-
-test('api de graficos agrupa pontos a cada 1 minuto quando intervalo=1m e explicitamente selecionado', function () {
-    $user = User::factory()->create();
-    $cidade = Cidade::factory()->create();
-    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
-    $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
-
-    $base = now()->startOfHour(); // 14:00
-
-    // Duas medições no mesmo minuto (14:01:10 e 14:01:40) -> mesmo bucket de 1m: 14:01
-    Medicao::factory()->create([
-        'estacao_id' => $estacao->private_id,
-        'temperatura' => 20.0,
-        'data_hora' => (clone $base)->addMinute()->addSeconds(10),
-    ]);
-    Medicao::factory()->create([
-        'estacao_id' => $estacao->private_id,
-        'temperatura' => 24.0,
-        'data_hora' => (clone $base)->addMinute()->addSeconds(40),
-    ]);
-
-    // Uma medição no minuto seguinte (14:02)
-    Medicao::factory()->create([
-        'estacao_id' => $estacao->private_id,
-        'temperatura' => 28.0,
-        'data_hora' => (clone $base)->addMinutes(2),
-    ]);
-
-    $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
-        'tipo_agrupamento' => 'cidade',
-        'localidade_id' => $cidade->id,
-        'metrica' => 'temperatura',
-        'periodo' => '24h',
-        'intervalo' => '1m',
-    ]));
-
-    $response->assertOk();
-    $response->assertJson([
-        'intervalo' => '1m',
-        'total_leituras' => 3,
-    ]);
-
-    // Deve agrupar em exatamente 2 buckets de 1 minuto: 14:01 e 14:02
-    expect($response->json('labels'))->toHaveCount(2);
-    expect($response->json('valores'))->toEqual([22.0, 28.0]);
-    expect($response->json('minimos'))->toEqual([20.0, 28.0]);
-    expect($response->json('maximos'))->toEqual([24.0, 28.0]);
+    // As duas medições no mesmo bloco de 5m foram consolidadas com média 21.0
+    expect($response->json('valores')[0])->toEqual(21.0);
+    expect($response->json('minimos')[0])->toEqual(20.0);
+    expect($response->json('maximos')[0])->toEqual(22.0);
 });

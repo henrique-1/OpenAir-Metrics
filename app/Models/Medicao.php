@@ -91,31 +91,31 @@ class Medicao extends Model
 
     /**
      * Cálculo do IQA pela fórmula de Interpolação Linear para Material Particulado (PM2.5) e Dióxido de Carbono (CO₂):
-     * Ip = Iinf + [ (Isup - Iinf) / (Csup - Cinf) ] * (Cp - Cinf)
+     * IQAr = Iini + [ (Ifin - Iini) / (Cfin - Cini) ] * (C - Cini)
      *
-     * Faixas de corte:
-     * - Boa:        I = 0 a 50    | PM2.5 = 0 a 25.0       | CO2 = 0 a 700
-     * - Moderada:   I = 51 a 100  | PM2.5 = >25.0 a 60.0   | CO2 = >700 a 1000
-     * - Ruim:       I = 101 a 150 | PM2.5 = >60.0 a 125.0  | CO2 = >1000 a 1500
-     * - Muito Ruim: I = 151 a 200 | PM2.5 = >125.0 a 210.0 | CO2 = >1500 a 2500
-     * - Péssima:    I > 200       | PM2.5 = >210.0         | CO2 = >2500
+     * Faixas de corte CONAMA 506/2024 (PM2.5) e ANVISA RE nº 09/2003 (CO₂):
+     * - N1 - Boa:        I = 0 a 40   | PM2.5 = 0 a 15.0       | CO2 = 0 a 700
+     * - N2 - Moderada:   I = 41 a 80  | PM2.5 = >15.0 a 50.0   | CO2 = >700 a 1000
+     * - N3 - Ruim:       I = 81 a 120 | PM2.5 = >50.0 a 75.0   | CO2 = >1000 a 1500
+     * - N4 - Muito Ruim: I = 121 a 200| PM2.5 = >75.0 a 125.0  | CO2 = >1500 a 2500
+     * - N5 - Péssima:    I = 201 a 400| PM2.5 = >125.0 a 300.0 | CO2 = >2500 a 5000
      */
     public static function calcularIqa(float $poeira, int $co2): int
     {
         $iqaPm = self::calcularIqaPoluente($poeira, [
-            ['c_inf' => 0.0, 'c_sup' => 25.0, 'i_inf' => 0, 'i_sup' => 50],
-            ['c_inf' => 25.0, 'c_sup' => 60.0, 'i_inf' => 51, 'i_sup' => 100],
-            ['c_inf' => 60.0, 'c_sup' => 125.0, 'i_inf' => 101, 'i_sup' => 150],
-            ['c_inf' => 125.0, 'c_sup' => 210.0, 'i_inf' => 151, 'i_sup' => 200],
-            ['c_inf' => 210.0, 'c_sup' => 500.0, 'i_inf' => 201, 'i_sup' => 500],
+            ['c_inf' => 0.0, 'c_sup' => 15.0, 'i_inf' => 0, 'i_sup' => 40],
+            ['c_inf' => 15.0, 'c_sup' => 50.0, 'i_inf' => 41, 'i_sup' => 80],
+            ['c_inf' => 50.0, 'c_sup' => 75.0, 'i_inf' => 81, 'i_sup' => 120],
+            ['c_inf' => 75.0, 'c_sup' => 125.0, 'i_inf' => 121, 'i_sup' => 200],
+            ['c_inf' => 125.0, 'c_sup' => 300.0, 'i_inf' => 201, 'i_sup' => 400],
         ]);
 
         $iqaCo2 = self::calcularIqaPoluente($co2, [
-            ['c_inf' => 0.0, 'c_sup' => 700.0, 'i_inf' => 0, 'i_sup' => 50],
-            ['c_inf' => 700.0, 'c_sup' => 1000.0, 'i_inf' => 51, 'i_sup' => 100],
-            ['c_inf' => 1000.0, 'c_sup' => 1500.0, 'i_inf' => 101, 'i_sup' => 150],
-            ['c_inf' => 1500.0, 'c_sup' => 2500.0, 'i_inf' => 151, 'i_sup' => 200],
-            ['c_inf' => 2500.0, 'c_sup' => 5000.0, 'i_inf' => 201, 'i_sup' => 500],
+            ['c_inf' => 0.0, 'c_sup' => 700.0, 'i_inf' => 0, 'i_sup' => 40],
+            ['c_inf' => 700.0, 'c_sup' => 1000.0, 'i_inf' => 41, 'i_sup' => 80],
+            ['c_inf' => 1000.0, 'c_sup' => 1500.0, 'i_inf' => 81, 'i_sup' => 120],
+            ['c_inf' => 1500.0, 'c_sup' => 2500.0, 'i_inf' => 121, 'i_sup' => 200],
+            ['c_inf' => 2500.0, 'c_sup' => 5000.0, 'i_inf' => 201, 'i_sup' => 400],
         ]);
 
         return (int) round(max($iqaPm, $iqaCo2));

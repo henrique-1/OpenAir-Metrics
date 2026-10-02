@@ -114,12 +114,12 @@
             const layerColorStops = {
                 'iqa': [
                     { val: 0, color: [46, 204, 113] },     // Boa (#2ecc71)
-                    { val: 48, color: [46, 204, 113] },
-                    { val: 52, color: [241, 196, 15] },    // Moderada (#f1c40f)
-                    { val: 98, color: [241, 196, 15] },
-                    { val: 102, color: [230, 126, 34] },   // Insalubre (#e67e22)
-                    { val: 148, color: [230, 126, 34] },
-                    { val: 152, color: [231, 76, 60] },    // Perigoso (#e74c3c)
+                    { val: 38, color: [46, 204, 113] },
+                    { val: 42, color: [241, 196, 15] },    // Moderada (#f1c40f)
+                    { val: 78, color: [241, 196, 15] },
+                    { val: 82, color: [230, 126, 34] },    // Ruim (#e67e22)
+                    { val: 118, color: [230, 126, 34] },
+                    { val: 122, color: [231, 76, 60] },    // Muito Ruim (#e74c3c)
                     { val: 198, color: [231, 76, 60] },
                     { val: 202, color: [142, 68, 173] },   // Péssima (#8e44ad)
                     { val: 400, color: [67, 17, 12] }      // Extrema (#43110c)
@@ -461,9 +461,9 @@
                         segments: [
                             { text: 'Boa', color: '#2ecc71' }, 
                             { text: 'Moderada', color: '#f1c40f' }, 
-                            { text: 'Insalubre', color: '#e67e22' }, 
-                            { text: 'Perigoso', color: '#e74c3c' },
-                            { text: 'Péssima', color: '#8e44ad' },
+                            { text: 'Ruim', color: '#e67e22' }, 
+                            { text: 'Muito Ruim', color: '#e74c3c' }, 
+                            { text: 'Péssima', color: '#8e44ad' }, 
                             { text: 'Extrema', color: '#43110c' }
                         ],
                         data: { 
@@ -584,13 +584,12 @@
                 // Função auxiliar para definir o texto e a cor com base no valor da camada
                 function getStatusInfo(val, layerKey) {
                     if (layerKey === 'iqa') {
-                        if (val <= 50) return { text: 'Boa', color: '#2ecc71' };
-                        if (val <= 100) return { text: 'Moderada', color: '#f1c40f' };
-                        if (val <= 150) return { text: 'Insalubre', color: '#e67e22' };
-                        if (val <= 200) return { text: 'Perigoso', color: '#e74c3c' };
+                        if (val <= 40) return { text: 'Boa', color: '#2ecc71' };
+                        if (val <= 80) return { text: 'Moderada', color: '#f1c40f' };
+                        if (val <= 120) return { text: 'Ruim', color: '#e67e22' };
+                        if (val <= 200) return { text: 'Muito Ruim', color: '#e74c3c' };
                         if (val <= 400) return { text: 'Péssima', color: '#8e44ad' };
                         return { text: 'Extrema', color: '#43110c' };
-                        
                     }
                     const rgb = getColorForValue(val, layerKey);
                     return { text: mapLayersData[layerKey].name, color: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` };
