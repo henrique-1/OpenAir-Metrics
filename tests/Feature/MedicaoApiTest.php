@@ -8,6 +8,7 @@ use App\Models\Patrimonio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -365,4 +366,33 @@ test('rejeita medicao com 401 se TELEMETRY_API_KEY estiver configurada e header 
 
     // Com chave correta
     $this->withHeader('X-Sensor-Key', 'segredo-teste-123')->postJson(route('api.medicoes.store'), $payload)->assertStatus(201);
+});
+
+test('configuracao allowed_origins do Reverb normaliza hostnames sem protocolo ou porta e autoriza localhost e IPs de rede local bloqueando origens externas', function () {
+    $allowedOrigins = config('reverb.apps.apps.0.allowed_origins');
+
+    expect($allowedOrigins)->toBeArray()->not->toBeEmpty();
+
+    foreach ($allowedOrigins as $entry) {
+        expect($entry)->not->toContain('http://');
+        expect($entry)->not->toContain('https://');
+        expect($entry)->not->toContain(':8000');
+    }
+
+    $verificarOrigem = function (string $headerOrigin) use ($allowedOrigins): bool {
+        $host = parse_url($headerOrigin, PHP_URL_HOST);
+        foreach ($allowedOrigins as $allowedOrigin) {
+            if (Str::is($allowedOrigin, (string) $host)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    expect($verificarOrigem('http://localhost:8000'))->toBeTrue();
+    expect($verificarOrigem('http://127.0.0.1:8000'))->toBeTrue();
+    expect($verificarOrigem('http://192.168.1.45:8000'))->toBeTrue();
+    expect($verificarOrigem('http://10.0.0.12:8000'))->toBeTrue();
+    expect($verificarOrigem('https://site-malicioso.com'))->toBeFalse();
 });

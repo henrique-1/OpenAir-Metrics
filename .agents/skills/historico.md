@@ -1,6 +1,6 @@
 # Histórico e Estado Atual do Projeto - OpenAir Metrics
 
-**Última Atualização:** 7 de Setembro de 2026  
+**Última Atualização:** 24 de Outubro de 2026  
 **Status do Projeto:** Em Desenvolvimento Ativo  
 **Versão do Framework:** Laravel 13 / PHP 8.3+ / Tailwind CSS v4
 
@@ -10,9 +10,9 @@
 
 O **OpenAir Metrics** é uma plataforma web para monitoramento em tempo real e georreferenciado da qualidade do ar e de parâmetros meteorológicos urbanos. O sistema agrega dados de estações IoT (sensores de qualidade do ar) e fornece:
 
-1. **Mapa Interativo Público (`/`)**: Visualização em mapa contínuo com camadas de calor (_heatmaps_) aceleradas por WebGL para métricas ambientais críticas.
-2. **Painel Administrativo / Dashboard (`/dashboard`)**: Área de autenticação restrita para acompanhamento de métricas e alertas da rede de sensores.
-3. **Módulo "Minhas Estações" (`/estacoes`) e Cadastro (`/estacoes/create`)**: Gerenciamento completo de estações IoT (Matrizes e Satélites), com seleção de localidades IBGE em cascata, posicionamento em mapa Leaflet com regra visual e geoespacial de proximidade de 200 metros.
+1. **Mapa Interativo Público (`/`)**: Visualização em mapa contínuo com superfície de interpolação espacial IDW (`L.IdwSurfaceLayer` em HTML5 Canvas) e atualização em tempo real via WebSockets (Laravel Reverb + Echo).
+2. **Painel Administrativo / Dashboard (`/dashboard`)**: Área de autenticação restrita para acompanhamento de métricas, alertas e séries temporais (Média, Máximo e Mínimo) atualizadas em tempo real.
+3. **Módulos Operacionais Municipais (`/estacoes`, `/estacoes/planejar`, `/patrimonios`, `/instalacoes`, `/usuarios`)**: Gerenciamento completo de estações IoT (Matrizes e Satélites), planejador automático de malha viária (`Snap to Road` com MariaDB Spatial e Overpass), controle de patrimônio, roteiro de instalação em campo e gestão de equipe com isolamento estrito por jurisdição municipal (`cidade_id`).
 4. **Servidor MCP Local (`routes/ai.php`)**: Suporte ao _Model Context Protocol_ para integração com agentes de inteligência artificial.
 
 ---
@@ -23,21 +23,23 @@ O **OpenAir Metrics** é uma plataforma web para monitoramento em tempo real e g
 
 - **PHP**: `^8.3` (compatível com PHP 8.5)
 - **Laravel Framework**: `^13.8`
-- **Laravel Sanctum**: `^4.0` (autenticação de API baseada em tokens)
+- **Laravel Reverb**: `^1.11` (servidor WebSocket nativo para broadcast em tempo real de telemetria)
+- **Laravel Sanctum**: `^4.0` (autenticação de API e segurança)
 - **Laravel MCP**: `^0.8.2` (servidor de ferramentas para agentes de IA)
 - **Laravel Boost**: `^2.2` (ferramentas e regras de desenvolvimento assistido)
 
 ### Frontend & Visualização
 
-- **Tailwind CSS**: `^4.0.0` (com `@tailwindcss/vite` e paleta customizada no tema)
-- **Leaflet.js**: `^1.9.4` (renderização e manipulação do mapa interativo e buffers de raio de 200m)
-- **WebGL Heatmap**: (`leaflet-webgl-heatmap.js` e `webgl-heatmap.js`) para renderização acelerada por GPU
+- **Tailwind CSS**: `^4.0.0` (com `@tailwindcss/vite`, suporte completo a Light/Dark Mode e paleta customizada)
+- **Leaflet.js**: `^1.9.4` (renderização do mapa interativo, camada contínua `L.IdwSurfaceLayer` com método de Shepard modificado e topologia de raio de 200m)
+- **Chart.js**: Gráficos analíticos multissérie (Média, Máximo e Mínimo) com atualização _in-place_
+- **Laravel Echo & Pusher.js**: Cliente WebSocket reativo com resolução dinâmica de host local/LAN (`resources/js/echo.js`)
 - **Blade UI Kit / Heroicons**: Componentes de ícones no Blade (`<x-heroicon-o-...>`)
 - **Vite**: `^8.0.0` com `laravel-vite-plugin`
 
 ### Testes & Qualidade de Código
 
-- **Pest PHP**: `^4.7` com `pest-plugin-laravel` (90 testes automatizados ativos, 425 asserções)
+- **Pest PHP**: `^4.7` com `pest-plugin-laravel` (174 testes automatizados ativos, 902 asserções)
 - **Laravel Pint**: `^1.27` para padronização de código PHP
 - **Banco em Testes**: SQLite em memória (`:memory:`)
 
@@ -48,74 +50,147 @@ O **OpenAir Metrics** é uma plataforma web para monitoramento em tempo real e g
 ```
 OpenAir-Metrics/
 ├── .agents/
-│   ├── mcp_config.json                # Configuração do servidor MCP local (openair-local)
+│   ├── mcp_config.json                        # Configuração do servidor MCP local (openair-local)
 │   └── skills/
-│       └── historico.md               # Este documento de histórico e estado do projeto
+│       ├── 00_historico_automatico.md         # Regra mestre de auto-documentação contínua
+│       ├── historico.md                       # Este documento de histórico e estado do projeto
+│       ├── conventional-commit/               # Skill para geração de commits padronizados
+│       ├── laravel-best-practices/            # Skill de boas práticas Laravel 13
+│       ├── mcp-development/                   # Skill de desenvolvimento MCP
+│       ├── pest-testing/                      # Skill de testes automatizados com Pest 4
+│       ├── security-audit/                    # Skill e validadores de auditoria defensiva de segurança
+│       └── tailwindcss-development/           # Skill de estilização Tailwind CSS v4
 ├── app/
+│   ├── Events/
+│   │   └── NovaMedicaoRecebida.php            # Evento ShouldBroadcastNow transmitido no canal 'medicoes'
 │   ├── Http/
 │   │   ├── Controllers/
-│   │   │   ├── AuthController.php         # Login, autenticação de sessão e logout
-│   │   │   ├── EstacaoController.php      # Listagem, formulário e salvamento de estações IoT
-│   │   │   └── LocalidadeController.php   # Endpoints AJAX de estados, cidades, bairros e coordenadas
+│   │   │   ├── Api/
+│   │   │   │   └── MedicaoApiController.php   # Ingestão de telemetria IoT via MAC Address e X-Sensor-Key
+│   │   │   ├── AuthController.php             # Login (com rate limit), autenticação de sessão e logout
+│   │   │   ├── DashboardController.php        # Painel analítico e API de séries temporais adaptativas
+│   │   │   ├── EstacaoController.php          # Listagem, cadastro individual, Snap to Road e substituição
+│   │   │   ├── HomeController.php             # Mapa público alimentado pelas últimas medições do banco
+│   │   │   ├── InstalacaoController.php       # Ordens de instalação e vinculação sequencial em campo
+│   │   │   ├── LocalidadeController.php       # Endpoints AJAX de estados, cidades, bairros e geocoding
+│   │   │   ├── PatrimonioController.php       # Gestão de inventário físico de sensores (individual e lote)
+│   │   │   ├── PerfilController.php           # Gestão do perfil do próprio usuário logado
+│   │   │   ├── PlanejamentoController.php     # Cálculo e persistência de malhas planejadas (até 20 satélites)
+│   │   │   └── UsuarioController.php          # Gestão de equipe municipal, super-admin e sucessão
 │   │   └── Requests/
-│   │       └── StoreEstacaoRequest.php    # Validação de formulário com regra geoespacial estrita de 200m
+│   │       └── StoreEstacaoRequest.php        # Validação geoespacial estrita de 200m e jurisdição municipal
+│   ├── Jobs/
+│   │   └── ResolveReverseGeocodingJob.php     # Job assíncrono com RateLimiter para geocodificação reversa
 │   ├── Mcp/Servers/
-│   │   └── OpenAirMetricsServer.php   # Servidor MCP registrado para agentes de IA
+│   │   └── OpenAirMetricsServer.php           # Servidor MCP registrado para agentes de IA
 │   ├── Models/
-│   │   ├── Bairro.php                 # Model de Bairro vinculado à Cidade e Estações
-│   │   ├── Cidade.php                 # Model de Cidade vinculada ao Estado e Bairros
-│   │   ├── Estado.php                 # Model de Estado IBGE com código UF
-│   │   ├── Estacao.php                # Model de estação IoT (Accessors/Mutators POINT, regra 200m)
-│   │   └── User.php                   # Model de usuário padrão (relação com estações)
-│   └── Providers/
-│       └── AppServiceProvider.php     # Service Provider da aplicação
+│   │   ├── Bairro.php                         # Model de Bairro vinculado à Cidade e Estações
+│   │   ├── Cidade.php                         # Model de Cidade vinculada ao Estado, Bairros e Usuários
+│   │   ├── Estacao.php                        # Model de estação IoT (POINT, ordenação DFS em cascata, 200m)
+│   │   ├── Estado.php                         # Model de Estado IBGE com código UF
+│   │   ├── MalhaViaria.php                    # Model de eixos viários (LINESTRING) para Snap to Road
+│   │   ├── Medicao.php                        # Model de telemetria e cálculo oficial do IQAr (CONAMA 506/2024)
+│   │   ├── Patrimonio.php                     # Model de inventário físico de placas/sensores
+│   │   └── User.php                           # Model de usuário (papéis: superadmin, admin, planejador, instalador)
+│   ├── Providers/
+│   │   └── AppServiceProvider.php             # Service Provider da aplicação
+│   └── Services/
+│       ├── GeocodingService.php               # Geocodificação reversa, busca espacial de vias e Snap to Road
+│       └── PlanejamentoMalhaService.php       # Algoritmo de árvore de corredores viários para malha de sensores
+├── config/
+│   ├── broadcasting.php                       # Configuração de conexões de broadcast (Reverb padrão)
+│   ├── reverb.php                             # Servidor WebSocket com validação de origens locais/LAN e produção
+│   └── services.php                           # Configuração de serviços externos e chave TELEMETRY_API_KEY
 ├── database/
 │   ├── factories/
-│   │   ├── BairroFactory.php          # Factory de Bairros
-│   │   ├── CidadeFactory.php          # Factory de Cidades
-│   │   ├── EstadoFactory.php          # Factory de Estados
-│   │   ├── EstacaoFactory.php         # Factory de Estações (estados matriz e satelite)
-│   │   └── UserFactory.php            # Factory de Usuários
+│   │   ├── BairroFactory.php                  # Factory de Bairros
+│   │   ├── CidadeFactory.php                  # Factory de Cidades
+│   │   ├── EstacaoFactory.php                 # Factory de Estações (estados matriz e satelite)
+│   │   ├── EstadoFactory.php                  # Factory de Estados
+│   │   ├── MedicaoFactory.php                 # Factory de Medições ambientais
+│   │   ├── PatrimonioFactory.php              # Factory de Patrimônios/ Sensores
+│   │   └── UserFactory.php                    # Factory de Usuários
 │   ├── migrations/
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── ..._create_personal_access_tokens_table.php
-│   │   ├── 2026_08_26_172033_create_estacoes_table.php          # Tabela estacoes com geometry POINT
-│   │   ├── 2026_08_26_172033_create_medicoes_table.php          # Tabela medicoes com índices temporais
-│   │   ├── 2026_08_29_181324_create_estados_table.php           # Tabela estados (IBGE)
-│   │   ├── 2026_08_29_181336_create_cidades_table.php           # Tabela cidades (IBGE)
-│   │   ├── 2026_08_29_181340_create_bairros_table.php           # Tabela bairros (IBGE)
-│   │   └── 2026_08_29_181357_add_fields_to_estacoes_table.php   # mac_address, tipo_estacao, bairro_id
+│   │   ├── 2026_08_26_172033_create_estacoes_table.php
+│   │   ├── 2026_08_26_172033_create_medicoes_table.php
+│   │   ├── 2026_08_29_181324_create_estados_table.php
+│   │   ├── 2026_08_29_181336_create_cidades_table.php
+│   │   ├── 2026_08_29_181340_create_bairros_table.php
+│   │   ├── 2026_08_29_181357_add_fields_to_estacoes_table.php
+│   │   ├── 2026_08_31_163211_add_address_fields_to_estacoes_table.php
+│   │   ├── 2026_09_01_134613_create_patrimonios_table.php
+│   │   ├── 2026_09_01_134641_update_estacoes_for_planning_and_installation.php
+│   │   ├── 2026_09_02_110000_create_malha_viaria_table.php
+│   │   ├── 2026_09_07_121841_remove_tipo_sugerido_from_patrimonios_table.php
+│   │   ├── 2026_09_07_124435_update_users_for_roles_and_address.php
+│   │   ├── 2026_09_07_124444_update_patrimonios_and_estacoes_for_city_and_replacement.php
+│   │   ├── 2026_09_09_134500_add_iqa_to_medicoes_table.php
+│   │   └── 2026_09_10_140000_update_patrimonio_status_and_user_roles.php
 │   └── seeders/
-│       ├── DatabaseSeeder.php         # Seed principal (admin e chamada de localidades)
-│       └── LocalidadesSeeder.php      # Seed dos 27 estados do Brasil e amostra de cidades/bairros
+│       ├── DatabaseSeeder.php                 # Seed principal (SuperAdminSeeder e LocalidadesSeeder)
+│       ├── LocalidadesSeeder.php              # Seed dos 27 estados do Brasil e amostra de cidades/bairros
+│       ├── MalhaViariaSeeder.php              # Importador de malha viária espacial via GDAL/ogr2ogr
+│       └── SuperAdminSeeder.php               # Seed seguro do Super-usuário com geração criptográfica de senha
 ├── resources/
 │   ├── css/
-│   │   └── app.css                    # Definições do Tailwind v4 e paleta de cores institucional
+│   │   └── app.css                            # Definições do Tailwind v4, tipografia WCAG AA e paleta institucional
 │   ├── js/
-│   │   ├── app.js                     # Inicialização do Leaflet e injeção do WebGL Heatmap
-│   │   └── vendor/                    # Dependências WebGL de terceiros
+│   │   ├── app.js                             # Inicialização do Leaflet, WebGL e cliente Echo
+│   │   ├── echo.js                            # Configuração do Laravel Echo / Reverb com wsHost dinâmico
+│   │   └── vendor/                            # Dependências auxiliares de terceiros
 │   └── views/
-│       ├── auth/login.blade.php       # Tela de login estilizada
+│       ├── auth/login.blade.php               # Tela de login estilizada
 │       ├── components/
-│       │   ├── layouts/app.blade.php  # Layout base da aplicação
-│       │   └── sidebar.blade.php      # Navegação lateral unificada com destaque de rotas ativas
-│       ├── dashboard.blade.php        # Dashboard com KPIs, métricas e listagem de estações
+│       │   ├── layouts/app.blade.php          # Layout base da aplicação com anti-FOUC de tema
+│       │   └── sidebar.blade.php              # Navegação lateral responsiva com drawer mobile e toggle Dark/Light
+│       ├── dashboard.blade.php                # Dashboard analítico com gráficos Chart.js e WebSockets em tempo real
 │       ├── estacoes/
-│       │   ├── create.blade.php       # Formulário com cascata IBGE e mapa Leaflet com regra dos 200m
-│       │   └── index.blade.php        # Tela "Minhas Estações" com tabela e cards de resumo
-│       └── home.blade.php             # Mapa público full-screen com camadas e interpolação IDW
+│       │   ├── create.blade.php               # Cadastro individual com cascata IBGE, Snap to Road e raio de 200m
+│       │   ├── index.blade.php                # Listagem "Minhas Estações" com filtros, ordenação e substituição
+│       │   └── planejar.blade.php             # Planejador automático de malha de sensores em cascata viária
+│       ├── home.blade.php                     # Mapa público full-screen com L.IdwSurfaceLayer e WebSockets
+│       ├── instalacoes/
+│       │   ├── index.blade.php                # Listagem de ordens de instalação e substituições pendentes
+│       │   └── show.blade.php                 # Roteiro de instalação sequencial em campo com links GPS
+│       ├── patrimonios/
+│       │   ├── create.blade.php               # Cadastro individual e importação em lote de sensores
+│       │   └── index.blade.php                # Inventário de equipamentos com filtros e status
+│       ├── perfil/
+│       │   └── edit.blade.php                 # Edição de perfil próprio e guia de níveis de permissão
+│       └── usuarios/
+│           ├── create.blade.php               # Cadastro de equipe municipal / sucessão de administrador
+│           ├── edit.blade.php                 # Edição de servidor municipal com autopreenchimento ViaCEP
+│           └── index.blade.php                # Gestão de equipe municipal com filtros e ativação/desativação
 ├── routes/
-│   ├── ai.php                         # Registro do servidor MCP (OpenAirMetricsServer)
-│   ├── api.php                        # Endpoints de API para localidades IBGE e coordenadas
-│   ├── console.php                    # Comandos artisan customizados
-│   └── web.php                        # Rotas web (guest, auth, dashboard, estacoes)
+│   ├── ai.php                                 # Registro do servidor MCP (OpenAirMetricsServer)
+│   ├── api.php                                # Endpoint POST /api/medicoes (com throttle:60,1 e X-Sensor-Key)
+│   ├── channels.php                           # Definição de canais de broadcast
+│   ├── console.php                            # Comandos artisan customizados
+│   └── web.php                                # Rotas web completas (home, auth, dashboard, estacoes, etc.)
 └── tests/
     ├── Feature/
-    │   ├── EstacaoTest.php            # Testes de integração de estações, cascata IBGE e regra dos 200m
-    │   └── ExampleTest.php            # Teste de fumaça da landing page
+    │   ├── AuthThrottleTest.php               # Testes de rate limiting no login (SEC-OAIR-003)
+    │   ├── DashboardTest.php                  # Testes de séries temporais, buckets adaptativos e isolamento
+    │   ├── EstacaoSubstituicaoTest.php        # Testes de fluxo de substituição de sensores e vida útil
+    │   ├── EstacaoTenantIsolationTest.php     # Testes de isolamento cross-tenant na substituição (SEC-OAIR-001)
+    │   ├── EstacaoTest.php                    # Testes de estações, cascata IBGE, encadeamento e regra dos 200m
+    │   ├── ExampleTest.php                    # Testes de integração do mapa público com dados reais do banco
+    │   ├── MalhaViariaTest.php                # Testes do motor geoespacial e Snap to Road
+    │   ├── MedicaoApiRateLimitTest.php        # Testes de rate limiting na ingestão de telemetria (SEC-OAIR-002)
+    │   ├── MedicaoApiTest.php                 # Testes de telemetria por MAC, IQAr CONAMA, broadcast e Reverb origins
+    │   ├── PatrimonioTest.php                 # Testes de inventário individual, em lote e isolamento municipal
+    │   ├── PerfilTest.php                     # Testes de perfil e imutabilidade do próprio e-mail
+    │   ├── PermissoesPapeisTest.php           # Testes de controle de acesso por papel e sucessão administrativa
+    │   ├── PlanejamentoEInstalacaoTest.php    # Testes do planejador de malha, ordenação DFS e roteiro em campo
+    │   ├── PlanejamentoMaxSatelitesTest.php   # Testes de limite de satélites contra DoS (SEC-OAIR-004)
+    │   ├── SuperUsuarioTest.php               # Testes do Super-usuário, cascata estado/cidade e SuperAdminSeeder
+    │   ├── ThemeToggleTest.php                # Testes de alternância Dark/Light Mode e isolamento da Home
+    │   └── UsuarioMunicipalTest.php           # Testes de gestão de equipe municipal
     └── Unit/
-        ├── EstacaoUnitTest.php        # Teste unitário de fórmulas geoespaciais e accessors POINT
-        └── ExampleTest.php            # Teste unitário base
+        ├── EstacaoUnitTest.php                # Testes unitários de cálculos geoespaciais e accessors POINT
+        └── ExampleTest.php                    # Teste unitário base
 ```
 
 ---
@@ -262,22 +337,26 @@ OpenAir-Metrics/
 
 ## 5. Pontos de Atenção e Débitos Técnicos
 
-1. **Dados Mockados no Mapa Público**:
-    - Os pontos de dados do mapa em `home.blade.php` continuam estáticos no script JavaScript.
+1. ~~**Dados Mockados no Mapa Público**~~ *(Resolvido em 09/09/2026)*:
+    - O mapa em `home.blade.php` agora consome dinamicamente as últimas leituras do banco via `HomeController`, renderiza a superfície IDW em Canvas (`L.IdwSurfaceLayer`) e recebe atualizações em tempo real via WebSockets (`NovaMedicaoRecebida` / Laravel Reverb + Echo).
 2. **Implementação de Ferramentas MCP**:
-    - As propriedades `$tools`, `$resources` e `$prompts` em `OpenAirMetricsServer` estão vazias, aguardando definição de ferramentas de consulta a dados climáticos.
+    - As propriedades `$tools`, `$resources` e `$prompts` em `OpenAirMetricsServer` permanecem vazias, aguardando definição de ferramentas de consulta a dados climáticos para agentes de IA.
+3. **Cards Superiores de KPIs Globais da Rede na Dashboard**:
+    - Enquanto os 4 cards estatísticos do gráfico (`stat-media`, `stat-maximo`, `stat-minimo`, `stat-amostras`) e a curva do Chart.js são atualizados em tempo real via WebSocket/AJAX, os 4 contadores globais no topo da página (`Estações Ativas`, `Total de Leituras`, `Alertas Qualidade (IQA)`, `Alertas Particulado`) são renderizados no carregamento inicial da view pelo Blade.
 
 ---
 
 ## 6. Roadmap e Próximos Passos Sugeridos
 
-- [ ] **Desenvolver API de Ingestão de Dados IoT**:
-    - Endpoint `POST /api/medicoes` autenticado via Sanctum para envio de telemetria por microcontroladores (ESP32/Arduino).
-- [ ] **Tornar o Mapa da Home Dinâmico**:
-    - Consumir as medições em tempo real e colorir os círculos com base no IQA real da estação.
-    - Conectar o script da `home.blade.php` com as leituras mais recentes das estações do banco.
+- [x] **Desenvolver API de Ingestão de Dados IoT** *(Concluído)*:
+    - Endpoint `POST /api/medicoes` (`MedicaoApiController@store`) operando com identificação exclusiva por `mac_address`, autenticação por chave pré-compartilhada (`X-Sensor-Key` / `TELEMETRY_API_KEY`), rate limiting (`throttle:60,1`), cálculo automático do IQAr (CONAMA 506/2024 e ANVISA RE nº 09/2003) e broadcast WebSocket imediato (`NovaMedicaoRecebida`).
+- [x] **Tornar o Mapa da Home e a Dashboard Dinâmicos em Tempo Real** *(Concluído)*:
+    - Mapa público (`home.blade.php`) conectado às leituras reais do banco (`HomeController`) e atualizado assincronamente via Laravel Reverb e Laravel Echo, com suporte transparente a `localhost` e IPs de rede local (LAN).
+    - Painel Analítico (`dashboard.blade.php`) com séries temporais de Média, Máximo e Mínimo, granularidade temporal adaptativa e atualização _in-place_ via WebSockets com debounce de 350ms.
 - [ ] **Implementar Ferramentas no Servidor MCP**:
-    - Adicionar ferramentas para agentes de IA consultarem estações próximas, alertas ativos e histórico de qualidade do ar.
+    - Adicionar ferramentas em `OpenAirMetricsServer` para agentes de IA consultarem estações próximas, alertas ativos e histórico de qualidade do ar.
+- [ ] **Atualização Dinâmica dos 4 Contadores Superiores de KPIs Globais da Dashboard**:
+    - Incluir os totais gerais de leituras e alertas no retorno JSON de `DashboardController@dadosGrafico` para atualizar também a fileira superior de KPIs sem recarregamento de página.
 
 ---
 
@@ -1506,3 +1585,34 @@ OpenAir-Metrics/
 - `vendor/bin/pint --dirty --format agent`: Formatação PHP 100% aprovada.
 - `php artisan test --compact`: Suíte completa aprovada com 173 testes (889 asserções).
 
+
+---
+
+### Sessão: 24 de Outubro de 2026 (Análise de Atualização Assíncrona em Tempo Real, Correção de Allowed Origins no Reverb e Atualização Arquitetural do Histórico)
+
+#### 1. Resumo Executivo das Entregas (ou da Documentação)
+
+- **Análise do Carregamento e Atualização Assíncrona do Mapa e Gráficos**:
+    - Verificado no histórico e confirmado no código-fonte que a arquitetura de atualização assíncrona em tempo real permanece 100% implementada através do evento `App\Events\NovaMedicaoRecebida` (`ShouldBroadcastNow`), transmitido via **Laravel Reverb** no canal público `medicoes` sempre que `POST /api/medicoes` registra uma nova leitura.
+    - Confirmada a escuta ativa via **Laravel Echo** tanto no Mapa Público (`resources/views/home.blade.php` via `processarNovaMedicao` e redesenho suave da camada `L.IdwSurfaceLayer` e popup) quanto no Painel Analítico (`resources/views/dashboard.blade.php` via `processarNovaMedicaoDashboard`, filtro por `cidade_id`/`bairro_id`, debounce de `350ms` e requisição AJAX silenciosa a `GET /dashboard/graficos` com `chartInstance.update()` _in-place_).
+- **Diagnóstico e Correção do Bloqueio de Conexão WebSocket (`SEC-OAIR-007` em `config/reverb.php` e `resources/js/echo.js`)**:
+    - **Causa Raiz**: O patch anterior `SEC-OAIR-007` configurou `allowed_origins` diretamente com `env('APP_URL')` (`http://localhost:8000`). Como `Laravel\Reverb\Protocols\Pusher\Server::verifyOrigin()` extrai apenas o hostname do cabeçalho `Origin` via `parse_url(..., PHP_URL_HOST)` (`localhost` ou o IP da máquina na LAN) e compara via `Str::is()`, a comparação contra `'http://localhost:8000'` sempre retornava `false`, rejeitando conexões WebSocket com `InvalidOrigin` (código `4009`).
+    - **Solução Segura em `config/reverb.php`**: Normalização automática de todas as entradas de `REVERB_ALLOWED_ORIGINS` e `APP_URL` para extrair exclusivamente o hostname (`PHP_URL_HOST`, sem protocolo ou porta) e, em ambientes `local` e `testing`, inclusão automática de `['localhost', '127.0.0.1', '192.168.*', '10.*', '172.*']`, permitindo acesso via `localhost:8000` ou pelo IP do notebook na rede local sem abrir precedentes para origens externas em produção.
+    - **Resolução Dinâmica de `wsHost` em `resources/js/echo.js`**: Quando `VITE_REVERB_HOST` for `127.0.0.1`, `localhost` ou vazio, o cliente Echo adota automaticamente `window.location.hostname`, garantindo que dispositivos na mesma rede local conectem ao WebSocket no IP do servidor de desenvolvimento sem necessidade de recompilar o bundle a cada troca de IP.
+- **Revisão das Seções 3, 5 e 6 do Documento de Histórico**:
+    - Atualizada a árvore arquitetural na Seção 3 para refletir todos os controllers, models, services, jobs, events, factories, migrations, seeders, views e os 19 arquivos de testes atuais.
+    - Atualizadas as Seções 5 (Débitos Técnicos) e 6 (Roadmap), marcando como concluídas a API de Ingestão IoT (`POST /api/medicoes`) e a dinamização em tempo real do Mapa Público e da Dashboard, mantendo pendente a implementação de Tools/Resources no `OpenAirMetricsServer` (MCP).
+
+#### 2. Arquivos Modificados e Criados (Se aplicável)
+
+- `config/reverb.php`: Normalização de `allowed_origins` extraindo `PHP_URL_HOST` e suporte seguro a `localhost`, `127.0.0.1` e faixas privadas de LAN (`192.168.*`, `10.*`, `172.*`) em ambiente local/teste.
+- `resources/js/echo.js`: Resolução dinâmica de `wsHost` com fallback para `window.location.hostname`.
+- `tests/Feature/MedicaoApiTest.php`: Novo teste automatizado validando a normalização de `allowed_origins` do Reverb e a autorização de `localhost` e IPs de LAN com bloqueio de domínios externos.
+- `.agents/skills/historico.md`: Atualização da árvore de arquitetura (Seção 3), revisão de débitos técnicos e roadmap (Seções 5 e 6) e adição do registro desta sessão (Seção 7).
+
+#### 3. Testes, Formatação e Compilação (Se aplicável)
+
+- `vendor/bin/pint --dirty --format agent`: Código PHP formatado sem inconsistências.
+- `php artisan config:clear`: Cache de configuração limpo e validado (`reverb.apps.apps.0.allowed_origins`).
+- `php artisan test --compact tests/Feature/MedicaoApiTest.php`: 18 testes aprovados (91 asserções), 0 falhas.
+- `npm run build`: Assets frontend recompilados via Vite com sucesso.

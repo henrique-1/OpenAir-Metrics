@@ -82,7 +82,23 @@ return [
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
-                'allowed_origins' => array_filter(explode(',', env('REVERB_ALLOWED_ORIGINS', env('APP_URL', '*')))),
+                'allowed_origins' => array_values(array_unique(array_filter(array_merge(
+                    array_map(
+                        static function (string $origin): string {
+                            $origin = trim($origin);
+                            if ($origin === '' || $origin === '*') {
+                                return $origin;
+                            }
+                            $withScheme = str_contains($origin, '://') ? $origin : 'http://'.$origin;
+
+                            return parse_url($withScheme, PHP_URL_HOST) ?: $origin;
+                        },
+                        array_filter(explode(',', (string) env('REVERB_ALLOWED_ORIGINS', env('APP_URL', ''))))
+                    ),
+                    in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)
+                        ? ['localhost', '127.0.0.1', '192.168.*', '10.*', '172.*']
+                        : []
+                )))),
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 30),
                 'max_connections' => env('REVERB_APP_MAX_CONNECTIONS'),
