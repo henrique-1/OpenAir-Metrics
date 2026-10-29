@@ -56,7 +56,10 @@ class PatrimonioController extends Controller
             });
         }
 
-        $patrimonios = $query->orderBy($sort, $direction)->paginate(15)->withQueryString();
+        $patrimonios = $query->orderBy($sort, $direction)
+            ->orderBy('private_id', $direction)
+            ->paginate(10)
+            ->withQueryString();
 
         // Contadores gerais para os cards de estatísticas escopados por jurisdição
         $baseQuery = Patrimonio::query();

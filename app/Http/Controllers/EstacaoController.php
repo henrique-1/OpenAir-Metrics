@@ -26,15 +26,21 @@ class EstacaoController extends Controller
             abort(403, 'O super-usuário só pode gerenciar administradores.');
         }
 
-        $query = Estacao::with(['bairro.cidade.estado', 'patrimonio', 'solicitanteSubstituicao']);
+        $baseQuery = Estacao::query();
 
         if ($user && $user->cidade_id) {
-            $query->whereHas('bairro', function ($cityQuery) use ($user) {
+            $baseQuery->whereHas('bairro', function ($cityQuery) use ($user) {
                 $cityQuery->where('cidade_id', $user->cidade_id);
             });
         } elseif ($user) {
-            $query->where('created_by', $user->id);
+            $baseQuery->where('created_by', $user->id);
         }
+
+        $totalEstacoes = (clone $baseQuery)->count();
+        $totalMatrizes = (clone $baseQuery)->where('tipo_estacao', 'Estação Matriz')->count();
+        $totalSatelites = (clone $baseQuery)->where('tipo_estacao', 'Estação Satélite')->count();
+
+        $query = (clone $baseQuery)->with(['bairro.cidade.estado', 'patrimonio', 'solicitanteSubstituicao']);
 
         // Filtros
         $busca = trim((string) $request->input('busca'));
@@ -81,6 +87,11 @@ class EstacaoController extends Controller
             case 'localidade':
                 $query->orderBy('logradouro', $direction);
                 break;
+            case 'vida_util':
+                $nullOrder = $direction === 'asc' ? 'ASC' : 'DESC';
+                $query->orderByRaw("CASE WHEN data_instalacao IS NULL THEN 1 ELSE 0 END {$nullOrder}")
+                    ->orderBy('data_instalacao', $direction);
+                break;
             case 'instalacao':
                 $query->orderBy('data_instalacao', $direction);
                 break;
@@ -89,18 +100,15 @@ class EstacaoController extends Controller
                 break;
         }
 
-        $estacoes = $query->get();
-
-        if ($sort === 'vida_util') {
-            $estacoes = $estacoes->sortBy(function ($estacao) {
-                $vida = $estacao->calcularVidaUtil();
-
-                return $vida['porcentagem_restante'] ?? 0;
-            }, SORT_REGULAR, $direction === 'desc')->values();
-        }
+        $estacoes = $query->orderBy('private_id', $direction)
+            ->paginate(10)
+            ->withQueryString();
 
         return view('estacoes.index', [
             'estacoes' => $estacoes,
+            'totalEstacoes' => $totalEstacoes,
+            'totalMatrizes' => $totalMatrizes,
+            'totalSatelites' => $totalSatelites,
             'user' => $user,
             'busca' => $busca,
             'tipo' => $tipo,

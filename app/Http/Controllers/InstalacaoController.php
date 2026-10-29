@@ -79,6 +79,7 @@ class InstalacaoController extends Controller
         }
 
         $matrizes = $query->orderBy($sort, $direction)
+            ->orderBy('private_id', $direction)
             ->paginate(10)
             ->withQueryString();
 

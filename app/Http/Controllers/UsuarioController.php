@@ -74,7 +74,8 @@ class UsuarioController extends Controller
         }
 
         $usuarios = $query->orderBy($sort, $direction)
-            ->paginate(15)
+            ->orderBy('id', $direction)
+            ->paginate(10)
             ->withQueryString();
 
         return view('usuarios.index', [

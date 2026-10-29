@@ -363,3 +363,31 @@ test('api de patrimonios disponiveis retorna array vazio para usuario autenticad
     $data = $response->json();
     expect($data)->toBeArray()->toBeEmpty();
 });
+
+test('listagem de patrimonios pagina de 10 em 10 registros', function () {
+    $cidade = Cidade::factory()->create();
+    $user = User::factory()->create(['cidade_id' => $cidade->id]);
+
+    for ($i = 1; $i <= 15; $i++) {
+        $hex = str_pad(dechex($i), 2, '0', STR_PAD_LEFT);
+        Patrimonio::factory()->create([
+            'cidade_id' => $cidade->id,
+            'mac_address' => strtoupper("11:22:33:44:55:{$hex}"),
+            'numero_patrimonio' => sprintf('PAT-%04d', $i),
+            'created_by' => $user->id,
+            'created_at' => now()->subMinutes(20 - $i),
+        ]);
+    }
+
+    $responsePage1 = $this->actingAs($user)->get(route('patrimonios.index'));
+    $responsePage1->assertSuccessful();
+    $patrimoniosPage1 = $responsePage1->viewData('patrimonios');
+    expect($patrimoniosPage1->perPage())->toBe(10);
+    expect($patrimoniosPage1->count())->toBe(10);
+    expect($patrimoniosPage1->total())->toBe(15);
+
+    $responsePage2 = $this->actingAs($user)->get(route('patrimonios.index', ['page' => 2]));
+    $responsePage2->assertSuccessful();
+    $patrimoniosPage2 = $responsePage2->viewData('patrimonios');
+    expect($patrimoniosPage2->count())->toBe(5);
+});

@@ -875,3 +875,26 @@ test('roteiro de instalacao exibe selecao exclusiva via dropdown e nao renderiza
     expect($matriz->patrimonio_id)->toBe($patrimonio->private_id);
     expect($patrimonio->status)->toBe('Instalada');
 });
+
+test('listagem de ordens de instalacao pagina de 10 em 10 registros', function () {
+    $cidade = Cidade::factory()->create();
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $user = User::factory()->create(['nivel' => 'instalador', 'cidade_id' => $cidade->id]);
+
+    Estacao::factory()->count(14)->create([
+        'tipo_estacao' => 'Estação Matriz',
+        'bairro_id' => $bairro->id,
+    ]);
+
+    $responsePage1 = $this->actingAs($user)->get(route('instalacoes.index'));
+    $responsePage1->assertSuccessful();
+    $matrizesPage1 = $responsePage1->viewData('matrizes');
+    expect($matrizesPage1->perPage())->toBe(10);
+    expect($matrizesPage1->count())->toBe(10);
+    expect($matrizesPage1->total())->toBe(14);
+
+    $responsePage2 = $this->actingAs($user)->get(route('instalacoes.index', ['page' => 2]));
+    $responsePage2->assertSuccessful();
+    $matrizesPage2 = $responsePage2->viewData('matrizes');
+    expect($matrizesPage2->count())->toBe(4);
+});

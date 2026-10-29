@@ -67,7 +67,7 @@
                         </div>
                         <div>
                             <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Total de Estações</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $estacoes->count() }}</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $totalEstacoes ?? $estacoes->total() }}</p>
                         </div>
                     </div>
 
@@ -77,7 +77,7 @@
                         </div>
                         <div>
                             <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Estações Matrizes</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $estacoes->where('tipo_estacao', 'Estação Matriz')->count() }}</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $totalMatrizes ?? $estacoes->where('tipo_estacao', 'Estação Matriz')->count() }}</p>
                         </div>
                     </div>
 
@@ -87,7 +87,7 @@
                         </div>
                         <div>
                             <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Estações Satélites</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $estacoes->where('tipo_estacao', 'Estação Satélite')->count() }}</p>
+                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $totalSatelites ?? $estacoes->where('tipo_estacao', 'Estação Satélite')->count() }}</p>
                         </div>
                     </div>
                 </div>
@@ -166,11 +166,6 @@
 
                 <!-- Tabela de Listagem de Estações -->
                 <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 overflow-hidden transition-colors">
-                    <div class="px-6 py-5 border-b border-athens-gray-200 dark:border-athens-gray-800 flex justify-between items-center bg-athens-gray-50/50 dark:bg-athens-gray-900/50">
-                        <h3 class="text-base font-bold text-blue-dianne-950 dark:text-white">Estações Cadastradas</h3>
-                        <span class="text-xs text-athens-gray-500 dark:text-athens-gray-400 font-medium">{{ $estacoes->count() }} {{ $estacoes->count() === 1 ? 'estação listada' : 'estações listadas' }}</span>
-                    </div>
-
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
@@ -366,6 +361,13 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Paginação -->
+                    @if ($estacoes->hasPages())
+                        <div class="px-6 py-4 border-t border-athens-gray-200 dark:border-athens-gray-800 bg-athens-gray-50 dark:bg-athens-gray-900">
+                            {{ $estacoes->links() }}
+                        </div>
+                    @endif
                 </div>
 
             </div>

@@ -536,3 +536,49 @@ test('listagem de estacoes exibe apenas estacoes da jurisdicao municipal do usua
     $response->assertSee('AA:11:11:11:11:11');
     $response->assertDontSee('AA:22:22:22:22:22');
 });
+
+test('listagem de estacoes pagina de 10 em 10 registros e mantem contadores totais', function () {
+    $cidade = Cidade::factory()->create(['nome' => 'Campinas']);
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $user = User::factory()->create(['cidade_id' => $cidade->id]);
+
+    for ($i = 1; $i <= 25; $i++) {
+        $hex = str_pad(dechex($i), 2, '0', STR_PAD_LEFT);
+        Estacao::factory()->create([
+            'created_by' => $user->id,
+            'bairro_id' => $bairro->id,
+            'mac_address' => strtoupper("AA:BB:CC:DD:EE:{$hex}"),
+            'tipo_estacao' => $i <= 5 ? 'Estação Matriz' : 'Estação Satélite',
+            'created_at' => now()->subMinutes(30 - $i),
+        ]);
+    }
+
+    // Página 1: deve listar 10 estações (as 10 mais recentes: 25 até 16)
+    $responsePage1 = $this->actingAs($user)->get(route('estacoes.index'));
+    $responsePage1->assertSuccessful();
+    $estacoesPage1 = $responsePage1->viewData('estacoes');
+    expect($estacoesPage1->perPage())->toBe(10);
+    expect($estacoesPage1->count())->toBe(10);
+    expect($estacoesPage1->total())->toBe(25);
+    expect($responsePage1->viewData('totalEstacoes'))->toBe(25);
+    expect($responsePage1->viewData('totalMatrizes'))->toBe(5);
+    expect($responsePage1->viewData('totalSatelites'))->toBe(20);
+    $responsePage1->assertSee('AA:BB:CC:DD:EE:19'); // 25 in hex is 19
+    $responsePage1->assertDontSee('AA:BB:CC:DD:EE:0F'); // 15 in hex is 0F
+
+    // Página 2: deve listar mais 10 estações (15 até 6)
+    $responsePage2 = $this->actingAs($user)->get(route('estacoes.index', ['page' => 2]));
+    $responsePage2->assertSuccessful();
+    $estacoesPage2 = $responsePage2->viewData('estacoes');
+    expect($estacoesPage2->count())->toBe(10);
+    $responsePage2->assertSee('AA:BB:CC:DD:EE:0F');
+    $responsePage2->assertDontSee('AA:BB:CC:DD:EE:05');
+
+    // Página 3: deve listar as 5 restantes (5 até 1)
+    $responsePage3 = $this->actingAs($user)->get(route('estacoes.index', ['page' => 3]));
+    $responsePage3->assertSuccessful();
+    $estacoesPage3 = $responsePage3->viewData('estacoes');
+    expect($estacoesPage3->count())->toBe(5);
+    $responsePage3->assertSee('AA:BB:CC:DD:EE:05');
+    $responsePage3->assertSee('AA:BB:CC:DD:EE:01');
+});

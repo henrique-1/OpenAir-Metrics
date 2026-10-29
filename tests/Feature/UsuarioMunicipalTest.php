@@ -293,3 +293,28 @@ test('telas de cadastro e edicao de usuario renderizam cards interativos de nive
     $responseEdit->assertSee('radio-cadastrador');
     $responseEdit->assertSee('radio-instalador');
 });
+
+test('listagem de usuarios pagina de 10 em 10 registros', function () {
+    $cidade = Cidade::factory()->create();
+    $admin = User::factory()->create([
+        'nivel' => 'administrador',
+        'cidade_id' => $cidade->id,
+    ]);
+
+    User::factory()->count(13)->create([
+        'nivel' => 'cadastrador',
+        'cidade_id' => $cidade->id,
+    ]);
+
+    $responsePage1 = $this->actingAs($admin)->get(route('usuarios.index'));
+    $responsePage1->assertSuccessful();
+    $usuariosPage1 = $responsePage1->viewData('usuarios');
+    expect($usuariosPage1->perPage())->toBe(10);
+    expect($usuariosPage1->count())->toBe(10);
+    expect($usuariosPage1->total())->toBe(13);
+
+    $responsePage2 = $this->actingAs($admin)->get(route('usuarios.index', ['page' => 2]));
+    $responsePage2->assertSuccessful();
+    $usuariosPage2 = $responsePage2->viewData('usuarios');
+    expect($usuariosPage2->count())->toBe(3);
+});
