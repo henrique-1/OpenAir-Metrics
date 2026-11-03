@@ -18,11 +18,14 @@ jobs:
     steps:
       - name: Executar Deploy via SSH na VPS
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          LARAVEL_ENV_ENCRYPTION_KEY: ${{ secrets.LARAVEL_ENV_ENCRYPTION_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT || 22 }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: LARAVEL_ENV_ENCRYPTION_KEY
           script_stop: false
           script: |
             echo "==> Conectado à VPS! Preparando ambiente..."
@@ -53,6 +56,15 @@ jobs:
 
             echo "==> Instalando dependências do Composer..."
             $PHP_BIN $COMPOSER_BIN install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+            if [ -f ".env.production.encrypted" ]; then
+              if [ -z "$LARAVEL_ENV_ENCRYPTION_KEY" ]; then
+                echo "ERRO: O secret LARAVEL_ENV_ENCRYPTION_KEY não está configurado no GitHub!"
+                exit 1
+              fi
+              echo "==> Descriptografando .env.production.encrypted para .env..."
+              $PHP_BIN artisan env:decrypt --env=production --filename=.env --key="$LARAVEL_ENV_ENCRYPTION_KEY" --force
+            fi
 
             echo "==> Compilando assets com Vite e Tailwind..."
             npm ci --no-audit --no-fund
