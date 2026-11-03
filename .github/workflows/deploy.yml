@@ -1,0 +1,58 @@
+name: Deploy para Produção (VPS Hostinger)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy OpenAir-Metrics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Executar Deploy via SSH na VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            export PATH="/usr/local/bin:$HOME/.local/bin:$PATH"
+            [ -s "/etc/profile.d/nvm.sh" ] && . "/etc/profile.d/nvm.sh"
+
+            PHP_BIN=$(command -v php8.5 || command -v php8.4 || command -v php)
+            COMPOSER_BIN=$(command -v composer)
+
+            cd /home/bissoli-openair/htdocs/openair.bissoli.tech
+
+            echo "==> Atualizando código-fonte da branch main..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "==> Instalando dependências do Composer..."
+            $PHP_BIN $COMPOSER_BIN install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+            echo "==> Compilando assets com Vite e Tailwind..."
+            npm ci --no-audit --no-fund
+            npm run build
+
+            echo "==> Executando migrations do banco de dados..."
+            $PHP_BIN artisan migrate --force
+
+            echo "==> Atualizando caches de produção do Laravel..."
+            $PHP_BIN artisan optimize:clear
+            $PHP_BIN artisan optimize
+
+            echo "==> Reiniciando workers de fila e servidor WebSocket Reverb..."
+            $PHP_BIN artisan queue:restart
+            $PHP_BIN artisan reverb:restart
+
+            echo "==> Deploy concluído com sucesso!"
