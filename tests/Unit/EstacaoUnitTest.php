@@ -30,3 +30,14 @@ test('estacao extrai latitude e longitude a partir de texto WKT', function () {
     expect($estacao->latitude)->toBe(-23.55052);
     expect($estacao->longitude)->toBe(-46.633308);
 });
+
+test('estacao normaliza latitude e longitude invertidas pelo eixo SRID 4326 do MySQL 8', function () {
+    $estacao = new Estacao;
+    $estacao->setRawAttributes([
+        'st_latitude' => -46.812740,
+        'st_longitude' => -21.967194,
+    ]);
+
+    expect($estacao->latitude)->toBe(-21.967194);
+    expect($estacao->longitude)->toBe(-46.812740);
+});

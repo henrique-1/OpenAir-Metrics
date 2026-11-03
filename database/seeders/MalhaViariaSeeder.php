@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Estacao;
 use App\Models\MalhaViaria;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -190,7 +191,7 @@ class MalhaViariaSeeder extends Seeder
                 'tipo_via' => $via['tipo_via'],
                 'geometria' => $isSqlite
                     ? $via['wkt']
-                    : DB::raw(sprintf("ST_GeomFromText('%s', 4326)", $via['wkt'])),
+                    : DB::raw(Estacao::geomFromTextSql(sprintf("'%s'", $via['wkt']))),
             ]);
         }
     }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\GeocodingService;
 use Database\Factories\EstacaoFactory;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -119,7 +120,8 @@ class Estacao extends Model
                 $driver = $connection->getDriverName();
 
                 if ($driver === 'mysql' || $driver === 'mariadb') {
-                    $estacao->attributes['coordenadas'] = DB::raw("ST_GeomFromText('POINT({$lng} {$lat})', 4326)");
+                    $geomSql = static::geomFromTextSql("'POINT({$lng} {$lat})'", $connection);
+                    $estacao->attributes['coordenadas'] = DB::raw($geomSql);
                 } else {
                     $estacao->attributes['coordenadas'] = "POINT({$lng} {$lat})";
                 }
@@ -143,7 +145,12 @@ class Estacao extends Model
                     return (float) $value;
                 }
                 if (isset($attributes['st_latitude']) && is_numeric($attributes['st_latitude'])) {
-                    return (float) $attributes['st_latitude'];
+                    $lat = (float) $attributes['st_latitude'];
+                    if (isset($attributes['st_longitude']) && is_numeric($attributes['st_longitude'])) {
+                        return static::normalizarParCoordenadas($lat, (float) $attributes['st_longitude'])['latitude'];
+                    }
+
+                    return $lat;
                 }
                 if (! empty($attributes['coordenadas_wkt'])) {
                     $coords = $this->extractCoordinatesFromAttribute($attributes['coordenadas_wkt']);
@@ -177,7 +184,12 @@ class Estacao extends Model
                     return (float) $value;
                 }
                 if (isset($attributes['st_longitude']) && is_numeric($attributes['st_longitude'])) {
-                    return (float) $attributes['st_longitude'];
+                    $lng = (float) $attributes['st_longitude'];
+                    if (isset($attributes['st_latitude']) && is_numeric($attributes['st_latitude'])) {
+                        return static::normalizarParCoordenadas((float) $attributes['st_latitude'], $lng)['longitude'];
+                    }
+
+                    return $lng;
                 }
                 if (! empty($attributes['coordenadas_wkt'])) {
                     $coords = $this->extractCoordinatesFromAttribute($attributes['coordenadas_wkt']);
@@ -297,6 +309,60 @@ class Estacao extends Model
     }
 
     /**
+     * Verifica se a conexão atual é MySQL 8+ / Percona Server (não-MariaDB),
+     * onde o SRID 4326 exige 'axis-order=long-lat' para manter a ordem (longitude latitude).
+     */
+    public static function isMySql8(?ConnectionInterface $connection = null): bool
+    {
+        $connection ??= DB::connection();
+        if ($connection->getDriverName() !== 'mysql') {
+            return false;
+        }
+
+        if (method_exists($connection, 'isMaria')) {
+            try {
+                return ! $connection->isMaria();
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Gera a expressão SQL ST_GeomFromText compatível com MariaDB e MySQL 8+ / Percona.
+     */
+    public static function geomFromTextSql(string $wktExpression = '?', ?ConnectionInterface $connection = null): string
+    {
+        if (static::isMySql8($connection)) {
+            return "ST_GeomFromText({$wktExpression}, 4326, 'axis-order=long-lat')";
+        }
+
+        return "ST_GeomFromText({$wktExpression}, 4326)";
+    }
+
+    /**
+     * Garante que latitude e longitude não estejam invertidas por diferença de eixo SRID 4326 (MySQL 8 vs MariaDB).
+     *
+     * @return array{latitude: float, longitude: float}
+     */
+    public static function normalizarParCoordenadas(float $latitude, float $longitude): array
+    {
+        if (($latitude < -34.0 || $latitude > 6.0) && ($longitude >= -34.0 && $longitude <= 6.0)) {
+            return [
+                'latitude' => $longitude,
+                'longitude' => $latitude,
+            ];
+        }
+
+        return [
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+        ];
+    }
+
+    /**
      * Extrai latitude e longitude a partir de texto WKT ou binário WKB do MySQL.
      *
      * @return array{latitude: float, longitude: float}|null
@@ -309,10 +375,7 @@ class Estacao extends Model
 
         // Se for string WKT no formato POINT(lng lat)
         if (is_string($value) && preg_match('/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i', $value, $matches)) {
-            return [
-                'longitude' => (float) $matches[1],
-                'latitude' => (float) $matches[2],
-            ];
+            return static::normalizarParCoordenadas((float) $matches[2], (float) $matches[1]);
         }
 
         // Se for binário WKB retornado pelo MySQL
@@ -321,18 +384,12 @@ class Estacao extends Model
             if (strlen($value) === 25) {
                 $unpacked = @unpack('Vsrid/corder/Vtype/dlon/dlat', $value);
                 if ($unpacked && isset($unpacked['dlat'], $unpacked['dlon'])) {
-                    return [
-                        'longitude' => (float) $unpacked['dlon'],
-                        'latitude' => (float) $unpacked['dlat'],
-                    ];
+                    return static::normalizarParCoordenadas((float) $unpacked['dlat'], (float) $unpacked['dlon']);
                 }
             } elseif (strlen($value) === 21) {
                 $unpacked = @unpack('corder/Vtype/dlon/dlat', $value);
                 if ($unpacked && isset($unpacked['dlat'], $unpacked['dlon'])) {
-                    return [
-                        'longitude' => (float) $unpacked['dlon'],
-                        'latitude' => (float) $unpacked['dlat'],
-                    ];
+                    return static::normalizarParCoordenadas((float) $unpacked['dlat'], (float) $unpacked['dlon']);
                 }
             }
         }
@@ -419,8 +476,16 @@ class Estacao extends Model
      */
     public function scopeWithCoordinates(Builder $query): Builder
     {
-        $driver = $query->getConnection()->getDriverName();
+        $connection = $query->getConnection();
+        $driver = $connection->getDriverName();
         if ($driver === 'mysql' || $driver === 'mariadb') {
+            if (static::isMySql8($connection)) {
+                return $query->select('estacoes.*')
+                    ->selectRaw('ST_AsText(ST_SRID(coordenadas, 0)) as coordenadas_wkt')
+                    ->selectRaw('ST_X(ST_SRID(coordenadas, 0)) as st_longitude')
+                    ->selectRaw('ST_Y(ST_SRID(coordenadas, 0)) as st_latitude');
+            }
+
             return $query->select('estacoes.*')
                 ->selectRaw('ST_AsText(coordenadas) as coordenadas_wkt')
                 ->selectRaw('ST_X(coordenadas) as st_longitude')
@@ -528,8 +593,9 @@ class Estacao extends Model
         $driver = $connection->getDriverName();
 
         if ($driver === 'mysql' || $driver === 'mariadb') {
+            $geomSql = static::geomFromTextSql("CONCAT('POINT(', ?, ' ', ?, ')')", $connection);
             $result = $query->selectRaw(
-                "MIN(ST_Distance_Sphere(coordenadas, ST_GeomFromText(CONCAT('POINT(', ?, ' ', ?, ')'), 4326))) as menor_distancia",
+                "MIN(ST_Distance_Sphere(coordenadas, {$geomSql})) as menor_distancia",
                 [$longitude, $latitude]
             )->value('menor_distancia');
 
@@ -581,8 +647,9 @@ class Estacao extends Model
         $driver = $connection->getDriverName();
 
         if ($driver === 'mysql' || $driver === 'mariadb') {
+            $geomSql = static::geomFromTextSql("CONCAT('POINT(', ?, ' ', ?, ')')", $connection);
             $result = $query->selectRaw(
-                "MIN(ST_Distance_Sphere(coordenadas, ST_GeomFromText(CONCAT('POINT(', ?, ' ', ?, ')'), 4326))) as menor_distancia",
+                "MIN(ST_Distance_Sphere(coordenadas, {$geomSql})) as menor_distancia",
                 [$longitude, $latitude]
             )->value('menor_distancia');
 

@@ -6,7 +6,6 @@ use App\Models\Estacao;
 use App\Models\Medicao;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\DB;
 
 class HomeController extends Controller
 {
@@ -15,19 +14,11 @@ class HomeController extends Controller
      */
     public function index(): View
     {
-        $driver = DB::connection()->getDriverName();
-        $query = Estacao::query()
+        $estacoes = Estacao::query()
+            ->withCoordinates()
             ->whereHas('medicoes')
-            ->with(['ultimaMedicao']);
-
-        if ($driver === 'mysql' || $driver === 'mariadb') {
-            $query->select('estacoes.*')
-                ->selectRaw('ST_AsText(coordenadas) as coordenadas_wkt')
-                ->selectRaw('ST_X(coordenadas) as st_longitude')
-                ->selectRaw('ST_Y(coordenadas) as st_latitude');
-        }
-
-        $estacoes = $query->get();
+            ->with(['ultimaMedicao'])
+            ->get();
 
         $dadosIqa = [];
         $dadosTemperatura = [];

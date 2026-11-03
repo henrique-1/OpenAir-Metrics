@@ -54,13 +54,36 @@ class GeocodingService
                 $minLat
             );
 
-            $rows = DB::select("
-                SELECT id, logradouro, tipo_via,
-                       ST_AsText(geometria) as wkt
-                FROM malha_viaria
-                WHERE MBRIntersects(geometria, ST_GeomFromText(?, 4326))
-                  AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
-            ", [$boxWkt]);
+            if (Estacao::isMySql8()) {
+                try {
+                    $rows = DB::select("
+                        SELECT id, logradouro, tipo_via,
+                               ST_AsText(ST_SRID(geometria, 0)) as wkt
+                        FROM malha_viaria
+                        WHERE (
+                            MBRIntersects(geometria, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))
+                            OR MBRIntersects(geometria, ST_GeomFromText(?, 4326))
+                        )
+                          AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
+                    ", [$boxWkt, $boxWkt]);
+                } catch (\Throwable) {
+                    $rows = DB::select("
+                        SELECT id, logradouro, tipo_via,
+                               ST_AsText(ST_SRID(geometria, 0)) as wkt
+                        FROM malha_viaria
+                        WHERE MBRIntersects(geometria, ST_GeomFromText(?, 0))
+                          AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
+                    ", [$boxWkt]);
+                }
+            } else {
+                $rows = DB::select("
+                    SELECT id, logradouro, tipo_via,
+                           ST_AsText(geometria) as wkt
+                    FROM malha_viaria
+                    WHERE MBRIntersects(geometria, ST_GeomFromText(?, 4326))
+                      AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
+                ", [$boxWkt]);
+            }
 
             $ways = [];
             foreach ($rows as $row) {
@@ -165,9 +188,10 @@ class GeocodingService
             foreach ($points as $point) {
                 $parts = preg_split('/\s+/', trim($point));
                 if (count($parts) >= 2) {
+                    $normalizado = Estacao::normalizarParCoordenadas((float) $parts[1], (float) $parts[0]);
                     $coords[] = [
-                        'lat' => (float) $parts[1],
-                        'lon' => (float) $parts[0],
+                        'lat' => $normalizado['latitude'],
+                        'lon' => $normalizado['longitude'],
                     ];
                 }
             }
@@ -462,8 +486,9 @@ class GeocodingService
                 });
         } else {
             $pointWkt = sprintf('POINT(%.7f %.7f)', $lng, $lat);
+            $geomSql = Estacao::geomFromTextSql('?');
             $estacaoProxima = Estacao::whereNotNull('logradouro')
-                ->whereRaw('ST_Distance_Sphere(coordenadas, ST_GeomFromText(?, 4326)) <= 10', [$pointWkt])
+                ->whereRaw("ST_Distance_Sphere(coordenadas, {$geomSql}) <= 10", [$pointWkt])
                 ->first();
         }
 

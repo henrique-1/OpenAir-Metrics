@@ -10,7 +10,6 @@ use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -180,20 +179,12 @@ OVERPASS;
     public function coordenadas(): JsonResponse
     {
         $user = Auth::user();
-        $driver = DB::connection()->getDriverName();
-        $query = Estacao::with(['bairro.cidade.estado', 'estacaoOrigem']);
+        $query = Estacao::withCoordinates()->with(['bairro.cidade.estado', 'estacaoOrigem']);
 
         if ($user && $user->cidade_id) {
             $query->whereHas('bairro.cidade', function ($q) use ($user) {
                 $q->where('id', $user->cidade_id);
             });
-        }
-
-        if ($driver === 'mysql' || $driver === 'mariadb') {
-            $query->select('estacoes.*')
-                ->selectRaw('ST_AsText(coordenadas) as coordenadas_wkt')
-                ->selectRaw('ST_X(coordenadas) as st_longitude')
-                ->selectRaw('ST_Y(coordenadas) as st_latitude');
         }
 
         $estacoes = $query->get()->map(function (Estacao $estacao) {
