@@ -23,13 +23,27 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT || 22 }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          script_stop: true
+          script_stop: false
           script: |
-            export PATH="/usr/local/bin:$HOME/.local/bin:$PATH"
-            [ -s "/etc/profile.d/nvm.sh" ] && . "/etc/profile.d/nvm.sh"
+            echo "==> Conectado à VPS! Preparando ambiente..."
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/.local/bin:$PATH"
 
-            PHP_BIN=$(command -v php8.5 || command -v php8.4 || command -v php)
-            COMPOSER_BIN=$(command -v composer)
+            if [ -d "/usr/local/nvm/versions/node" ]; then
+              NODE_LATEST=$(ls -1 /usr/local/nvm/versions/node | tail -n 1)
+              export PATH="/usr/local/nvm/versions/node/$NODE_LATEST/bin:$PATH"
+            elif [ -d "$HOME/.nvm/versions/node" ]; then
+              NODE_LATEST=$(ls -1 "$HOME/.nvm/versions/node" | tail -n 1)
+              export PATH="$HOME/.nvm/versions/node/$NODE_LATEST/bin:$PATH"
+            fi
+
+            set -e
+
+            PHP_BIN=$(command -v php8.5 || command -v php8.4 || command -v php8.3 || command -v php)
+            COMPOSER_BIN=$(command -v composer || echo "/usr/local/bin/composer")
+
+            echo "PHP: $($PHP_BIN -v | head -n 1)"
+            echo "Node: $(node -v)"
+            echo "NPM: $(npm -v)"
 
             cd /home/bissoli-openair/htdocs/openair.bissoli.tech
 
@@ -53,6 +67,6 @@ jobs:
 
             echo "==> Reiniciando workers de fila e servidor WebSocket Reverb..."
             $PHP_BIN artisan queue:restart
-            $PHP_BIN artisan reverb:restart
+            $PHP_BIN artisan reverb:restart || true
 
             echo "==> Deploy concluído com sucesso!"
