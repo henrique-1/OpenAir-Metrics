@@ -22,6 +22,7 @@
 ### UC01 — Visualizar Mapa Público de Monitoramento em Tempo Real
 
 - **Atores:** Visitante, Usuário Autenticado, Sistema (Broadcasting Reverb).
+- **Requisitos Funcionais Associados:** RF05.
 - **Resumo:** Exibe o mapa público interativo com a localização geográfica e os indicadores ambientais mais recentes (IQA, temperatura, umidade, $\text{PM}_{2.5}$ e $\text{CO}_2$) de todas as estações com medições registradas.
 - **Pré-condições:** Nenhuma (acesso público na rota `GET /` em [web.php](file:///home/henrique_1/Documents/OpenAir-Metrics/routes/web.php#L15)).
 - **Fluxo Principal (Caminho Feliz):**
@@ -41,20 +42,24 @@
 ### UC02 — Autenticar no Sistema (Login e Logout)
 
 - **Atores:** Visitante (Login), Usuário Autenticado (Logout).
-- **Resumo:** Realiza a autenticação de usuários ativos por e-mail e senha com redirecionamento contextual por perfil, bem como o encerramento seguro da sessão.
+- **Requisitos Funcionais Associados:** RF01, RF02.
+- **Resumo:** Realiza a autenticação de usuários ativos por e-mail e senha com suporte à alternância de visualização de credencial (NIST SP 800-63B), redirecionamento contextual por perfil e encerramento seguro da sessão.
 - **Pré-condições:** Para Login (`GET/POST /login`), o ator deve ser um visitante (`guest`). Para Logout (`POST /logout`), o ator deve estar autenticado (`auth`).
 - **Fluxo Principal (Caminho Feliz):**
-  1. O Visitante submete o formulário de login (`POST /login`) com `email`, `password` e a opção `remember`.
-  2. O Sistema ([`AuthController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php#L23-L56)) valida o formato de e-mail e a presença da senha.
-  3. O Sistema acrescenta a restrição obrigatória `ativo = true` às credenciais e verifica a autenticação (`Auth::attempt`).
-  4. O Sistema regenera o ID da sessão (`$request->session()->regenerate()`) para prevenção de *Session Fixation*.
-  5. O Sistema redireciona o usuário para o painel padrão (`route('dashboard')`) ou URL pretendida.
+  1. O Visitante acessa `/login` e visualiza o formulário com cabeçalho limpo com o logotipo institucional (sem a app bar de navegação flutuante).
+  2. O Visitante digita `email` e `password`, podendo alternar a visibilidade da senha entre texto legível e pontilhado através do botão acessível com ícone de olho (`data-alternar-senha="password"` e atributos `aria-pressed`/`aria-label`).
+  3. O Visitante seleciona opcionalmente "Lembrar de mim" (`remember`) e submete o formulário (`POST /login`).
+  4. O Sistema ([`AuthController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php#L23-L56)) valida o formato de e-mail e a presença da senha.
+  5. O Sistema acrescenta a restrição obrigatória `ativo = true` às credenciais e verifica a autenticação (`Auth::attempt`).
+  6. O Sistema regenera o ID da sessão (`$request->session()->regenerate()`) para prevenção de *Session Fixation*.
+  7. O Sistema redireciona o usuário para o painel padrão (`route('dashboard')`) ou URL pretendida.
 - **Fluxos Alternativos / Exceções:**
   - **A1 - Redirecionamento de Super-Usuário:** Se o usuário autenticado possuir perfil `superadmin` ou `super_administrador` ([`User::isSuperAdmin`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L65-L68)), o Sistema redireciona para `route('usuarios.index')` ([`AuthController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php#L40-L42)).
   - **A2 - Redirecionamento de Instalador:** Se o usuário autenticado possuir perfil `instalador` ([`User::isInstalador`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L90-L93)), o Sistema redireciona para `route('instalacoes.index')` ([`AuthController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php#L44-L46)).
   - **A3 - Credenciais inválidas ou conta inativa (`ativo = false`):** O Sistema recusa o login, preserva apenas o campo `email` e retorna à tela anterior com a mensagem de erro informando que as credenciais não correspondem ou a conta está desativada ([`AuthController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php#L53-L55)).
   - **A4 - Limite de tentativas excedido (*Rate Limiting*):** Se o Visitante realizar mais de 5 submissões em 1 minuto (`throttle:5,1` em [web.php](file:///home/henrique_1/Documents/OpenAir-Metrics/routes/web.php#L25)), o Sistema bloqueia a requisição com status `HTTP 429 Too Many Requests`.
   - **A5 - Encerramento de Sessão (`POST /logout`):** O Usuário Autenticado solicita logout; o Sistema ([`AuthController::destroy`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php#L61-L72)) executa `Auth::logout()`, invalida a sessão, regenera o token CSRF e redireciona para `/`.
+  - **A6 - Navegação para Recuperação de Senha:** Caso o Visitante clique no link "Não lembra a senha? Recupere aqui", um manipulador JavaScript captura o e-mail previamente digitado e redireciona para `GET /esqueci-senha?email=...`, agilizando a solicitação.
 - **Pós-condições:** Sessão autenticada iniciada (no login) ou invalidada com token CSRF renovado (no logout).
 
 ---
@@ -62,12 +67,15 @@
 ### UC03 — Gerenciar Perfil Próprio
 
 - **Atores:** Usuário Autenticado.
-- **Resumo:** Permite ao usuário autenticado visualizar e atualizar seus dados cadastrais e endereço residencial/profissional.
+- **Requisitos Funcionais Associados:** RF03.
+- **Resumo:** Permite ao usuário autenticado visualizar e atualizar seus dados cadastrais, consultar o estado de segurança de sua conta (com recomendações de 2FA/Passkeys para administradores e instaladores) e gerenciar seu endereço residencial/profissional.
 - **Pré-condições:** O usuário deve estar autenticado no sistema (`middleware('auth')`).
 - **Fluxo Principal (Caminho Feliz):**
-  1. O Usuário Autenticado acessa a tela de perfil (`GET /perfil` em [`PerfilController::edit`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PerfilController.php#L15-L25)) e envia as alterações via `PUT /perfil`.
-  2. O Sistema ([`PerfilController::update`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PerfilController.php#L30-L59)) valida `name` (obrigatório, máx. 255) e os campos opcionais de endereço (`logradouro`, `numero`, `complemento`, `bairro`, `estado` com máx. 2 caracteres, `cep` com máx. 9 caracteres).
-  3. O Sistema atualiza o registro em [`User`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L30-L105) e redireciona para `route('perfil.edit')` com mensagem de sucesso.
+  1. O Usuário Autenticado acessa a tela de perfil (`GET /perfil` em [`PerfilController::edit`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PerfilController.php#L15-L25)).
+  2. O Sistema renderiza as seções cadastrais e, caso o usuário possua nível `administrador` ou `instalador` sem segundo fator ativado, exibe um banner de alerta destacando a recomendação de habilitar MFA (TOTP) ou Passkeys para proteção da jurisdição municipal.
+  3. O Usuário envia as alterações via formulário (`PUT /perfil`).
+  4. O Sistema ([`PerfilController::update`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PerfilController.php#L30-L59)) valida `name` (obrigatório, máx. 255) e os campos opcionais de endereço (`logradouro`, `numero`, `complemento`, `bairro`, `estado` com máx. 2 caracteres, `cep` com máx. 9 caracteres).
+  5. O Sistema atualiza o registro em [`User`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L30-L105) e redireciona para `route('perfil.edit')` com mensagem de sucesso.
 - **Fluxos Alternativos / Exceções:**
   - **A1 - Usuário já possui município vinculado (`$user->cidade_id != null`):** O Sistema ignora e remove qualquer parâmetro `cidade_id` enviado na requisição (`unset($validated['cidade_id'])`), impedindo a troca de jurisdição pelo próprio usuário ([`PerfilController::update`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PerfilController.php#L52-L54)).
   - **A2 - Usuário ainda não possui município vinculado (`! $user->cidade_id`):** O Sistema habilita a regra `'cidade_id' => ['nullable', 'exists:cidades,id']` e permite a associação inicial ([`PerfilController::update`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PerfilController.php#L45-L47)).
@@ -79,6 +87,7 @@
 ### UC04 — Gerenciar Usuários e Administradores Municipais
 
 - **Atores:** Super-Usuário (`superadmin`), Administrador Municipal (`administrador`).
+- **Requisitos Funcionais Associados:** RF04.
 - **Resumo:** Permite listar, filtrar, cadastrar, editar e alternar o status ativo/inativo de contas de usuários, respeitando a hierarquia administrativa e a regra de sucessão municipal.
 - **Pré-condições:** O usuário deve estar autenticado com perfil `superadmin` ou `administrador` ([`UsuarioController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L14-L361)).
 - **Fluxo Principal (Caminho Feliz):**
@@ -103,6 +112,7 @@
 ### UC05 — Consultar Dashboard Analítico e Gráficos de Séries Temporais
 
 - **Atores:** Administrador Municipal, Planejador Técnico, Instalador.
+- **Requisitos Funcionais Associados:** RF06, RF07.
 - **Resumo:** Apresenta indicadores consolidados de estações, contadores de alertas críticos e gráficos de séries temporais com granularidade adaptativa por localidade, métrica e período.
 - **Pré-condições:** O usuário deve estar autenticado e **não** possuir perfil `superadmin`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -122,6 +132,7 @@
 ### UC06 — Consultar e Filtrar Estações de Monitoramento
 
 - **Atores:** Administrador Municipal, Planejador Técnico, Instalador.
+- **Requisitos Funcionais Associados:** RF09.
 - **Resumo:** Lista todas as estações do município (ou criadas pelo usuário), exibindo status de instalação, pendências de substituição e cálculo de vida útil dos sensores.
 - **Pré-condições:** O usuário deve estar autenticado e não ser `superadmin`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -142,6 +153,7 @@
 ### UC07 — Cadastrar Estação Individualmente
 
 - **Atores:** Planejador Técnico, Administrador Municipal, APIs OpenStreetMap (Nominatim), Sistema (Fila).
+- **Requisitos Funcionais Associados:** RF10.
 - **Resumo:** Realiza o cadastro manual de uma Estação Matriz ou Estação Satélite no mapa, validando jurisdição, alcance máximo de 200m, geocodificação reversa e vínculo automático com o patrimônio.
 - **Pré-condições:** O usuário deve estar autenticado com perfil `cadastrador`/`planejador` ou `administrador`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -163,6 +175,7 @@
 ### UC08 — Simular e Planejar Malha de Estações em Cascata Viária
 
 - **Atores:** Planejador Técnico, Administrador Municipal, APIs OpenStreetMap (Overpass / Nominatim).
+- **Requisitos Funcionais Associados:** RF13, RF14.
 - **Resumo:** Calcula automaticamente a disposição ótima de 1 Estação Matriz e de 1 a 20 Estações Satélites sobre o leito de vias públicas urbanas em cascata multidirecional, permitindo também o ajuste fino individual (*Snap to Road*).
 - **Pré-condições:** O usuário deve estar autenticado com perfil `cadastrador`/`planejador` ou `administrador`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -184,6 +197,7 @@
 ### UC09 — Salvar Malha Planejada e Gerar Ordem de Instalação
 
 - **Atores:** Planejador Técnico, Administrador Municipal.
+- **Requisitos Funcionais Associados:** RF15.
 - **Resumo:** Persiste em lote a Estação Matriz e as Estações Satélites planejadas com status `'Planejada'`, constrói a árvore de conexões e normaliza a ordem sequencial de instalação em cascata (DFS).
 - **Pré-condições:** O usuário deve estar autenticado com perfil `cadastrador`/`planejador` ou `administrador` e possuir uma malha calculada.
 - **Fluxo Principal (Caminho Feliz):**
@@ -203,6 +217,7 @@
 ### UC10 — Gerenciar Inventário de Patrimônio (Individual, Lote e Descarte)
 
 - **Atores:** Planejador Técnico, Administrador Municipal, Instalador (apenas listagem/consulta).
+- **Requisitos Funcionais Associados:** RF16.
 - **Resumo:** Gerencia o ciclo de estoque das placas/sensores IoT do município, permitindo cadastro unitário ou em lote com geração automática de código patrimonial e baixa lógica para descarte.
 - **Pré-condições:** O usuário deve estar autenticado (não `superadmin` para listagem; `cadastrador`/`planejador` ou `administrador` para criação e descarte).
 - **Fluxo Principal (Caminho Feliz):**
@@ -221,6 +236,7 @@
 ### UC11 — Consultar Ordens de Instalação e Roteiro em Cascata
 
 - **Atores:** Instalador, Planejador Técnico, Administrador Municipal.
+- **Requisitos Funcionais Associados:** RF17.
 - **Resumo:** Lista as malhas planejadas agrupadas por Estação Matriz e exibe o roteiro detalhado passo a passo na ordem topológica de instalação em campo.
 - **Pré-condições:** O usuário deve estar autenticado e não possuir perfil `superadmin`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -238,6 +254,7 @@
 ### UC12 — Ativar Estação e Vincular Equipamento em Campo
 
 - **Atores:** Instalador.
+- **Requisitos Funcionais Associados:** RF18.
 - **Resumo:** Registra a instalação física de uma estação em campo vinculando um Patrimônio ou MAC Address, validando a precedência hierárquica da malha e atualizando o status operacional.
 - **Pré-condições:** O usuário deve estar autenticado estritamente com perfil `instalador` ([`User::isInstalador`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L90-L93)).
 - **Fluxo Principal (Caminho Feliz):**
@@ -261,6 +278,7 @@
 ### UC13 — Solicitar Substituição de Sensores de Estação
 
 - **Atores:** Administrador Municipal, Planejador Técnico.
+- **Requisitos Funcionais Associados:** RF11.
 - **Resumo:** Registra uma ordem de manutenção/substituição preventiva ou corretiva para os sensores de uma estação instalada em campo.
 - **Pré-condições:** O usuário deve estar autenticado com perfil `administrador` ou `cadastrador`/`planejador`, e a estação deve estar instalada (`data_instalacao != null`).
 - **Fluxo Principal (Caminho Feliz):**
@@ -280,6 +298,7 @@
 ### UC14 — Efetivar Substituição de Sensor de Estação
 
 - **Atores:** Instalador, Planejador Técnico, Administrador Municipal.
+- **Requisitos Funcionais Associados:** RF12.
 - **Resumo:** Conclui a substituição do hardware de uma estação, alocando um novo equipamento disponível do patrimônio e descartando o equipamento anterior.
 - **Pré-condições:** O usuário deve estar autenticado com perfil `instalador`, `cadastrador`/`planejador` ou `administrador`, e deve existir um item de [`Patrimonio`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Patrimonio.php#L12-L128) com status `'Disponível'`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -299,6 +318,7 @@
 ### UC15 — Enviar e Processar Telemetria Ambiental (Sensor IoT)
 
 - **Atores:** Sensor IoT (Estação em Campo), Sistema (Broadcasting Reverb).
+- **Requisitos Funcionais Associados:** RF08.
 - **Resumo:** Recebe os pacotes de telemetria enviados pelas estações em campo, valida a autenticidade e os limites físicos dos sensores, calcula o IQA, persiste a leitura e transmite o evento em tempo real.
 - **Pré-condições:** A estação correspondente ao MAC Address deve estar cadastrada e com `status_instalacao === 'Instalada'`.
 - **Fluxo Principal (Caminho Feliz):**
@@ -321,6 +341,7 @@
 ### UC16 — Consultar Localidades e Resolver Geocodificação Reversa
 
 - **Atores:** Usuário Autenticado, Sistema (Worker de Fila), APIs OpenStreetMap (Overpass / Nominatim).
+- **Requisitos Funcionais Associados:** RF19, RF20.
 - **Resumo:** Fornece listas hierárquicas de estados, cidades e bairros (com importação automática via Overpass) e resolve endereços a partir de coordenadas geográficas de forma síncrona ou assíncrona.
 - **Pré-condições:** O usuário deve estar autenticado para chamadas HTTP às rotas de [`LocalidadeController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/LocalidadeController.php#L17-L295).
 - **Fluxo Principal (Caminho Feliz):**
@@ -343,6 +364,7 @@
 ### UC17 — Recuperar Senha de Acesso (Self-Service)
 
 - **Atores:** Visitante / Usuário Cadastrado, Sistema (Fila de Notificações).
+- **Requisitos Funcionais Associados:** RF21.
 - **Resumo:** Permite que qualquer usuário com conta ativa solicite a redefinição de sua senha a partir da tela de login, recebendo um link temporário com validade estrita de 30 minutos e definindo uma nova senha conforme as diretrizes da NIST SP 800-63B Rev. 4.
 - **Pré-condições:** O ator deve ser um visitante não autenticado (`guest`).
 - **Fluxo Principal (Caminho Feliz):**
@@ -369,6 +391,7 @@
 ### UC18 — Ativar Conta e Concluir Cadastro de Novo Usuário
 
 - **Atores:** Novo Usuário (Convidado), Sistema (Broker de Tokens).
+- **Requisitos Funcionais Associados:** RF22.
 - **Resumo:** Permite que um novo colaborador cadastrado por um administrador ative seu acesso, defina sua própria senha (sob as diretrizes da NIST SP 800-63B Rev. 4) e informe opcionalmente seus dados residenciais.
 - **Pré-condições:** O usuário deve ter sido previamente cadastrado por um gestor municipal ou super-administrador, possuindo um token de ativação válido.
 - **Fluxo Principal (Caminho Feliz):**
@@ -389,6 +412,7 @@
 ### UC19 — Configurar e Autenticar com 2FA TOTP (Google Authenticator / Authy)
 
 - **Atores:** Usuário Autenticado (Ativação e Gestão), Visitante com 2FA Ativo (Desafio no Login).
+- **Requisitos Funcionais Associados:** RF23.
 - **Resumo:** Permite que qualquer usuário autenticado ative ou desative o segundo fator de autenticação baseado em tempo (TOTP) no perfil, escaneie o QR Code em seu aplicativo autenticador (Google Authenticator, Authy), confirme com o código de 6 dígitos e utilize códigos de recuperação de backup. Durante o login tradicional por e-mail e senha, intercepta a autenticação para exigir o código de 6 dígitos antes de liberar o acesso.
 - **Pré-condições:** Para ativar/gerenciar, o usuário deve estar autenticado (`/perfil`). Para o desafio no login, o usuário deve ter informado credenciais válidas e possuir 2FA ativo e confirmado (`two_factor_confirmed_at != null`).
 - **Fluxo Principal 1 — Ativação e Confirmação no Perfil (`/perfil`):**
@@ -416,6 +440,7 @@
 ### UC20 — Gerenciar e Autenticar com Passkeys / Biometria FIDO2 (NIST AAL3 - Spatie)
 
 - **Atores:** Administrador Municipal (`administrador`), Instalador (`instalador`), Visitante com Passkey registrada.
+- **Requisitos Funcionais Associados:** RF24.
 - **Resumo:** Disponibiliza registro, listagem, exclusão e login sem senha utilizando Passkeys (Touch ID, Face ID, Windows Hello, chaves de hardware FIDO2 / YubiKey) através do `spatie/laravel-passkeys`, exclusivo para os papéis de Administrador Municipal e Instalador.
 - **Pré-condições:** O ator deve ser um usuário ativo com papel `administrador` ou `instalador` (`User::podeUsarPasskey() === true`). Usuários `cadastrador` e `superadmin` têm a funcionalidade ocultada e bloqueada (`HTTP 403 Forbidden`).
 - **Fluxo Principal 1 — Registro de Passkey no Perfil (`/perfil`):**
@@ -440,3 +465,34 @@
   - **A3 - Remoção de Passkey (`DELETE /user/passkeys/{passkey}`):** O usuário pode remover uma chave cadastrada no perfil; o Sistema verifica a autoria (`$passkey->authenticatable_id === $user->id`) e remove o registro do banco de dados. Tentativas de excluir a chave de outro usuário retornam `HTTP 403`.
   - **A4 - Navegador sem suporte a WebAuthn:** O cliente detecta a ausência de `window.PublicKeyCredential` e exibe aviso informando a incompatibilidade do navegador.
 - **Pós-condições:** Credencial criptográfica pública registrada de forma segura no dispositivo do usuário; login biométrico ágil e imune a phishing operacional.
+
+---
+
+## Matriz de Rastreabilidade (Requisitos Funcionais $\leftrightarrow$ Casos de Uso)
+
+| Requisito Funcional (RF) | Título do Requisito no Módulo | Caso de Uso (UC) | Título do Caso de Uso Especificado | Atores Primários |
+| :---: | :--- | :---: | :--- | :--- |
+| **RF01** | Autenticação de Usuários | **UC02** | Autenticar no Sistema (Login e Logout) | Visitante |
+| **RF02** | Encerramento de Sessão | **UC02** | Autenticar no Sistema (Login e Logout) | Usuário Autenticado |
+| **RF03** | Gestão de Perfil Próprio | **UC03** | Gerenciar Perfil Próprio | Usuário Autenticado |
+| **RF04** | Administração de Usuários e Administradores Municipais | **UC04** | Gerenciar Usuários e Administradores Municipais | Super-Usuário, Administrador Municipal |
+| **RF05** | Mapa Público em Tempo Real | **UC01** | Visualizar Mapa Público de Monitoramento em Tempo Real | Visitante, Sistema |
+| **RF06** | Painel Analítico e Contadores de Alertas | **UC05** | Consultar Dashboard Analítico e Gráficos de Séries Temporais | Administrador, Planejador, Instalador |
+| **RF07** | Séries Temporais com Granularidade Adaptativa | **UC05** | Consultar Dashboard Analítico e Gráficos de Séries Temporais | Administrador, Planejador, Instalador |
+| **RF08** | Recepção de Telemetria IoT | **UC15** | Enviar e Processar Telemetria Ambiental (Sensor IoT) | Sensor IoT, Sistema |
+| **RF09** | Listagem e Filtragem de Estações | **UC06** | Consultar e Filtrar Estações de Monitoramento | Administrador, Planejador, Instalador |
+| **RF10** | Cadastro Individual de Estação | **UC07** | Cadastrar Estação Individualmente | Planejador Técnico, Administrador |
+| **RF11** | Solicitação de Substituição de Sensores | **UC13** | Solicitar Substituição de Sensores de Estação | Administrador Municipal, Planejador Técnico |
+| **RF12** | Efetivação de Substituição de Sensor | **UC14** | Efetivar Substituição de Sensor de Estação | Instalador, Planejador Técnico, Administrador |
+| **RF13** | Simulação e Cálculo de Malha em Cascata | **UC08** | Simular e Planejar Malha de Estações em Cascata Viária | Planejador Técnico, Administrador |
+| **RF14** | Ajuste Fino sobre Vias Públicas (*Snap to Road*) | **UC08** | Simular e Planejar Malha de Estações em Cascata Viária | Planejador Técnico, Administrador |
+| **RF15** | Persistência de Malha Planejada | **UC09** | Salvar Malha Planejada e Gerar Ordem de Instalação | Planejador Técnico, Administrador |
+| **RF16** | Gestão de Inventário de Patrimônio (Individual e em Lote) | **UC10** | Gerenciar Inventário de Patrimônio (Individual, Lote e Descarte) | Planejador Técnico, Administrador |
+| **RF17** | Acompanhamento de Ordens de Instalação | **UC11** | Consultar Ordens de Instalação e Roteiro em Cascata | Instalador, Planejador, Administrador |
+| **RF18** | Ativação e Vinculação de Hardware em Campo | **UC12** | Ativar Estação e Vincular Equipamento em Campo | Instalador |
+| **RF19** | Consulta de Localidades e Importação Sob Demanda de Bairros | **UC16** | Consultar Localidades e Resolver Geocodificação Reversa | Usuário Autenticado, APIs OSM |
+| **RF20** | Geocodificação Reversa Síncrona e Assíncrona | **UC16** | Consultar Localidades e Resolver Geocodificação Reversa | Usuário Autenticado, Sistema (Worker) |
+| **RF21** | Recuperação Autônoma de Senha (Self-Service) | **UC17** | Recuperar Senha de Acesso (Self-Service) | Visitante / Usuário Cadastrado |
+| **RF22** | Ativação de Conta e Conclusão de Cadastro | **UC18** | Ativar Conta e Concluir Cadastro de Novo Usuário | Novo Usuário (Convidado) |
+| **RF23** | Autenticação Multifator Baseada em Tempo (TOTP) | **UC19** | Configurar e Autenticar com 2FA TOTP | Usuário Autenticado, Visitante com 2FA |
+| **RF24** | Autenticação Biométrica e Sem Senha via Passkeys (WebAuthn / FIDO2) | **UC20** | Gerenciar e Autenticar com Passkeys / Biometria FIDO2 | Administrador Municipal, Instalador |

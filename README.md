@@ -30,17 +30,25 @@
   - [2.3 Motor Geoespacial e Algoritmo de Planejamento Viário (*Snap to Road*)](#23-motor-geoespacial-e-algoritmo-de-planejamento-viário-snap-to-road)
   - [2.4 Modelagem de Dados e Domínio Espacial](#24-modelagem-de-dados-e-domínio-espacial)
 - [3. Requisitos do Sistema](#3-requisitos-do-sistema)
-  - [3.1 Requisitos Funcionais (RF01 a RF20)](#31-requisitos-funcionais-rf01-a-rf20)
-  - [3.2 Requisitos Não Funcionais (RNF01 a RNF10)](#32-requisitos-não-funcionais-rnf01-a-rnf10)
+  - [3.1 Requisitos Funcionais (RF01 a RF24)](#31-requisitos-funcionais-rf01-a-rf24)
+  - [3.2 Requisitos Não Funcionais (RNF01 a RNF12)](#32-requisitos-não-funcionais-rnf01-a-rnf12)
   - [3.3 Regras de Negócio Fundamentais (RN01 a RN16)](#33-regras-de-negócio-fundamentais-rn01-a-rn16)
 - [4. Especificação de Casos de Uso](#4-especificação-de-casos-de-uso)
   - [4.1 Catálogo de Atores do Sistema](#41-catálogo-de-atores-do-sistema)
-  - [4.2 Matriz Sintética de Casos de Uso (UC01 a UC16)](#42-matriz-sintética-de-casos-de-uso-uc01-a-uc16)
+  - [4.2 Matriz Sintética de Casos de Uso (UC01 a UC20)](#42-matriz-sintética-de-casos-de-uso-uc01-a-uc20)
 - [5. Inteligência Ambiental e Cálculo do IQA](#5-inteligência-ambiental-e-cálculo-do-iqa)
   - [5.1 Formulação Matemática do IQA](#51-formulação-matemática-do-iqa)
   - [5.2 Faixas de Qualidade segundo CONAMA e ANVISA](#52-faixas-de-qualidade-segundo-conama-e-anvisa)
 - [6. Stack Tecnológica](#6-stack-tecnológica)
 - [7. Estrutura do Repositório e Documentação Técnica](#7-estrutura-do-repositório-e-documentação-técnica)
+- [8. Guia de Instalação e Execução Local](#8-guia-de-instalação-e-execução-local)
+  - [8.1 Pré-requisitos](#81-pré-requisitos)
+  - [8.2 Configuração do Ambiente (.env)](#82-configuração-do-ambiente-env)
+  - [8.3 Instalação das Dependências](#83-instalação-das-dependências)
+  - [8.4 Configuração do Banco de Dados e Importação Completa](#84-configuração-do-banco-de-dados-e-importação-completa)
+  - [8.5 Inicialização dos Serviços](#85-inicialização-dos-serviços)
+  - [8.6 Acesso e Credenciais de Desenvolvimento](#86-acesso-e-credenciais-de-desenvolvimento)
+- [9. Testes Automatizados e Qualidade de Código](#9-testes-automatizados-e-qualidade-de-código)
 
 ---
 
@@ -236,7 +244,7 @@ erDiagram
 
 > 📖 **Documentação Completa de Requisitos:** Consulte os detalhes exaustivos, assinaturas de métodos e regras em [`docs/ANALISE_DE_REQUISITOS.md`](file:///home/henrique_1/Documents/OpenAir-Metrics/docs/ANALISE_DE_REQUISITOS.md).
 
-### 3.1 Requisitos Funcionais (RF01 a RF20)
+### 3.1 Requisitos Funcionais (RF01 a RF24)
 
 | Código | Módulo | Descrição Resumida |
 | :--- | :--- | :--- |
@@ -260,21 +268,27 @@ erDiagram
 | **RF18** | Instalações | Ativação física de nós em campo por técnicos instaladores via MAC Address ou código de patrimônio. |
 | **RF19** | Localidades | Consulta de estados/cidades/bairros e importação sob demanda de bairros via OpenStreetMap Overpass. |
 | **RF20** | Geocodificação | Resolução de endereços geográficos reversos com estratégia de cache e filas assíncronas no Nominatim. |
+| **RF21** | Segurança | Redefinição de senha por autoatendimento (*Forgot Password*) com token assinado e expiração de 60 minutos. |
+| **RF22** | Segurança | Conclusão de primeiro acesso / convite de operadores com definição de senha forte e verificação de e-mail. |
+| **RF23** | Segurança | Autenticação Multifator via TOTP (RFC 6238) com QR Code, segredo Base32 e 8 códigos de recuperação. |
+| **RF24** | Segurança | Autenticação sem senha (*Passwordless*) via Passkeys / WebAuthn (FIDO2) com criptografia assimétrica de chave pública. |
 
 ---
 
-### 3.2 Requisitos Não Funcionais (RNF01 a RNF10)
+### 3.2 Requisitos Não Funcionais (RNF01 a RNF12)
 
 - **RNF01 — Stack Tecnológica:** PHP 8.5, Laravel 13, Sanctum v4, Reverb v1, Tailwind CSS v4, Leaflet 1.9 e Laravel MCP.
 - **RNF02 — Persistência Geoespacial:** Armazenamento em geometrias nativas `POINT` e `LINESTRING` com SRID 4326 e `SPATIAL INDEX` no MariaDB.
 - **RNF03 — Compatibilidade Híbrida de Driver:** Mecanismo de contingência automática em PHP (cálculo de Haversine e decodificação WKT/WKB) para testes automatizados em SQLite.
 - **RNF04 — Ingestão Massiva de Malha Viária:** Seeder automatizado via `ogr2ogr`/GDAL para importação em lote de bases PBF do OpenStreetMap (`brazil-latest.osm.pbf`).
 - **RNF05 — Segregação de Chaves Primárias:** Proteção de chaves internas autoincrementais (`private_id`), expondo unicamente UUIDv4 (`public_id`) em rotas, payloads e links.
-- **RNF06 — Limitação de Taxa (*Rate Limiting*):** Proteção multinível contra abusos: `throttle:5,1` no Login; `throttle:60,1` na Telemetria; limite de 1 req/s na geocodificação externa.
+- **RNF06 — Limitação de Taxa (*Rate Limiting*):** Proteção multinível contra abusos: `throttle:5,1` no Login; `throttle:3,1` na Recuperação de Senha; `throttle:60,1` na Telemetria; limite de 1 req/s na geocodificação externa.
 - **RNF07 — Autenticação de Dispositivos IoT em Tempo Constante:** Validação do header `X-Sensor-Key` via `hash_equals()` contra ataques de temporização (*timing attacks*).
 - **RNF08 — Cache em Múltiplas Camadas:** Cache de 30 dias para geocodificação reversa e cache de 24 horas para geometrias de vias do Overpass.
 - **RNF09 — Alta Disponibilidade e Failover:** Rotação de 4 servidores espelho Overpass com timeouts curtos (6 a 8s) para resiliência de rede.
 - **RNF10 — Transacionalidade e Preservação de Histórico:** Atomicidade estrita em transações compostas (`DB::beginTransaction`) e descarte lógico de patrimônios (preservação de histórico).
+- **RNF11 — Padronização Visual e Internacionalização de Notificações Transacionais:** Templates de e-mail responsivos, compatíveis com modo claro/escuro e tradução integral para Português do Brasil (`lang/pt_BR/`) e Inglês (`lang/en/`).
+- **RNF12 — Isolamento de Ferramentas e Rotas de Diagnóstico:** Rotas de pré-visualização de e-mails (`/preview-email/*`) bloqueadas em ambiente de produção (`app.env === 'production'`) via comando `php artisan env:prod`.
 
 ---
 
@@ -306,13 +320,17 @@ erDiagram
 
 ---
 
-### 4.2 Matriz Sintética de Casos de Uso (UC01 a UC16)
+### 4.2 Matriz Sintética de Casos de Uso (UC01 a UC20)
 
 ```mermaid
 flowchart TD
-    subgraph PUBLICO["Acesso Público"]
+    subgraph PUBLICO_SEGURANCA["Acesso Público & Segurança Avançada"]
         UC01["UC01: Visualizar Mapa Público em Tempo Real"]
         UC02["UC02: Autenticar no Sistema (Login / Logout)"]
+        UC17["UC17: Redefinir Senha por Autoatendimento"]
+        UC18["UC18: Concluir Cadastro de Primeiro Acesso"]
+        UC19["UC19: Gerenciar e Autenticar com 2FA TOTP"]
+        UC20["UC20: Gerenciar e Autenticar com Passkeys"]
     end
 
     subgraph GESTAO["Gestão de Acessos & Painéis"]
@@ -360,6 +378,10 @@ flowchart TD
 | **UC14** | Efetivar Substituição | Instalador, Planejador | Troca física da placa, descarte do hardware antigo e renovação da vida útil. |
 | **UC15** | Enviar Telemetria IoT | Sensor IoT (ESP32), Reverb | Ingestão REST com chave `X-Sensor-Key`, cálculo de IQA e difusão em tempo real. |
 | **UC16** | Resolver Geocodificação | Usuário, Fila, APIs OSM | Resolução síncrona/assíncrona de endereços e importação sob demanda de bairros. |
+| **UC17** | Redefinir Senha por Autoatendimento | Usuário Visitante | Solicitação de link temporário assinado via e-mail e redefinição segura segundo NIST SP 800-63B. |
+| **UC18** | Concluir Cadastro de Primeiro Acesso | Novo Operador | Conclusão do convite enviado por e-mail com definição da primeira senha e verificação instantânea. |
+| **UC19** | Gerenciar e Autenticar com 2FA TOTP | Usuário Autenticado | Configuração de segredo RFC 6238 via QR Code, códigos de recuperação e desafio no login. |
+| **UC20** | Gerenciar e Autenticar com Passkeys | Usuário Autenticado | Registro de credencial biométrica/FIDO2 via WebAuthn e login moderno sem senha (*Passwordless*). |
 
 ---
 
@@ -371,7 +393,7 @@ O Índice de Qualidade do Ar (IQA) sintetiza múltiplas variáveis físico-quím
 
 $$\text{IQA}_p = I_{\text{inf}} + \frac{I_{\text{sup}} - I_{\text{inf}}}{C_{\text{sup}} - C_{\text{inf}}} \times (C - C_{\text{inf}})$$
 
-$$\text{IQA} = \min\left(500, \;\operatorname{round}\left(\max\left(\text{IQA}_{\text{PM}_{2.5}}, \;\text{IQA}_{\text{CO}_2}\right)\right)\right)$$
+$$\text{IQA} = \min\left(500, \;\text{round}\left(\max\left(\text{IQA}_{\text{PM}_{2.5}}, \;\text{IQA}_{\text{CO}_2}\right)\right)\right)$$
 
 Onde:
 - $C$: Concentração observada do poluente na medição;
@@ -416,27 +438,254 @@ Onde:
 ```text
 OpenAir-Metrics/
 ├── app/
-│   ├── Events/                     # Eventos de difusão (ex: NovaMedicaoRecebida)
+│   ├── Events/                     # Eventos de difusão em tempo real (ex: NovaMedicaoRecebida)
 │   ├── Http/
 │   │   ├── Controllers/            # Controladores MVC e API de Ingestão de Sensores
 │   │   ├── Middleware/             # Controle de autenticação e proteção de rotas
 │   │   └── Requests/               # Validações espaciais e regras de negócio (Form Requests)
 │   ├── Jobs/                       # Processamento assíncrono (ResolveReverseGeocodingJob)
+│   ├── Mcp/                        # Servidores, ferramentas e recursos do Model Context Protocol (Laravel MCP)
 │   ├── Models/                     # Modelos Eloquent com lógica de domínio e IQA
 │   └── Services/                   # Serviços de Geocodificação e Planejamento de Malha
 ├── config/                         # Configurações de telemetria, reverb, cache e banco
 ├── database/
+│   ├── dumps/                      # 💾 Repositório local para backups e dumps SQL (openair_backup.sql)
 │   ├── migrations/                 # Esquemas relacionais e tabelas espaciais (SRID 4326)
 │   └── seeders/                    # Carga de dados, malha viária OSM e usuários de teste
 ├── docs/                           # 📚 Documentação Técnica Exaustiva do Projeto
-│   ├── ANALISE_DE_REQUISITOS.md    # Requisitos Funcionais, Não Funcionais e Regras de Negócio
-│   └── ESPECIFICACAO_CASOS_DE_USO.md # Especificação Completa dos Casos de Uso (UC01 a UC16)
+│   ├── ANALISE_DE_REQUISITOS.md    # Requisitos Funcionais (RF01–RF24), Não Funcionais (RNF01–RNF12) e Regras
+│   └── ESPECIFICACAO_CASOS_DE_USO.md # Especificação Completa dos Casos de Uso (UC01 a UC20) e Matriz de Rastreabilidade
+├── lang/                           # 🌐 Internacionalização (pt_BR e en) para templates e validações
 ├── resources/
 │   ├── css/                        # Estilos Tailwind CSS v4
 │   ├── js/                         # Inicialização do Echo, Reverb e Leaflet
-│   └── views/                      # Templates Blade (Home, Dashboard, Estações, etc.)
+│   └── views/                      # Templates Blade (Home, Dashboard, Estações, Auth e vendor/mail)
 ├── routes/
 │   ├── api.php                     # Endpoint seguro de telemetria IoT (/api/medicoes)
 │   └── web.php                     # Rotas administrativas, autenticação e mapa público
 └── tests/                          # Suíte de testes automatizados com Pest PHP
+```
+
+---
+
+## 8. Guia de Instalação e Execução Local
+
+Este guia detalha o passo a passo completo para configurar, importar o banco de dados e executar o **OpenAir-Metrics** em ambiente de desenvolvimento local, utilizando as credenciais e configurações mapeadas no arquivo `.env`.
+
+### 8.1 Pré-requisitos
+
+Certifique-se de possuir instalado em sua estação de trabalho:
+- **PHP 8.3 ou 8.5** com extensões: `pdo_mysql`, `mbstring`, `openssl`, `bcmath`, `curl`, `xml`, `gd`, `sqlite3`
+- **Composer 2.x** (gerenciador de dependências PHP)
+- **Node.js 20+** e **NPM** (compilação de assets front-end e Tailwind CSS v4)
+- **Podman** (ou Docker) com container do **MariaDB** (versão 11.4+ recomendada) e ferramenta gráfica opcional (**PHPMyAdmin**)
+
+---
+
+### 8.2 Configuração do Ambiente (.env)
+
+Clone o repositório e crie o arquivo de configuração `.env` a partir do modelo de exemplo:
+
+```bash
+cp .env.example .env
+```
+
+Abra o arquivo `.env` e confirme os parâmetros essenciais para o funcionamento local integrado:
+
+```env
+APP_NAME=OpenAir-Metrics
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_TIMEZONE=America/Sao_Paulo
+APP_URL=http://localhost:8000
+APP_LOCALE=pt_BR
+APP_FALLBACK_LOCALE=en
+
+# Conexão com MariaDB Local (Container Podman)
+DB_CONNECTION=mariadb
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=OpenAir
+DB_USERNAME=tcc
+DB_PASSWORD="&1+=p5:y06ERFZm9^<DS7o"
+
+# Servidor WebSocket Nativo (Laravel Reverb)
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=openair-metrics-local
+REVERB_APP_KEY=openairlocalkey
+REVERB_APP_SECRET=openairlocalsecret
+REVERB_HOST="localhost"
+REVERB_PORT=8080
+REVERB_SCHEME=http
+
+# Sensores e Segurança de Telemetria
+TELEMETRY_API_KEY=b864f6bbe1b2ac271c1d73beeec86372515e2d6451b08e0a6e86c646a7cdcd7a
+INITIAL_SUPERADMIN_PASSWORD="OpenAir@NarigudoGamer#ro0t"
+
+# Filas e Sessões
+QUEUE_CONNECTION=sync
+SESSION_DRIVER=database
+
+# E-mail em Desenvolvimento (Driver log ou Mailpit local)
+MAIL_MAILER=log
+MAIL_FROM_ADDRESS="no-reply@openairmetrics.com.br"
+MAIL_FROM_NAME="OpenAir Metrics"
+```
+
+---
+
+### 8.3 Instalação das Dependências
+
+Execute os comandos abaixo na raiz do projeto para baixar os pacotes PHP e Node.js e gerar a chave criptográfica da aplicação:
+
+```bash
+# Instalação das dependências do backend Laravel
+composer install
+
+# Instalação das dependências do frontend (Tailwind v4, Leaflet, Laravel Echo)
+npm install
+
+# Geração da chave mestra do Laravel
+php artisan key:generate
+```
+
+---
+
+### 8.4 Configuração do Banco de Dados e Importação Completa
+
+O banco de dados relacional e geoespacial do OpenAir-Metrics pode ser provisionado de três formas, conforme sua preferência de fluxo:
+
+> 📁 **Armazenamento do Dump:** Caso realize a exportação manual via PHPMyAdmin, salve o arquivo `.sql` no diretório padronizado:  
+> [`database/dumps/openair_backup.sql`](file:///home/henrique_1/Documents/OpenAir-Metrics/database/dumps/README.md).
+
+#### Opção A — Importação Gráfica via PHPMyAdmin (Recomendada)
+1. Acesse a interface do seu **PHPMyAdmin** local no navegador (ex: `http://localhost:8080` ou porta mapeada do container).
+2. Efetue login com o usuário `tcc` e senha `&1+=p5:y06ERFZm9^<DS7o`.
+3. No menu lateral esquerdo, verifique se o banco de dados `OpenAir` já existe. Caso não exista, clique em **Novo (New)**, insira o nome `OpenAir`, selecione o agrupamento (collation) `utf8mb4_unicode_ci` e confirme a criação.
+4. Clique no banco de dados `OpenAir` para selecioná-lo.
+5. Acesse a aba superior **Importar (Import)**.
+6. No campo *Escolher arquivo*, selecione o arquivo do seu dump: `database/dumps/openair_backup.sql`.
+7. Role até o final da página e clique no botão **Executar (Import)**.
+8. Aguarde a mensagem de confirmação de sucesso com todas as tabelas e dados espaciais importados.
+
+#### Opção B — Importação via Linha de Comando (Container Podman / Host)
+Se preferir importar via terminal diretamente para o container Podman onde o MariaDB está em execução:
+
+```bash
+# 1. Localize o nome ou ID do container MariaDB em execução
+podman ps
+
+# 2. Execute a importação via stream diretamente para o container
+podman exec -i <NOME_OU_ID_DO_CONTAINER> mariadb -u tcc -p"&1+=p5:y06ERFZm9^<DS7o" OpenAir < database/dumps/openair_backup.sql
+```
+
+Caso o cliente `mariadb` ou `mysql` esteja instalado no host Linux:
+```bash
+mariadb -h 127.0.0.1 -P 3306 -u tcc -p"&1+=p5:y06ERFZm9^<DS7o" OpenAir < database/dumps/openair_backup.sql
+```
+
+#### Opção C — Instalação Limpa via Migrations e Seeders do Laravel
+Caso deseje provisionar a estrutura do banco do zero a partir do código-fonte, aplicando as migrações e a carga de testes padrão:
+
+```bash
+# Executa todas as migrações estruturais e de segurança (TOTP, Passkeys, Espaciais)
+php artisan migrate
+
+# Opcional: Carrega a base inicial com usuários e malha viária de exemplo
+php artisan db:seed
+```
+
+---
+
+### 8.5 Inicialização dos Serviços
+
+Para a operação completa com recepção de telemetria em tempo real, mapas interativos e atualização ao vivo, inicie os seguintes serviços (em abas ou terminais separados):
+
+#### 1. Servidor Web da Aplicação (HTTP)
+```bash
+php artisan serve
+```
+> Disponível em: [http://localhost:8000](http://localhost:8000)
+
+#### 2. Servidor de WebSockets (Laravel Reverb)
+```bash
+php artisan reverb:start
+```
+> Escutando em: `ws://localhost:8080`
+
+#### 3. Bundler de Assets Front-end (Vite)
+```bash
+# Para desenvolvimento ativo com Hot Module Replacement (HMR)
+npm run dev
+
+# Ou para gerar os assets estáticos compilados para produção
+npm run build
+```
+
+#### 4. Processador de Filas Assíncronas (Opcional se `QUEUE_CONNECTION=database`)
+```bash
+php artisan queue:listen
+```
+
+---
+
+### 8.6 Acesso e Credenciais de Desenvolvimento
+
+Após iniciar os serviços, você pode testar todas as funcionalidades do sistema:
+
+- **Mapa Público Interativo:**  
+  Acesse [http://localhost:8000/](http://localhost:8000/) no navegador para visualizar as estações e a telemetria em tempo real.
+- **Painel Administrativo:**  
+  Acesse [http://localhost:8000/login](http://localhost:8000/login) e utilize as credenciais padrão:
+  - **E-mail:** `superadmin@openair.local`
+  - **Senha:** `OpenAir@NarigudoGamer#ro0t` (ou a senha configurada em `INITIAL_SUPERADMIN_PASSWORD`)
+- **Pré-visualização dos Templates de E-mail (Somente em Ambiente Local):**
+  - Recuperação de Senha: [http://localhost:8000/preview-email/reset-password](http://localhost:8000/preview-email/reset-password)
+  - Conclusão de Cadastro: [http://localhost:8000/preview-email/complete-registration](http://localhost:8000/preview-email/complete-registration)
+- **Simulação de Telemetria IoT via `curl`:**
+  Envie um pacote de medição simulando um sensor ESP32 para verificar a ingestão e atualização instantânea no mapa:
+  ```bash
+  curl -X POST http://localhost:8000/api/medicoes \
+    -H "Content-Type: application/json" \
+    -H "X-Sensor-Key: b864f6bbe1b2ac271c1d73beeec86372515e2d6451b08e0a6e86c646a7cdcd7a" \
+    -d '{
+      "mac_address": "AA:BB:CC:DD:EE:01",
+      "temperatura": 23.8,
+      "umidade": 52.4,
+      "co2": 415.0,
+      "poeira": 11.2
+    }'
+  ```
+
+---
+
+## 9. Testes Automatizados e Qualidade de Código
+
+### 9.1 Execução da Suíte de Testes (Pest PHP)
+
+O projeto conta com testes unitários e de integração abrangendo algoritmos geoespaciais, cálculo do IQA, fluxos de autenticação (convite, redefinição de senha, TOTP, Passkeys) e ingestão de telemetria:
+
+```bash
+# Executa todos os testes automatizados
+php artisan test --compact
+
+# Executa apenas uma suíte ou teste específico
+php artisan test --compact --filter=Auth
+```
+
+### 9.2 Formatação e Padronização de Código (Laravel Pint)
+
+Para garantir a aderência aos padrões de código PSR-12 e convenções do ecossistema Laravel:
+
+```bash
+vendor/bin/pint --format agent
+```
+
+### 9.3 Segurança e Proteção em Produção (`php artisan env:prod`)
+
+O sistema conta com um comando customizado de prontidão operacional que valida se a chave `LARAVEL_ENV_ENCRYPTION_KEY` está configurada, trava as rotas de diagnóstico e debug (`RNF12`) e valida as variáveis sensíveis:
+
+```bash
+php artisan env:prod
 ```

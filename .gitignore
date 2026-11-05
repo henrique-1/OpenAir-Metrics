@@ -30,9 +30,12 @@ Thumbs.db
 boost.json
 AGENTS.md
 
-# Arquivos de banco de dados SQLite locais
+# Arquivos de banco de dados SQLite locais e Dumps SQL pesados
 /database/*.sqlite
 /database/*.sqlite-*
+/database/dumps/*.sql
+/database/dumps/*.sql.gz
+/database/dumps/*.zip
 
 # Arquivos brutos do OpenStreetMap
 /storage/app/osm/*.osm.pbf
