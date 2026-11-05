@@ -38,7 +38,7 @@
                                 class="w-full pl-4 pr-11 py-2 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 outline-none transition-all text-athens-gray-900 dark:text-athens-gray-100 bg-white dark:bg-athens-gray-800 placeholder-athens-gray-400 dark:placeholder-athens-gray-500"
                                 placeholder="Mínimo 15 caracteres">
                             <button type="button" data-alternar-senha="password" aria-label="Mostrar senha" aria-pressed="false"
-                                class="absolute inset-y-0 right-0 px-3 flex items-center text-athens-gray-500 hover:text-athens-gray-800 dark:hover:text-athens-gray-200 transition">
+                                class="absolute inset-y-0 right-0 px-3 flex items-center text-athens-gray-500 hover:text-athens-gray-800 dark:hover:text-athens-gray-200 transition cursor-pointer z-10">
                                 <x-heroicon-o-eye class="w-5 h-5" data-icone="mostrar" />
                                 <x-heroicon-o-eye-slash class="w-5 h-5 hidden" data-icone="ocultar" />
                             </button>
@@ -60,7 +60,7 @@
                                 class="w-full pl-4 pr-11 py-2 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 outline-none transition-all text-athens-gray-900 dark:text-athens-gray-100 bg-white dark:bg-athens-gray-800 placeholder-athens-gray-400 dark:placeholder-athens-gray-500"
                                 placeholder="Repita a nova senha">
                             <button type="button" data-alternar-senha="password_confirmation" aria-label="Mostrar senha" aria-pressed="false"
-                                class="absolute inset-y-0 right-0 px-3 flex items-center text-athens-gray-500 hover:text-athens-gray-800 dark:hover:text-athens-gray-200 transition">
+                                class="absolute inset-y-0 right-0 px-3 flex items-center text-athens-gray-500 hover:text-athens-gray-800 dark:hover:text-athens-gray-200 transition cursor-pointer z-10">
                                 <x-heroicon-o-eye class="w-5 h-5" data-icone="mostrar" />
                                 <x-heroicon-o-eye-slash class="w-5 h-5 hidden" data-icone="ocultar" />
                             </button>
@@ -92,13 +92,15 @@
             document.querySelectorAll('[data-alternar-senha]').forEach((botao) => {
                 botao.addEventListener('click', () => {
                     const campo = document.getElementById(botao.dataset.alternarSenha);
-                    const exibir = campo.type === 'password';
+                    if (! campo) return;
 
+                    const exibir = campo.type === 'password';
                     campo.type = exibir ? 'text' : 'password';
+
                     botao.setAttribute('aria-pressed', String(exibir));
                     botao.setAttribute('aria-label', exibir ? 'Ocultar senha' : 'Mostrar senha');
-                    botao.querySelector('[data-icone="mostrar"]').classList.toggle('hidden', exibir);
-                    botao.querySelector('[data-icone="ocultar"]').classList.toggle('hidden', ! exibir);
+                    botao.querySelector('[data-icone="mostrar"]')?.classList.toggle('hidden', exibir);
+                    botao.querySelector('[data-icone="ocultar"]')?.classList.toggle('hidden', ! exibir);
                 });
             });
 
