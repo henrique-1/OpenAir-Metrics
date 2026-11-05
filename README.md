@@ -45,7 +45,7 @@
   - [8.1 Pré-requisitos](#81-pré-requisitos)
   - [8.2 Configuração do Ambiente (.env)](#82-configuração-do-ambiente-env)
   - [8.3 Instalação das Dependências](#83-instalação-das-dependências)
-  - [8.4 Configuração do Banco de Dados e Importação Completa](#84-configuração-do-banco-de-dados-e-importação-completa)
+  - [8.4 Criação e População Automática do Banco de Dados (Migrate & Seed)](#84-criação-e-população-automática-do-banco-de-dados-migrate--seed)
   - [8.5 Inicialização dos Serviços](#85-inicialização-dos-serviços)
   - [8.6 Acesso e Credenciais de Desenvolvimento](#86-acesso-e-credenciais-de-desenvolvimento)
 - [9. Testes Automatizados e Qualidade de Código](#9-testes-automatizados-e-qualidade-de-código)
@@ -117,8 +117,8 @@ A seleção tecnológica do hardware priorizou componentes acessíveis no mercad
 | :--- | :--- | :--- | :--- | :--- |
 | **ESP32 DevKit** | *Controlador do Nó* | 2 núcleos Xtensa 32-bit (240 MHz) | 520 KB SRAM / Flash 4MB | Microcontrolador com Wi-Fi b/g/n e BLE nativos |
 | **DHT22 (AM2302)** | Temperatura e Umidade | -40 a +80 °C / 0 a 100% RH | ±0,5 °C / ±2% RH | Polímero capacitivo e termistor NTC calibrado |
-| **DSM501A (Samyoung)** | Material Particulado ($\text{PM}_{1.0}$ e $\text{PM}_{2.5}$) | Até 15.000 partículas / 283 ml | Partículas a partir de 1 µm | Dispersão óptica de luz (LED + heater térmico + PWM) |
-| **MH-Z19C (Winsen)** | Dióxido de Carbono ($\text{CO}_2$) | 400 a 5.000 ppm | ±(50 ppm + 5% leitura) | Infravermelho Não Dispersivo (NDIR) com compensação térmica |
+| **DSM501A (Samyoung)** | Material Particulado (PM<sub>1.0</sub> e PM<sub>2.5</sub>) | Até 15.000 partículas / 283 ml | Partículas a partir de 1 µm | Dispersão óptica de luz (LED + heater térmico + PWM) |
+| **MH-Z19C (Winsen)** | Dióxido de Carbono (CO<sub>2</sub>) | 400 a 5.000 ppm | ±(50 ppm + 5% leitura) | Infravermelho Não Dispersivo (NDIR) com compensação térmica |
 
 ---
 
@@ -252,7 +252,7 @@ erDiagram
 | **RF02** | Autenticação | Encerramento seguro da sessão (Logout) com renovação do token CSRF. |
 | **RF03** | Perfil | Visualização e atualização de dados cadastrais e endereço; bloqueio de alteração de cidade após fixada. |
 | **RF04** | Usuários | Gestão completa de usuários locais, hierarquia de permissões e regra de sucessão administrativa municipal. |
-| **RF05** | Monitoramento | Mapa público em tempo real na página inicial (`GET /`) com IQA, Temperatura, Umidade, $\text{PM}_{2.5}$ e $\text{CO}_2$. |
+| **RF05** | Monitoramento | Mapa público em tempo real na página inicial (`GET /`) com IQA, Temperatura, Umidade, PM<sub>2.5</sub> e CO<sub>2</sub>. |
 | **RF06** | Dashboard | Painel analítico municipal com contadores de estações ativas e alertas ambientais críticos. |
 | **RF07** | Dashboard | Séries temporais analíticas com agrupamento temporal adaptativo (5 segundos a 1 dia) por cidade/bairro. |
 | **RF08** | Telemetria IoT | Ingestão de dados via API REST (`POST /api/medicoes`), validação física de sensores e disparo em WebSocket. |
@@ -389,7 +389,7 @@ flowchart TD
 
 ### 5.1 Formulação Matemática do IQA
 
-O Índice de Qualidade do Ar (IQA) sintetiza múltiplas variáveis físico-químicas em uma escala adimensional compreensível. O cálculo é computado por interpolação linear multivariada implementada em [`Medicao::calcularIqa`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Medicao.php#L103-L149), baseada nas normativas da **Resolução CONAMA nº 506/2024** (para Material Particulado $\text{PM}_{2.5}$) e da **Resolução ANVISA RE nº 09/2003** (para Dióxido de Carbono $\text{CO}_2$):
+O Índice de Qualidade do Ar (IQA) sintetiza múltiplas variáveis físico-químicas em uma escala adimensional compreensível. O cálculo é computado por interpolação linear multivariada implementada em [`Medicao::calcularIqa`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Medicao.php#L103-L149), baseada nas normativas da **Resolução CONAMA nº 506/2024** (para Material Particulado PM<sub>2.5</sub>) e da **Resolução ANVISA RE nº 09/2003** (para Dióxido de Carbono CO<sub>2</sub>):
 
 $$\text{IQA}_p = I_{\text{inf}} + \frac{I_{\text{sup}} - I_{\text{inf}}}{C_{\text{sup}} - C_{\text{inf}}} \times (C - C_{\text{inf}})$$
 
@@ -404,7 +404,7 @@ Onde:
 
 ### 5.2 Faixas de Qualidade segundo CONAMA e ANVISA
 
-| Nível | Classificação | Faixa IQA | $\text{PM}_{2.5}$ ($\mu\text{g/m}^3$) | $\text{CO}_2$ (ppm) | Efeitos na Saúde e Recomendações |
+| Nível | Classificação | Faixa IQA | PM<sub>2.5</sub> (µg/m³) | CO<sub>2</sub> (ppm) | Efeitos na Saúde e Recomendações |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 | **N1** | 🟢 **Boa** | 0 – 40 | 0,0 a 15,0 | 0 a 700 | Qualidade ideal do ar; sem riscos à população. |
 | **N2** | 🟡 **Moderada** | 41 – 80 | 15,1 a 50,0 | 701 a 1000 | Pessoas de grupos sensíveis podem apresentar sintomas leves. |
@@ -420,7 +420,7 @@ Onde:
 | :--- | :--- | :--- |
 | **Firmware & Hardware** | **ESP32 (C/C++)** | Microcontrolador de borda com processamento dual-core e baixo consumo. |
 | **Rede de Sensores** | **ESP-NOW (2.4 GHz)** | Protocolo peer-to-peer em malha viária (alcance até 200m sem roteador Wi-Fi). |
-| **Sensores Físicos** | **DHT22, DSM501A, MH-Z19C** | Aferição de Temperatura, Umidade, Particulados finos ($\text{PM}$) e $\text{CO}_2$. |
+| **Sensores Físicos** | **DHT22, DSM501A, MH-Z19C** | Aferição de Temperatura, Umidade, Particulados finos (PM) e CO<sub>2</sub>. |
 | **Framework Backend** | **Laravel 13 (PHP 8.5)** | Núcleo MVC, injeção de dependências, filas assíncronas e API RESTful. |
 | **WebSockets & Real-Time** | **Laravel Reverb v1** | Servidor WebSocket nativo de alta performance para transmissão de telemetria. |
 | **Banco de Dados Relacional** | **MariaDB 11.4+ / MySQL** | Persistência transacional com suporte geoespacial (`SPATIAL INDEX`). |
@@ -449,7 +449,6 @@ OpenAir-Metrics/
 │   └── Services/                   # Serviços de Geocodificação e Planejamento de Malha
 ├── config/                         # Configurações de telemetria, reverb, cache e banco
 ├── database/
-│   ├── dumps/                      # 💾 Repositório local para backups e dumps SQL (openair_backup.sql)
 │   ├── migrations/                 # Esquemas relacionais e tabelas espaciais (SRID 4326)
 │   └── seeders/                    # Carga de dados, malha viária OSM e usuários de teste
 ├── docs/                           # 📚 Documentação Técnica Exaustiva do Projeto
@@ -490,7 +489,7 @@ Clone o repositório e crie o arquivo de configuração `.env` a partir do model
 cp .env.example .env
 ```
 
-Abra o arquivo `.env` e confirme os parâmetros essenciais para o funcionamento local integrado:
+Abra o arquivo `.env` e configure os parâmetros essenciais para o seu ambiente local:
 
 ```env
 APP_NAME=OpenAir-Metrics
@@ -502,13 +501,13 @@ APP_URL=http://localhost:8000
 APP_LOCALE=pt_BR
 APP_FALLBACK_LOCALE=en
 
-# Conexão com MariaDB Local (Container Podman)
+# Conexão com Banco de Dados MariaDB / MySQL (Preencha com seus dados locais)
 DB_CONNECTION=mariadb
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=OpenAir
-DB_USERNAME=tcc
-DB_PASSWORD="&1+=p5:y06ERFZm9^<DS7o"
+DB_DATABASE=seu_banco_aqui
+DB_USERNAME=seu_usuario_aqui
+DB_PASSWORD=sua_senha_aqui
 
 # Servidor WebSocket Nativo (Laravel Reverb)
 BROADCAST_CONNECTION=reverb
@@ -520,8 +519,8 @@ REVERB_PORT=8080
 REVERB_SCHEME=http
 
 # Sensores e Segurança de Telemetria
-TELEMETRY_API_KEY=b864f6bbe1b2ac271c1d73beeec86372515e2d6451b08e0a6e86c646a7cdcd7a
-INITIAL_SUPERADMIN_PASSWORD="OpenAir@NarigudoGamer#ro0t"
+TELEMETRY_API_KEY=sua_chave_de_telemetria_aqui
+INITIAL_SUPERADMIN_PASSWORD="OpenAir@Root#SenhaForte2026"
 
 # Filas e Sessões
 QUEUE_CONNECTION=sync
@@ -532,6 +531,20 @@ MAIL_MAILER=log
 MAIL_FROM_ADDRESS="no-reply@openairmetrics.com.br"
 MAIL_FROM_NAME="OpenAir Metrics"
 ```
+
+#### Como Gerar a Chave de Telemetria (`TELEMETRY_API_KEY`)
+
+O sistema exige uma chave de autenticação criptograficamente segura de **256 bits (64 caracteres hexadecimais)** para autenticar as requisições dos sensores IoT no cabeçalho `X-Sensor-Key`. Você pode gerá-la com qualquer um dos comandos abaixo:
+
+```bash
+# Opção 1: Via PHP nativo no terminal (Recomendada)
+php -r "echo bin2hex(random_bytes(32)) . PHP_EOL;"
+
+# Opção 2: Via OpenSSL no terminal
+openssl rand -hex 32
+```
+
+> 🔑 **Aplicação da Chave:** Copie a sequência de 64 caracteres gerada e cole no campo `TELEMETRY_API_KEY=` do seu `.env`. Essa mesma chave deverá ser configurada no firmware do microcontrolador ESP32 para envio dos pacotes.
 
 ---
 
@@ -552,49 +565,25 @@ php artisan key:generate
 
 ---
 
-### 8.4 Configuração do Banco de Dados e Importação Completa
+### 8.4 Criação e População Automática do Banco de Dados (Migrate & Seed)
 
-O banco de dados relacional e geoespacial do OpenAir-Metrics pode ser provisionado de três formas, conforme sua preferência de fluxo:
-
-> 📁 **Armazenamento do Dump:** Caso realize a exportação manual via PHPMyAdmin, salve o arquivo `.sql` no diretório padronizado:  
-> [`database/dumps/openair_backup.sql`](file:///home/henrique_1/Documents/OpenAir-Metrics/database/dumps/README.md).
-
-#### Opção A — Importação Gráfica via PHPMyAdmin (Recomendada)
-1. Acesse a interface do seu **PHPMyAdmin** local no navegador (ex: `http://localhost:8080` ou porta mapeada do container).
-2. Efetue login com o usuário `tcc` e senha `&1+=p5:y06ERFZm9^<DS7o`.
-3. No menu lateral esquerdo, verifique se o banco de dados `OpenAir` já existe. Caso não exista, clique em **Novo (New)**, insira o nome `OpenAir`, selecione o agrupamento (collation) `utf8mb4_unicode_ci` e confirme a criação.
-4. Clique no banco de dados `OpenAir` para selecioná-lo.
-5. Acesse a aba superior **Importar (Import)**.
-6. No campo *Escolher arquivo*, selecione o arquivo do seu dump: `database/dumps/openair_backup.sql`.
-7. Role até o final da página e clique no botão **Executar (Import)**.
-8. Aguarde a mensagem de confirmação de sucesso com todas as tabelas e dados espaciais importados.
-
-#### Opção B — Importação via Linha de Comando (Container Podman / Host)
-Se preferir importar via terminal diretamente para o container Podman onde o MariaDB está em execução:
+**Não é necessário importar nenhum arquivo SQL externo!** A aplicação é 100% autossuficiente e provisiona toda a base de dados relacional e geoespacial executando unicamente:
 
 ```bash
-# 1. Localize o nome ou ID do container MariaDB em execução
-podman ps
-
-# 2. Execute a importação via stream diretamente para o container
-podman exec -i <NOME_OU_ID_DO_CONTAINER> mariadb -u tcc -p"&1+=p5:y06ERFZm9^<DS7o" OpenAir < database/dumps/openair_backup.sql
+php artisan migrate --seed
 ```
 
-Caso o cliente `mariadb` ou `mysql` esteja instalado no host Linux:
-```bash
-mariadb -h 127.0.0.1 -P 3306 -u tcc -p"&1+=p5:y06ERFZm9^<DS7o" OpenAir < database/dumps/openair_backup.sql
-```
+#### O que este comando executa automaticamente?
 
-#### Opção C — Instalação Limpa via Migrations e Seeders do Laravel
-Caso deseje provisionar a estrutura do banco do zero a partir do código-fonte, aplicando as migrações e a carga de testes padrão:
+1. **Estrutura Relacional e Geoespacial (`migrate`):** Cria todas as tabelas do sistema com geometrias nativas (`POINT` e `LINESTRING` com SRID 4326), índices espaciais (`SPATIAL INDEX`), além das tabelas de autenticação avançada (Dois Fatores TOTP e Passkeys WebAuthn FIDO2).
+2. **Conta do Superadministrador (`SuperAdminSeeder`):** Cria o usuário global com o e-mail `superadmin@openair.local` e a senha definida no parâmetro `INITIAL_SUPERADMIN_PASSWORD` do `.env`.
+3. **Divisão Territorial do Brasil (`LocalidadesSeeder`):** Popula automaticamente todos os 27 Estados (UFs) e os mais de 5.500 Municípios brasileiros, além de bairros estruturados.
+4. **Malha Viária e Geoprocessamento (`MalhaViariaSeeder`):** Inicializa as vias estruturadas de teste com coordenadas espaciais reais. Além disso, a aplicação possui integração dinâmica com a API Overpass do OpenStreetMap — se o usuário planejar uma malha em qualquer ponto do mapa que ainda não esteja no banco local, o sistema busca e desenha as ruas automaticamente em tempo de execução.
 
-```bash
-# Executa todas as migrações estruturais e de segurança (TOTP, Passkeys, Espaciais)
-php artisan migrate
-
-# Opcional: Carrega a base inicial com usuários e malha viária de exemplo
-php artisan db:seed
-```
+> 💡 **Dica de Reset:** Se em qualquer momento desejar recriar a base de dados do zero com dados limpos, basta rodar:
+> ```bash
+> php artisan migrate:fresh --seed
+> ```
 
 ---
 
@@ -639,7 +628,7 @@ Após iniciar os serviços, você pode testar todas as funcionalidades do sistem
 - **Painel Administrativo:**  
   Acesse [http://localhost:8000/login](http://localhost:8000/login) e utilize as credenciais padrão:
   - **E-mail:** `superadmin@openair.local`
-  - **Senha:** `OpenAir@NarigudoGamer#ro0t` (ou a senha configurada em `INITIAL_SUPERADMIN_PASSWORD`)
+  - **Senha:** A senha configurada no parâmetro `INITIAL_SUPERADMIN_PASSWORD` do `.env`
 - **Pré-visualização dos Templates de E-mail (Somente em Ambiente Local):**
   - Recuperação de Senha: [http://localhost:8000/preview-email/reset-password](http://localhost:8000/preview-email/reset-password)
   - Conclusão de Cadastro: [http://localhost:8000/preview-email/complete-registration](http://localhost:8000/preview-email/complete-registration)
@@ -648,7 +637,7 @@ Após iniciar os serviços, você pode testar todas as funcionalidades do sistem
   ```bash
   curl -X POST http://localhost:8000/api/medicoes \
     -H "Content-Type: application/json" \
-    -H "X-Sensor-Key: b864f6bbe1b2ac271c1d73beeec86372515e2d6451b08e0a6e86c646a7cdcd7a" \
+    -H "X-Sensor-Key: SUA_TELEMETRY_API_KEY_AQUI" \
     -d '{
       "mac_address": "AA:BB:CC:DD:EE:01",
       "temperatura": 23.8,
