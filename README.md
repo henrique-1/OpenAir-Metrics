@@ -46,7 +46,7 @@
   - [8.2 Configuração do Ambiente (.env)](#82-configuração-do-ambiente-env)
   - [8.3 Instalação das Dependências](#83-instalação-das-dependências)
   - [8.4 Criação e População Automática do Banco de Dados (Migrate & Seed)](#84-criação-e-população-automática-do-banco-de-dados-migrate--seed)
-  - [8.5 Inicialização dos Serviços](#85-inicialização-dos-serviços)
+  - [8.5 Inicialização dos Serviços (composer run dev -vv)](#85-inicialização-dos-serviços-composer-run-dev--vv)
   - [8.6 Acesso e Credenciais de Desenvolvimento](#86-acesso-e-credenciais-de-desenvolvimento)
 - [9. Testes Automatizados e Qualidade de Código](#9-testes-automatizados-e-qualidade-de-código)
 
@@ -587,35 +587,26 @@ php artisan migrate --seed
 
 ---
 
-### 8.5 Inicialização dos Serviços
+### 8.5 Inicialização dos Serviços (composer run dev -vv)
 
-Para a operação completa com recepção de telemetria em tempo real, mapas interativos e atualização ao vivo, inicie os seguintes serviços (em abas ou terminais separados):
+O OpenAir-Metrics possui um script unificado pré-configurado no Composer que inicializa todos os microsserviços e processos locais necessários em paralelo em um único terminal com cores e logs em tempo real:
 
-#### 1. Servidor Web da Aplicação (HTTP)
 ```bash
-php artisan serve
-```
-> Disponível em: [http://localhost:8000](http://localhost:8000)
-
-#### 2. Servidor de WebSockets (Laravel Reverb)
-```bash
-php artisan reverb:start
-```
-> Escutando em: `ws://localhost:8080`
-
-#### 3. Bundler de Assets Front-end (Vite)
-```bash
-# Para desenvolvimento ativo com Hot Module Replacement (HMR)
-npm run dev
-
-# Ou para gerar os assets estáticos compilados para produção
-npm run build
+composer run dev -vv
 ```
 
-#### 4. Processador de Filas Assíncronas (Opcional se `QUEUE_CONNECTION=database`)
-```bash
-php artisan queue:listen
-```
+#### O que é executado simultaneamente por este comando?
+- 🚀 **`server`:** Servidor HTTP do Laravel (`php artisan serve --host=0.0.0.0 --port=8000`) acessível em [http://localhost:8000](http://localhost:8000).
+- ⚡ **`reverb`:** Servidor nativo de WebSockets (`php artisan reverb:start`) escutando na porta `ws://localhost:8080`.
+- 🎨 **`vite`:** Compilação com Hot Module Replacement / HMR (`npm run dev`) para Tailwind CSS v4, Leaflet e Laravel Echo.
+- 📬 **`queue`:** Processador de filas assíncronas (`php artisan queue:listen`) para geocodificação reversa em segundo plano.
+- 📋 **`logs`:** Monitor de logs e exceções em tempo real (`php artisan pail`).
+
+> 💡 **Execução em Terminais Separados (Alternativa):** Caso prefira rodar os serviços individualmente em abas isoladas:
+> - Terminal 1: `php artisan serve`
+> - Terminal 2: `php artisan reverb:start`
+> - Terminal 3: `npm run dev` (ou `npm run build` para bundle estático)
+> - Terminal 4: `php artisan queue:listen`
 
 ---
 
