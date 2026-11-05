@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -232,6 +233,43 @@ class UsuarioController extends Controller
             : "O usuário {$user->name} foi desativado com sucesso!";
 
         return back()->with('success', $mensagem);
+    }
+
+    /**
+     * Reseta emergencialmente o segundo fator de autenticação (TOTP e Passkeys) de um usuário
+     * em caso de perda de dispositivo/códigos de recuperação (Contingência).
+     */
+    public function resetarMfa(Request $request, User $user): RedirectResponse
+    {
+        $currentUser = $request->user();
+        if (! $currentUser->isSuperAdmin() && ! $currentUser->isAdministrador()) {
+            abort(403, 'Acesso restrito a administradores.');
+        }
+
+        if ($currentUser->isSuperAdmin()) {
+            if (! $user->isAdministrador()) {
+                abort(403, 'Super-usuário só pode gerenciar administradores municipais.');
+            }
+        } else {
+            if ($user->cidade_id !== $currentUser->cidade_id || ! in_array($user->nivel, ['cadastrador', 'instalador'], true)) {
+                abort(403, 'Acesso restrito a usuários sob sua jurisdição municipal.');
+            }
+        }
+
+        // Limpa segredos TOTP e remove Passkeys associadas
+        $user->forceFill([
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
+        ])->save();
+
+        $user->passkeys()->delete();
+
+        Log::warning(
+            "MFA emergencialmente resetado para o usuário ID: {$user->id} ({$user->email}) pelo administrador ID: {$currentUser->id} ({$currentUser->email})."
+        );
+
+        return back()->with('success', "A autenticação em duas etapas (MFA) do usuário {$user->name} foi desativada com sucesso.");
     }
 
     /**

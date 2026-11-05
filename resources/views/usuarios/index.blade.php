@@ -208,6 +208,20 @@
                                                 @endif
                                             </div>
                                             <div class="text-xs text-athens-gray-500 dark:text-athens-gray-400">{{ $u->email }}</div>
+                                            @if($u->hasEnabledTwoFactorAuthentication() || $u->passkeys->isNotEmpty())
+                                                <div class="flex items-center gap-1 mt-1">
+                                                    @if($u->hasEnabledTwoFactorAuthentication())
+                                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                            2FA TOTP
+                                                        </span>
+                                                    @endif
+                                                    @if($u->passkeys->isNotEmpty())
+                                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-dianne-50 dark:bg-blue-dianne-950/60 text-blue-dianne-700 dark:text-blue-dianne-300 border border-blue-dianne-200 dark:border-blue-dianne-800">
+                                                            Passkey ({{ $u->passkeys->count() }})
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="py-4 px-6">
                                             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
@@ -247,6 +261,21 @@
                                                     <x-heroicon-o-pencil-square class="w-3.5 h-3.5" />
                                                     Editar
                                                 </a>
+
+                                                <!-- Botão Contingência: Resetar MFA (se ativo) -->
+                                                @if($u->id !== $currentUser->id && ($u->hasEnabledTwoFactorAuthentication() || $u->passkeys->isNotEmpty()))
+                                                    <form method="POST" action="{{ route('usuarios.resetar-mfa', $u->id) }}" onsubmit="return confirm('ATENÇÃO: Deseja realmente resetar o MFA/2FA de {{ $u->name }}? Esta ação deve ser usada apenas em caso de perda de autenticador/códigos de backup.');">
+                                                        @csrf
+                                                        <button 
+                                                            type="submit" 
+                                                            title="Resetar 2FA e Passkeys perdidos (Contingência)" 
+                                                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 transition cursor-pointer"
+                                                        >
+                                                            <x-heroicon-o-shield-exclamation class="w-3.5 h-3.5" />
+                                                            Resetar MFA
+                                                        </button>
+                                                    </form>
+                                                @endif
 
                                                 <!-- Botão Desativar / Reativar -->
                                                 @if($u->id === $currentUser->id)

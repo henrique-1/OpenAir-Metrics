@@ -12,6 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
+use Spatie\LaravelPasskeys\Models\Concerns\HasPasskeys;
+use Spatie\LaravelPasskeys\Models\Passkey;
 
 #[Fillable([
     'name',
@@ -27,11 +32,11 @@ use Illuminate\Notifications\Notifiable;
     'estado',
     'cep',
 ])]
-#[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
+class User extends Authenticatable implements HasPasskeys, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
      * Get the attributes that should be cast.
@@ -44,6 +49,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'ativo' => 'boolean',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
@@ -99,6 +105,31 @@ class User extends Authenticatable
     public function isInstalador(): bool
     {
         return $this->nivel === 'instalador';
+    }
+
+    public function podeUsarPasskey(): bool
+    {
+        return $this->isAdministrador() || $this->isInstalador();
+    }
+
+    public function passkeys(): HasMany
+    {
+        return $this->hasMany(Passkey::class, 'authenticatable_id');
+    }
+
+    public function getPasskeyName(): string
+    {
+        return $this->email;
+    }
+
+    public function getPasskeyId(): string
+    {
+        return (string) $this->id;
+    }
+
+    public function getPasskeyDisplayName(): string
+    {
+        return $this->name;
     }
 
     public function getNivelLabelAttribute(): string

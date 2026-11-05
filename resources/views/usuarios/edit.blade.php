@@ -371,6 +371,21 @@
                             </div>
                         </div>
 
+                        @if($usuario->id !== $currentUser->id && ($usuario->hasEnabledTwoFactorAuthentication() || $usuario->passkeys->isNotEmpty()))
+                            <div class="mt-6 p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <x-heroicon-o-shield-exclamation class="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <div>
+                                        <p class="text-sm font-bold text-amber-950 dark:text-amber-200">Autenticação Multifator Ativa (MFA)</p>
+                                        <p class="text-xs text-amber-800 dark:text-amber-300">Este usuário possui 2FA TOTP ou Passkey configurados. Caso o colaborador tenha perdido o dispositivo ou códigos de backup, você pode redefinir o acesso.</p>
+                                    </div>
+                                </div>
+                                <button type="submit" form="form-resetar-mfa" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition shadow-xs cursor-pointer shrink-0">
+                                    Resetar MFA / 2FA
+                                </button>
+                            </div>
+                        @endif
+
                         <!-- Botões -->
                         <div class="flex items-center justify-end gap-3 pt-6 border-t border-athens-gray-100 dark:border-athens-gray-800">
                             <a href="{{ route('usuarios.index') }}" class="px-5 py-2.5 text-sm font-semibold text-athens-gray-600 dark:text-athens-gray-400 hover:text-blue-dianne-950 dark:hover:text-white hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 rounded-lg transition">
@@ -382,6 +397,12 @@
                             </button>
                         </div>
                     </form>
+
+                    @if($usuario->id !== $currentUser->id && ($usuario->hasEnabledTwoFactorAuthentication() || $usuario->passkeys->isNotEmpty()))
+                        <form id="form-resetar-mfa" method="POST" action="{{ route('usuarios.resetar-mfa', $usuario->id) }}" onsubmit="return confirm('Deseja realmente desativar o 2FA e remover as Passkeys de {{ $usuario->name }}?');" class="hidden">
+                            @csrf
+                        </form>
+                    @endif
                 </div>
 
             </div>

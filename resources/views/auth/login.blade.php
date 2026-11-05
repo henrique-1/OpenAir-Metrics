@@ -60,6 +60,32 @@
                         <x-heroicon-o-arrow-right class="w-4 h-4" />
                     </button>
 
+                    <!-- Divisor -->
+                    <div id="passkey-divider" class="relative flex items-center justify-center my-1 hidden">
+                        <div class="border-t border-athens-gray-200 dark:border-athens-gray-800 w-full"></div>
+                        <span class="bg-white dark:bg-athens-gray-900 px-3 text-xs text-athens-gray-400 uppercase font-semibold">ou</span>
+                        <div class="border-t border-athens-gray-200 dark:border-athens-gray-800 w-full"></div>
+                    </div>
+
+                    <!-- Botão Passkey / Biometria (para Administradores e Instaladores) -->
+                    <button type="button" id="btn-login-passkey"
+                        class="hidden w-full bg-athens-gray-100 hover:bg-athens-gray-200 dark:bg-athens-gray-800 dark:hover:bg-athens-gray-700/80 text-athens-gray-800 dark:text-athens-gray-200 font-semibold py-2.5 px-4 rounded-lg transition-colors border border-athens-gray-300 dark:border-athens-gray-700 flex justify-center items-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-dianne-500 cursor-pointer">
+                        <x-heroicon-o-finger-print class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400" />
+                        <span>Entrar com Passkey / Biometria</span>
+                    </button>
+                    <p id="passkey-error" class="hidden text-cinnabar-500 text-xs text-center mt-0.5"></p>
+                    @if(session('authenticatePasskey::message'))
+                        <p class="text-cinnabar-500 text-xs text-center mt-0.5">
+                            {{ session('authenticatePasskey::message') }}
+                        </p>
+                    @endif
+
+                    <form id="passkey-login-form" method="POST" action="{{ route('passkeys.login') }}" class="hidden">
+                        @csrf
+                        <input type="hidden" name="start_authentication_response" id="passkey-start-auth-response">
+                        <input type="hidden" name="remember" id="passkey-remember">
+                    </form>
+
                     <!-- Recuperação de senha -->
                     @if (Route::has('password.request'))
                         <p class="text-sm text-center text-athens-gray-600 dark:text-athens-gray-400">
@@ -95,6 +121,97 @@
                 url.searchParams.set('email', email);
                 window.location.href = url.toString();
             });
+
+            // Autenticação biométrica via Passkey (WebAuthn)
+            const btnPasskey = document.getElementById('btn-login-passkey');
+            const passkeyDivider = document.getElementById('passkey-divider');
+            const passkeyError = document.getElementById('passkey-error');
+
+            if (window.PublicKeyCredential && btnPasskey && passkeyDivider) {
+                btnPasskey.classList.remove('hidden');
+                passkeyDivider.classList.remove('hidden');
+
+                btnPasskey.addEventListener('click', async () => {
+                    passkeyError.classList.add('hidden');
+                    passkeyError.textContent = '';
+                    btnPasskey.disabled = true;
+
+                    try {
+                        const optRes = await fetch('{{ route('passkeys.authentication_options') }}', {
+                            headers: { 'Accept': 'application/json' }
+                        });
+
+                        if (! optRes.ok) {
+                            throw new Error('Não foi possível iniciar o login com Passkey.');
+                        }
+
+                        const options = await optRes.json();
+
+                        const base64UrlToBuffer = (base64url) => {
+                            const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+                            const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+                            const binary = atob(padded);
+                            const bytes = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) {
+                                bytes[i] = binary.charCodeAt(i);
+                            }
+                            return bytes.buffer;
+                        };
+
+                        const bufferToBase64Url = (buffer) => {
+                            const bytes = new Uint8Array(buffer);
+                            let binary = '';
+                            for (let i = 0; i < bytes.byteLength; i++) {
+                                binary += String.fromCharCode(bytes[i]);
+                            }
+                            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                        };
+
+                        const requestOptions = {
+                            ...options,
+                            challenge: base64UrlToBuffer(options.challenge),
+                            allowCredentials: (options.allowCredentials || []).map(c => ({
+                                ...c,
+                                id: base64UrlToBuffer(c.id)
+                            }))
+                        };
+
+                        const assertion = await navigator.credentials.get({ publicKey: requestOptions });
+
+                        if (! assertion) {
+                            throw new Error('Nenhuma credencial foi fornecida.');
+                        }
+
+                        const credentialPayload = assertion.toJSON ? assertion.toJSON() : {
+                            id: assertion.id,
+                            rawId: bufferToBase64Url(assertion.rawId),
+                            type: assertion.type,
+                            response: {
+                                clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
+                                authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
+                                signature: bufferToBase64Url(assertion.response.signature),
+                                userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : null
+                            }
+                        };
+
+                        const form = document.getElementById('passkey-login-form');
+                        document.getElementById('passkey-start-auth-response').value = JSON.stringify(credentialPayload);
+                        document.getElementById('passkey-remember').value = document.querySelector('input[name="remember"]')?.checked ? '1' : '0';
+                        form.submit();
+
+                    } catch (err) {
+                        console.error('Erro no login com Passkey:', err);
+                        passkeyError.textContent = err.name === 'NotAllowedError'
+                            ? 'Operação biométrica cancelada ou expirada.'
+                            : (err.message || 'Falha ao autenticar com Passkey.');
+                        passkeyError.classList.remove('hidden');
+                        btnPasskey.disabled = false;
+                    }
+                    } finally {
+                        btnPasskey.disabled = false;
+                    }
+                });
+            }
         </script>
     @endpush
 </x-layouts.app>

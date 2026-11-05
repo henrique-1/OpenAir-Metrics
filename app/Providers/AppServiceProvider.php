@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Spatie\LaravelPasskeys\Models\Passkey;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +25,24 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configurarPoliticaDeSenha();
+        $this->configurarGates();
+        $this->configurarPasskeys();
+    }
+
+    /**
+     * Define os Gates de autorização da aplicação.
+     */
+    private function configurarGates(): void
+    {
+        Gate::define('manage-passkeys', fn (User $user): bool => $user->podeUsarPasskey());
+    }
+
+    /**
+     * Configura o modelo de Passkeys utilizado pela aplicação (Spatie).
+     */
+    private function configurarPasskeys(): void
+    {
+        Route::model('passkey', Passkey::class);
     }
 
     /**

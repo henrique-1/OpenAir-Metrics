@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class AuthController extends Controller
@@ -33,8 +35,20 @@ class AuthController extends Controller
 
         $credentials['ativo'] = true;
 
-        // 2. Tentativa de autenticação
-        if (Auth::attempt($credentials, $remember)) {
+        // 2. Tentativa de autenticação com checagem de MFA (TOTP)
+        $user = User::where('email', $credentials['email'])->where('ativo', true)->first();
+
+        if ($user && Hash::check($credentials['password'], $user->password)) {
+            if ($user->hasEnabledTwoFactorAuthentication()) {
+                $request->session()->put([
+                    'login.id' => $user->getKey(),
+                    'login.remember' => $remember,
+                ]);
+
+                return redirect()->route('two-factor.login');
+            }
+
+            Auth::login($user, $remember);
             $request->session()->regenerate();
 
             if (Auth::user()?->isSuperAdmin()) {

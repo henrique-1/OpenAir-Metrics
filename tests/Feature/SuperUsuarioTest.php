@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\ConviteCadastroNotification;
 use Database\Seeders\SuperAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -270,12 +271,12 @@ test('superadmin seeder cria super usuario com sucesso', function () {
 });
 
 test('superadmin seeder aceita senha customizada via INITIAL_SUPERADMIN_PASSWORD', function () {
-    putenv('INITIAL_SUPERADMIN_PASSWORD=SenhaCustomizada999!');
+    Env::getRepository()->set('INITIAL_SUPERADMIN_PASSWORD', 'SenhaCustomizada999!');
 
     $this->seed(SuperAdminSeeder::class);
 
     $user = User::where('email', 'superadmin@openair.com')->first();
     expect(Hash::check('SenhaCustomizada999!', $user->password))->toBeTrue();
 
-    putenv('INITIAL_SUPERADMIN_PASSWORD');
+    Env::getRepository()->clear('INITIAL_SUPERADMIN_PASSWORD');
 });

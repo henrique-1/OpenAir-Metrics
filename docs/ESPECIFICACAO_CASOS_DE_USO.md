@@ -383,3 +383,60 @@
   - **A2 - Senha fraca ou vazada (NIST):** O formulário retorna com validação apontando a exigência de 15 caracteres ou a presença da senha em bases públicas de vazamentos.
   - **A3 - Confirmação de senha divergente:** O Sistema bloqueia a requisição e sinaliza erro no campo de confirmação.
 - **Pós-condições:** Usuário com senha personalizada definida, endereço atualizado, e-mail verificado e acesso liberado ao sistema.
+
+---
+
+### UC19 — Configurar e Autenticar com 2FA TOTP (Google Authenticator / Authy)
+
+- **Atores:** Usuário Autenticado (Ativação e Gestão), Visitante com 2FA Ativo (Desafio no Login).
+- **Resumo:** Permite que qualquer usuário autenticado ative ou desative o segundo fator de autenticação baseado em tempo (TOTP) no perfil, escaneie o QR Code em seu aplicativo autenticador (Google Authenticator, Authy), confirme com o código de 6 dígitos e utilize códigos de recuperação de backup. Durante o login tradicional por e-mail e senha, intercepta a autenticação para exigir o código de 6 dígitos antes de liberar o acesso.
+- **Pré-condições:** Para ativar/gerenciar, o usuário deve estar autenticado (`/perfil`). Para o desafio no login, o usuário deve ter informado credenciais válidas e possuir 2FA ativo e confirmado (`two_factor_confirmed_at != null`).
+- **Fluxo Principal 1 — Ativação e Confirmação no Perfil (`/perfil`):**
+  1. O Usuário Autenticado acessa a tela de perfil e clica em "Habilitar Autenticação em Duas Etapas" (`POST /user/two-factor-authentication`).
+  2. O Sistema gera um segredo simétrico criptografado (`two_factor_secret`), gera 8 códigos de recuperação (`two_factor_recovery_codes`) e renderiza o QR Code SVG na tela.
+  3. O Usuário abre o app autenticador no smartphone, escaneia o QR Code (ou insere a chave manual) e digita o código de 6 dígitos gerado.
+  4. O Usuário submete o formulário de confirmação (`POST /user/confirmed-two-factor-authentication`).
+  5. O Sistema valida o HMAC-SHA1 do código contra o segredo, marca `two_factor_confirmed_at = now()` e exibe os 8 códigos de recuperação para armazenamento seguro.
+- **Fluxo Principal 2 — Desafio durante o Login (`/two-factor-challenge`):**
+  1. O Usuário submete e-mail e senha corretos na tela de login.
+  2. O Sistema ([`AuthController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/AuthController.php)) detecta que o usuário possui 2FA ativo (`hasEnabledTwoFactorAuthentication()`), armazena o ID do usuário na sessão (`login.id`) e redireciona para a tela de desafio (`GET /two-factor-challenge`).
+  3. O Usuário digita o código de 6 dígitos do seu app autenticador e submete o formulário.
+  4. O Sistema valida o código, autentica a sessão (`Auth::login`), remove `login.id` da sessão, regenera a sessão e redireciona o usuário para o destino conforme seu papel (`superadmin` para `/usuarios`, `instalador` para `/instalacoes`, demais para `/dashboard`).
+- **Fluxos Alternativos / Exceções:**
+  - **A1 - Código TOTP inválido na confirmação:** O Sistema recusa a ativação e exibe mensagem no saco de erros `confirmTwoFactorAuthentication`. O 2FA permanece não confirmado.
+  - **A2 - Código TOTP inválido no login:** O Sistema rejeita o acesso e mantém o usuário na tela de desafio com a mensagem "O código de autenticação de duas etapas informado é inválido."
+  - **A3 - Autenticação com Código de Recuperação (Backup):** Se o usuário não tiver acesso ao smartphone, ele clica em "Usar código de recuperação" na tela de desafio e insere um dos seus códigos descartáveis. O Sistema valida o código, efetua o login e substitui automaticamente o código utilizado por um novo no banco.
+  - **A4 - Regeneração de Códigos de Recuperação:** O usuário autenticado pode clicar em "Gerar novos códigos" no perfil (`POST /user/two-factor-recovery-codes`) para invalidar os anteriores e gerar 8 novos códigos.
+  - **A5 - Desativação do 2FA:** O usuário autenticado pode desativar o 2FA a qualquer momento (`DELETE /user/two-factor-authentication`), removendo o segredo, confirmação e códigos de recuperação.
+  - **A6 - Contingência Administrativa (Perda do Autenticador):** Se o colaborador perder o dispositivo e todos os 8 códigos de backup, um Super-Usuário ou o Administrador Municipal de sua cidade pode realizar a redefinição emergencial via `POST /usuarios/{user}/resetar-mfa`. O Sistema limpa os segredos TOTP, remove todas as passkeys vinculadas e registra evento de segurança em log (`warning`).
+- **Pós-condições:** Conta protegida com autenticação em duas etapas; logins subsequentes exigirão o código TOTP ou recovery code.
+
+---
+
+### UC20 — Gerenciar e Autenticar com Passkeys / Biometria FIDO2 (NIST AAL3 - Spatie)
+
+- **Atores:** Administrador Municipal (`administrador`), Instalador (`instalador`), Visitante com Passkey registrada.
+- **Resumo:** Disponibiliza registro, listagem, exclusão e login sem senha utilizando Passkeys (Touch ID, Face ID, Windows Hello, chaves de hardware FIDO2 / YubiKey) através do `spatie/laravel-passkeys`, exclusivo para os papéis de Administrador Municipal e Instalador.
+- **Pré-condições:** O ator deve ser um usuário ativo com papel `administrador` ou `instalador` (`User::podeUsarPasskey() === true`). Usuários `cadastrador` e `superadmin` têm a funcionalidade ocultada e bloqueada (`HTTP 403 Forbidden`).
+- **Fluxo Principal 1 — Registro de Passkey no Perfil (`/perfil`):**
+  1. O Administrador ou Instalador autenticado acessa `/perfil` e clica no botão "Adicionar Passkey".
+  2. O script do cliente solicita opções de registro via `GET /user/passkeys/options`.
+  3. O Sistema gera as opções de criação WebAuthn (`GeneratePasskeyRegisterOptionsAction`) e as salva na sessão.
+  4. O navegador solicita a biometria/toque físico do usuário via `navigator.credentials.create({ publicKey: options })`.
+  5. O usuário confirma com biometria ou chave física; o navegador retorna a credencial gerada.
+  6. O cliente envia a credencial com um nome amigável (ex: "MacBook Touch ID") para `POST /user/passkeys`.
+  7. O Sistema valida a atestação via `StorePasskeyAction` e salva a credencial na tabela `passkeys`, vinculada ao `authenticatable_id`.
+- **Fluxo Principal 2 — Login Sem Senha / Multifator via Passkey (`/login`):**
+  1. O usuário clica no botão "Entrar com Passkey / Biometria" na tela de login.
+  2. O cliente solicita opções de autenticação via `GET /passkeys/authentication-options`.
+  3. O navegador invoca `navigator.credentials.get({ publicKey: options })` e solicita a verificação biométrica.
+  4. O usuário confirma com a biometria; o navegador gera uma asserção assinada.
+  5. O cliente submete a asserção para `POST /passkeys/authenticate`.
+  6. O Sistema (`FindPasskeyToAuthenticateAction`) localiza a credencial pública, incrementa o contador (anti-replay), assegura que a conta está ativa e possui papel permitido (`podeUsarPasskey()`).
+  7. O Sistema autentica o usuário e redireciona para a URL correspondente ao perfil (`/instalacoes` para instalador, `/dashboard` para administrador).
+- **Fluxos Alternativos / Exceções:**
+  - **A1 - Usuário sem permissão tenta acessar rotas de Passkey:** Se um `cadastrador` ou `superadmin` tentar acessar `GET /user/passkeys/options`, `POST /user/passkeys` ou `DELETE /user/passkeys/{passkey}`, o Gate `manage-passkeys` interrompe com `HTTP 403 Forbidden`.
+  - **A2 - Conta desativada (`ativo = false`) ou papel não permitido:** O `FindPasskeyToAuthenticateAction` valida o status e papel, rejeitando a autenticação e redirecionando para a tela de login com erro.
+  - **A3 - Remoção de Passkey (`DELETE /user/passkeys/{passkey}`):** O usuário pode remover uma chave cadastrada no perfil; o Sistema verifica a autoria (`$passkey->authenticatable_id === $user->id`) e remove o registro do banco de dados. Tentativas de excluir a chave de outro usuário retornam `HTTP 403`.
+  - **A4 - Navegador sem suporte a WebAuthn:** O cliente detecta a ausência de `window.PublicKeyCredential` e exibe aviso informando a incompatibilidade do navegador.
+- **Pós-condições:** Credencial criptográfica pública registrada de forma segura no dispositivo do usuário; login biométrico ágil e imune a phishing operacional.

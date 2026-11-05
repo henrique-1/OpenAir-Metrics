@@ -8,6 +8,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InstalacaoController;
 use App\Http\Controllers\LocalidadeController;
 use App\Http\Controllers\NewPasswordController;
+use App\Http\Controllers\PasskeyController;
 use App\Http\Controllers\PasswordResetLinkController;
 use App\Http\Controllers\PatrimonioController;
 use App\Http\Controllers\PerfilController;
@@ -36,6 +37,9 @@ Route::middleware('guest')->group(function () {
     // Ativação e conclusão de cadastro de novos usuários
     Route::get('/completar-cadastro/{token}', [CompletarCadastroController::class, 'create'])->name('cadastro.completar');
     Route::post('/completar-cadastro', [CompletarCadastroController::class, 'store'])->middleware('throttle:5,1')->name('cadastro.salvar');
+
+    // Autenticação sem senha via Spatie Passkeys
+    Route::passkeys();
 });
 
 // Rotas protegidas (apenas usuários autenticados)
@@ -82,11 +86,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');
 
+    // Gerenciamento de Passkeys (Spatie Passkeys - Restrito a Administradores e Instaladores)
+    Route::prefix('user/passkeys')->middleware('can:manage-passkeys')->group(function () {
+        Route::get('/options', [PasskeyController::class, 'options'])->name('passkey.registration-options');
+        Route::post('/', [PasskeyController::class, 'store'])->name('passkey.store');
+        Route::delete('/{passkey}', [PasskeyController::class, 'destroy'])->name('passkey.destroy');
+    });
+
     // Módulo de Gestão de Usuários Municipais (Administrador)
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
     Route::get('/usuarios/create', [UsuarioController::class, 'create'])->name('usuarios.create');
     Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::patch('/usuarios/{user}/toggle-status', [UsuarioController::class, 'toggleStatus'])->name('usuarios.toggle-status');
+    Route::post('/usuarios/{user}/resetar-mfa', [UsuarioController::class, 'resetarMfa'])->name('usuarios.resetar-mfa');
     Route::get('/usuarios/{user}/edit', [UsuarioController::class, 'edit'])->name('usuarios.edit');
     Route::put('/usuarios/{user}', [UsuarioController::class, 'update'])->name('usuarios.update');
 

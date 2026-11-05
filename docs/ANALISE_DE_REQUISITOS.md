@@ -20,6 +20,8 @@ Arquiteturalmente, o sistema adota o padrão **MVC orientado a serviços de dom�
 - **RF04 — Administração de Usuários e Administradores Municipais:** O sistema deve permitir a listagem, busca, filtragem, criação, edição e ativação/desativação de contas via [`UsuarioController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L14-L361) (`/usuarios`), restringindo o escopo conforme o papel do gestor logado. Na criação de novos usuários, o administrador define apenas dados básicos (Nome Completo, E-mail e Nível/Jurisdição); o sistema cria a conta com senha provisória aleatória e envia automaticamente um e-mail de ativação ([`ConviteCadastroNotification`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Notifications/ConviteCadastroNotification.php)) para que o próprio colaborador defina sua senha e informe opcionalmente seu endereço.
 - **RF17 — Recuperação Autônoma de Senha:** O sistema deve permitir a redefinição de senha esquecida via [`PasswordResetLinkController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PasswordResetLinkController.php) e [`NewPasswordController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/NewPasswordController.php) (`/esqueci-senha` e `/redefinir-senha/{token}`), com link de recuperação de 30 minutos enviado por e-mail ([`RedefinirSenhaNotification`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Notifications/RedefinirSenhaNotification.php)), preenchimento prévio automático do e-mail digitado no login via query string, encerramento de outras sessões ativas e proteção uniforme contra enumeração de contas.
 - **RF18 — Ativação de Conta e Conclusão de Cadastro:** O sistema deve disponibilizar interface pública com validação de token temporário (30 minutos) via [`CompletarCadastroController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/CompletarCadastroController.php) (`GET/POST /completar-cadastro/{token}`) para que colaboradores recém-cadastrados definam sua senha e preencham opcionalmente endereço cadastral (CEP, logradouro, número, complemento, bairro, estado).
+- **RF21 — Autenticação Multifator Baseada em Tempo (TOTP):** O sistema deve fornecer autenticação em duas etapas voluntária para os colaboradores via Laravel Fortify (`/user/two-factor-authentication`), permitindo escanear o QR Code em aplicativos como Google Authenticator ou Authy, confirmar a ativação mediante código de 6 dígitos, interceptar o login tradicional para desafio em `/two-factor-challenge` e disponibilizar 8 códigos descartáveis de recuperação (backup) com regeneração e desativação a qualquer momento. Em casos de perda irrecuperável do autenticador, o sistema deve prover contingência administrativa via `POST /usuarios/{user}/resetar-mfa`, permitindo ao Super-Usuário ou Administrador Municipal (dentro de sua jurisdição) redefinir emergencialmente o MFA da conta com registro em log de auditoria.
+- **RF22 — Autenticação Biométrica e Sem Senha via Passkeys (WebAuthn / FIDO2):** O sistema deve permitir o cadastro de Passkeys (Touch ID, Face ID, Windows Hello, YubiKey) e login sem senha via `spatie/laravel-passkeys`, com acesso restrito com exclusividade a usuários de nível `administrador` e `instalador` (NIST AAL3). Usuários `cadastrador` e `superadmin` têm a funcionalidade ocultada na interface e bloqueada a nível de política (`HTTP 403 Forbidden`). Contas desativadas têm autenticação por Passkey sumariamente rejeitada. Na tela de perfil, é exibido um aviso recomendando a ativação de MFA/Passkey (Opção A) para administradores e instaladores que ainda não configuraram segundo fator.
 
 #### Diretrizes de Segurança e Política de Credenciais (NIST SP 800-63B Rev. 4)
 - **Tamanho Mínimo e Máximo:** Senhas devem ter entre 15 e 64 caracteres (`Password::min(15)->max(64)`), permitindo o uso de frases secretas longas (*passphrases*).
@@ -156,10 +158,14 @@ Representa os operadores, gestores municipais, técnicos e super-administradores
   - `nivel` (enum: `'superadmin'`, `'administrador'`, `'cadastrador'`, `'planejador'`, `'instalador'`)
   - `ativo` (boolean, default `true`)
   - `cidade_id` (FK nullable $\to$ `cidades.id`, `nullOnDelete`)
+  - `two_factor_secret` (text, nullable, encrypted — segredo TOTP)
+  - `two_factor_recovery_codes` (text, nullable, encrypted — códigos de backup)
+  - `two_factor_confirmed_at` (timestamp, nullable — confirmação do 2FA)
   - `logradouro`, `numero`, `complemento`, `bairro`, `estado` (UF, char 2), `cep`
 - **Relacionamentos Primários:**
   - `cidade()`: `BelongsTo` $\to$ [`Cidade`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Cidade.php#L11-L36)
   - `estacoes()`: `HasMany` $\to$ [`Estacao`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Estacao.php#L19-L741) (`created_by`)
+  - `passkeys()`: `HasMany` $\to$ `Passkey` (`user_id`)
 
 ### 2. [`Estacao`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Estacao.php#L19-L741) (Tabela `estacoes`)
 Entidade central que representa um ponto de monitoramento ambiental (planejado ou instalado em campo) e sua posição na topologia da malha.
@@ -228,3 +234,15 @@ Base geoespacial de segmentos de ruas importados do OpenStreetMap para suporte a
 - **[`Estado`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Estado.php#L10-L27) (`estados`):** `id` (PK), `nome`, `uf` (unique, 2 chars). Possui `cidades()` (`HasMany` $\to$ [`Cidade`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Cidade.php#L11-L36)).
 - **[`Cidade`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Cidade.php#L11-L36) (`cidades`):** `id` (PK), `estado_id` (FK $\to$ `estados.id`), `nome`. Pertence a `estado()` (`BelongsTo` $\to$ [`Estado`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Estado.php#L10-L27)) e possui `bairros()` (`HasMany` $\to$ [`Bairro`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Bairro.php#L11-L36)).
 - **[`Bairro`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Bairro.php#L11-L36) (`bairros`):** `id` (PK), `cidade_id` (FK $\to$ `cidades.id`), `nome`. Pertence a `cidade()` (`BelongsTo` $\to$ [`Cidade`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Cidade.php#L11-L36)) e possui `estacoes()` (`HasMany` $\to$ [`Estacao`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Estacao.php#L19-L741)).
+
+### 7. [`Passkey`](file:///home/henrique_1/Documents/OpenAir-Metrics/vendor/laravel/passkeys/src/Passkey.php) (Tabela `passkeys`)
+Representa uma credencial pública biométrica ou chave física FIDO2 registrada por um Administrador Municipal ou Instalador.
+- **Atributos Críticos:**
+  - `id` (PK, bigint)
+  - `user_id` (FK $\to$ `users.id`, `cascadeOnDelete`)
+  - `name` (string 255 — Ex: "MacBook Touch ID", "YubiKey 5C")
+  - `credential_id` (string 255, unique — identificador da credencial pública gerado pelo autenticador)
+  - `credential` (json — dados estruturados da chave pública COSE, algoritmo e contadores)
+  - `last_used_at` (timestamp, nullable)
+- **Relacionamentos Primários:**
+  - `user()`: `BelongsTo` $\to$ [`User`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L30-L105)
