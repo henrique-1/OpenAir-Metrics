@@ -83,11 +83,11 @@
 - **Pré-condições:** O usuário deve estar autenticado com perfil `superadmin` ou `administrador` ([`UsuarioController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L14-L361)).
 - **Fluxo Principal (Caminho Feliz):**
   1. O Ator acessa a listagem paginada de usuários (`GET /usuarios` em [`UsuarioController::index`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L19-L93)), podendo filtrar por busca textual (`name`, `email`), `status` (`ativo`/`inativo`), `cidade_id` (se `superadmin`) ou `nivel` (se `administrador`).
-  2. O Ator acessa o formulário (`GET /usuarios/create`) e submete os dados de um novo usuário (`POST /usuarios` em [`UsuarioController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L132-L199)).
-  3. O Sistema valida a unicidade do `email`, a confirmação de senha (`min:8`, `confirmed`) e os atributos de escopo:
+  2. O Ator acessa o formulário (`GET /usuarios/create`) e submete os dados básicos do novo usuário (`POST /usuarios` em [`UsuarioController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L132-L199)), informando apenas `name`, `email` e os dados de jurisdição/escopo (sem definição de senha pelo criador).
+  3. O Sistema valida a unicidade do `email` e os atributos de escopo:
      - Se `superadmin`: define `nivel = 'administrador'`, valida que `cidade_id` pertence ao `estado_id` selecionado e vincula ao município escolhido.
      - Se `administrador`: força `cidade_id = $currentUser->cidade_id` e valida `nivel` em `['administrador', 'cadastrador', 'instalador']`.
-  4. O Sistema cria o registro em [`User`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L30-L105) com `ativo = true` e redireciona para `route('usuarios.index')`.
+  4. O Sistema cria o registro em [`User`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/User.php#L30-L105) com `ativo = true` e senha inicial aleatória/provisória, gera um token temporário de 30 minutos via broker e despacha em segundo plano a notificação [`ConviteCadastroNotification`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Notifications/ConviteCadastroNotification.php), para que o próprio usuário crie sua senha sob as diretrizes da NIST e informe opcionalmente seu endereço residencial. O Sistema redireciona para `route('usuarios.index')`.
 - **Fluxos Alternativos / Exceções:**
   - **A1 - Usuário sem permissão administrativa (`! isSuperAdmin() && ! isAdministrador()`):** O Sistema interrompe imediatamente a requisição com `HTTP 403 Forbidden` ("Acesso restrito a administradores.") em qualquer método de [`UsuarioController`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L22-L24).
   - **A2 - Sucessão Administrativa Municipal (`administrador` cadastra outro `administrador`):** Ao criar um novo usuário com `nivel === 'administrador'`, o Sistema desativa a conta do administrador logado (`$currentUser->update(['ativo' => false])`), executa `Auth::logout()`, invalida a sessão, regenera o token CSRF e redireciona para `route('login')` com aviso de sucessão ([`UsuarioController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/UsuarioController.php#L189-L196)).
@@ -337,3 +337,49 @@
   - **A3 - Estado/UF inexistente em `cidadesPorUf`:** O Sistema retorna um array JSON vazio `[]` ([`LocalidadeController::cidadesPorUf`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/LocalidadeController.php#L46-L48)).
   - **A4 - Resolução Assíncrona via Fila e Rate Limiting do Nominatim (`$sync === false`):** Quando acionado assincronamente, o Sistema retorna os dados preliminares locais e despacha [`ResolveReverseGeocodingJob`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Jobs/ResolveReverseGeocodingJob.php#L14-L81). O Job aplica `RateLimiter::attempt('nominatim_reverse_geocoding', 1, ..., 1)` (máximo de 1 requisição por segundo); se o limite for atingido fora do ambiente de testes, o Job executa `$this->release(2)` para reprocessamento após 2 segundos e, ao concluir, atualiza os campos de endereço da [`Estacao`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Models/Estacao.php#L19-L741) ([`ResolveReverseGeocodingJob::processGeocoding`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Jobs/ResolveReverseGeocodingJob.php#L58-L80)).
 - **Pós-condições:** Localidades e endereços estruturados retornados ao cliente, com novos bairros persistidos no banco e resultados armazenados em cache por 30 dias.
+
+---
+
+### UC17 — Recuperar Senha de Acesso (Self-Service)
+
+- **Atores:** Visitante / Usuário Cadastrado, Sistema (Fila de Notificações).
+- **Resumo:** Permite que qualquer usuário com conta ativa solicite a redefinição de sua senha a partir da tela de login, recebendo um link temporário com validade estrita de 30 minutos e definindo uma nova senha conforme as diretrizes da NIST SP 800-63B Rev. 4.
+- **Pré-condições:** O ator deve ser um visitante não autenticado (`guest`).
+- **Fluxo Principal (Caminho Feliz):**
+  1. O Visitante clica em "Não lembra a senha? Recupere aqui" na tela de login (`/login`); se o campo de e-mail já estiver preenchido, um script client-side anexa o valor na query string (`/esqueci-senha?email=...`).
+  2. O Sistema renderiza a tela de solicitação ([`PasswordResetLinkController::create`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PasswordResetLinkController.php)) com o campo de e-mail pré-preenchido.
+  3. O Visitante submete o formulário com o e-mail (`POST /esqueci-senha` em [`PasswordResetLinkController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/PasswordResetLinkController.php)).
+  4. O Sistema valida o formato do e-mail, gera um token seguro associado ao usuário ativo na tabela `password_reset_tokens` e enfileira em segundo plano o e-mail [`RedefinirSenhaNotification`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Notifications/RedefinirSenhaNotification.php).
+  5. O Sistema responde com mensagem genérica ("Se o e-mail informado estiver cadastrado e ativo, você receberá em instantes um link para redefinir sua senha.") para proteção contra enumeração de usuários.
+  6. O Usuário abre o e-mail recebido e clica no link assinado `GET /redefinir-senha/{token}?email=...`.
+  7. O Sistema valida a existência do token ([`NewPasswordController::create`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/NewPasswordController.php)) e exibe o formulário de redefinição com botões de alternância de visibilidade e contador de caracteres.
+  8. O Usuário informa a nova senha e sua confirmação, submetendo o formulário (`POST /redefinir-senha` em [`NewPasswordController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/NewPasswordController.php)).
+  9. O Sistema valida a senha conforme a política NIST (15 a 64 caracteres, sem imposição forçada de caracteres especiais, verificada contra a base *Have I Been Pwned* via `Password::defaults()`).
+  10. O Sistema grava o novo hash de senha, regenera o `remember_token`, invalida o token de redefinição, encerra quaisquer outras sessões ativas do usuário em outros navegadores na tabela `sessions` e redireciona para a tela de login com mensagem de sucesso.
+- **Fluxos Alternativos / Exceções:**
+  - **A1 - E-mail inexistente ou conta inativa (`ativo === false`):** O Sistema não despacha notificação, não gera token e retorna a mesma mensagem genérica de sucesso, impedindo a descoberta de contas cadastradas.
+  - **A2 - Token inválido ou manipulado:** O Sistema recusa a submissão e exibe a mensagem de erro: "Este link de recuperação é inválido ou expirou. Solicite um novo."
+  - **A3 - Token expirado (> 30 minutos):** O Sistema rejeita a requisição, pois a validade máxima é de 30 minutos (`AUTH_PASSWORD_RESET_EXPIRE`).
+  - **A4 - Senha em desacordo com as regras NIST:** Se a senha tiver menos de 15 caracteres, mais de 64 caracteres ou constar em vazamentos conhecidos de dados, a submissão é rejeitada com mensagem descritiva específica.
+  - **A5 - Taxa excessiva de solicitações (*Rate Limiting*):** Se o usuário disparar mais de 5 requisições por minuto (`throttle:5,1`), o Sistema responde com status `HTTP 429 Too Many Requests`.
+- **Pós-condições:** Nova senha cadastrada, sessões anteriores revogadas e usuário apto a realizar login com a nova credencial.
+
+---
+
+### UC18 — Ativar Conta e Concluir Cadastro de Novo Usuário
+
+- **Atores:** Novo Usuário (Convidado), Sistema (Broker de Tokens).
+- **Resumo:** Permite que um novo colaborador cadastrado por um administrador ative seu acesso, defina sua própria senha (sob as diretrizes da NIST SP 800-63B Rev. 4) e informe opcionalmente seus dados residenciais.
+- **Pré-condições:** O usuário deve ter sido previamente cadastrado por um gestor municipal ou super-administrador, possuindo um token de ativação válido.
+- **Fluxo Principal (Caminho Feliz):**
+  1. O Usuário acessa o link de ativação recebido por e-mail (`GET /completar-cadastro/{token}?email=...` em [`CompletarCadastroController::create`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/CompletarCadastroController.php)).
+  2. O Sistema exibe a tela de conclusão de cadastro com o e-mail fixo em modo somente leitura, campos para definição da nova senha com confirmação, e formulário opcional de endereço (CEP, logradouro, número, complemento, bairro, estado).
+  3. O Usuário preenche a nova senha (15 a 64 caracteres) e seus dados de endereço, submetendo o formulário (`POST /completar-cadastro` em [`CompletarCadastroController::store`](file:///home/henrique_1/Documents/OpenAir-Metrics/app/Http/Controllers/CompletarCadastroController.php)).
+  4. O Sistema valida o token via broker de senhas, valida a senha contra a política NIST (`Password::defaults()`) e valida os campos de endereço.
+  5. O Sistema atualiza o registro do usuário: grava o hash da senha, preenche os campos de endereço informados, marca `email_verified_at = now()`, assegura `ativo = true` e remove o token de uso único.
+  6. O Sistema redireciona para a tela de login (`route('login')`) com mensagem de sucesso: "Cadastro ativado com sucesso! Faça login com a sua nova senha."
+- **Fluxos Alternativos / Exceções:**
+  - **A1 - Link de ativação expirado (> 30 minutos):** O Sistema recusa a submissão e orienta o usuário a solicitar um novo link através da recuperação de senha no login.
+  - **A2 - Senha fraca ou vazada (NIST):** O formulário retorna com validação apontando a exigência de 15 caracteres ou a presença da senha em bases públicas de vazamentos.
+  - **A3 - Confirmação de senha divergente:** O Sistema bloqueia a requisição e sinaliza erro no campo de confirmação.
+- **Pós-condições:** Usuário com senha personalizada definida, endereço atualizado, e-mail verificado e acesso liberado ao sistema.

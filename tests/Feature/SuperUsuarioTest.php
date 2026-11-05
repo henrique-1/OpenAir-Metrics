@@ -3,9 +3,11 @@
 use App\Models\Cidade;
 use App\Models\Estado;
 use App\Models\User;
+use App\Notifications\ConviteCadastroNotification;
 use Database\Seeders\SuperAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
@@ -80,6 +82,8 @@ test('super-usuario visualiza campo de estado e cidades desabilitadas inicialmen
 });
 
 test('super-usuario pode cadastrar novo administrador municipal escolhendo a cidade', function () {
+    Notification::fake();
+
     $superadmin = User::factory()->create(['nivel' => 'superadmin', 'cidade_id' => null]);
     $estado = Estado::factory()->create(['nome' => 'São Paulo', 'uf' => 'SP']);
     $cidade = Cidade::factory()->create(['nome' => 'Ribeirão Preto', 'estado_id' => $estado->id]);
@@ -87,8 +91,6 @@ test('super-usuario pode cadastrar novo administrador municipal escolhendo a cid
     $payload = [
         'name' => 'Novo Gestor Ribeirão',
         'email' => 'gestor@ribeirao.sp.gov.br',
-        'password' => 'senhaSegura123',
-        'password_confirmation' => 'senhaSegura123',
         'estado_id' => $estado->id,
         'cidade_id' => $cidade->id,
     ];
@@ -105,6 +107,10 @@ test('super-usuario pode cadastrar novo administrador municipal escolhendo a cid
         'cidade_id' => $cidade->id,
         'ativo' => true,
     ]);
+
+    $novoAdmin = User::where('email', 'gestor@ribeirao.sp.gov.br')->first();
+    expect($novoAdmin)->not->toBeNull();
+    Notification::assertSentTo($novoAdmin, ConviteCadastroNotification::class);
 });
 
 test('super-usuario nao pode cadastrar administrador com cidade que nao pertence ao estado selecionado', function () {
@@ -116,8 +122,6 @@ test('super-usuario nao pode cadastrar administrador com cidade que nao pertence
     $payload = [
         'name' => 'Gestor Invalido',
         'email' => 'invalido@teste.com',
-        'password' => 'senhaSegura123',
-        'password_confirmation' => 'senhaSegura123',
         'estado_id' => $estadoSp->id,
         'cidade_id' => $cidadeRj->id, // Cidade pertence ao RJ, mas estado informado é SP
     ];

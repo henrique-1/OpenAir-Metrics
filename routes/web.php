@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CompletarCadastroController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EstacaoController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InstalacaoController;
 use App\Http\Controllers\LocalidadeController;
+use App\Http\Controllers\NewPasswordController;
+use App\Http\Controllers\PasswordResetLinkController;
 use App\Http\Controllers\PatrimonioController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\PlanejamentoController;
@@ -23,6 +26,16 @@ Route::middleware('guest')->group(function () {
 
     // Rota POST para processar a submissão do formulário
     Route::post('/login', [AuthController::class, 'store'])->middleware('throttle:5,1')->name('login.store');
+
+    // Recuperação de senha
+    Route::get('/esqueci-senha', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    Route::post('/esqueci-senha', [PasswordResetLinkController::class, 'store'])->middleware('throttle:5,1')->name('password.email');
+    Route::get('/redefinir-senha/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    Route::post('/redefinir-senha', [NewPasswordController::class, 'store'])->middleware('throttle:5,1')->name('password.update');
+
+    // Ativação e conclusão de cadastro de novos usuários
+    Route::get('/completar-cadastro/{token}', [CompletarCadastroController::class, 'create'])->name('cadastro.completar');
+    Route::post('/completar-cadastro', [CompletarCadastroController::class, 'store'])->middleware('throttle:5,1')->name('cadastro.salvar');
 });
 
 // Rotas protegidas (apenas usuários autenticados)

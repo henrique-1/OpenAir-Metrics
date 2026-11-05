@@ -14,6 +14,12 @@
 
             <!-- Formulário -->
             <div class="p-6">
+                @if (session('status'))
+                    <div role="status" class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-sm text-emerald-800 dark:text-emerald-200">
+                        {{ session('status') }}
+                    </div>
+                @endif
+
                 <form method="POST" action="{{ route('login') }}" class="flex flex-col gap-4">
                     @csrf
 
@@ -39,15 +45,12 @@
                         @enderror
                     </div>
 
-                    <!-- Lembre-me & Recuperação -->
+                    <!-- Lembre-me -->
                     <div class="flex items-center justify-between mt-2">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" name="remember" class="rounded border-athens-gray-300 dark:border-athens-gray-700 bg-white dark:bg-athens-gray-800 text-blue-dianne-600 focus:ring-blue-dianne-500 w-4 h-4 transition">
                             <span class="text-sm text-athens-gray-700 dark:text-athens-gray-300">Lembrar de mim</span>
                         </label>
-                        @if (Route::has('password.request'))
-                            <a href="{{ route('password.request') }}" class="text-sm text-blue-dianne-600 dark:text-blue-dianne-400 hover:text-blue-dianne-800 dark:hover:text-blue-dianne-300 font-medium transition">Esqueceu a senha?</a>
-                        @endif
                     </div>
 
                     <!-- Botão de Submit -->
@@ -56,6 +59,14 @@
                         Entrar
                         <x-heroicon-o-arrow-right class="w-4 h-4" />
                     </button>
+
+                    <!-- Recuperação de senha -->
+                    @if (Route::has('password.request'))
+                        <p class="text-sm text-center text-athens-gray-600 dark:text-athens-gray-400">
+                            Não lembra a senha?
+                            <a href="{{ route('password.request') }}" id="link-recuperar-senha" class="text-blue-dianne-600 dark:text-blue-dianne-400 hover:text-blue-dianne-800 dark:hover:text-blue-dianne-300 font-medium underline-offset-2 hover:underline transition">Recupere aqui</a>
+                        </p>
+                    @endif
                 </form>
             </div>
             
@@ -68,4 +79,22 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            // Leva o e-mail já digitado no login para a tela de recuperação de senha.
+            document.getElementById('link-recuperar-senha')?.addEventListener('click', (event) => {
+                const email = document.getElementById('email')?.value.trim();
+
+                if (! email) {
+                    return;
+                }
+
+                event.preventDefault();
+                const url = new URL(event.currentTarget.href);
+                url.searchParams.set('email', email);
+                window.location.href = url.toString();
+            });
+        </script>
+    @endpush
 </x-layouts.app>

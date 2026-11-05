@@ -2,7 +2,9 @@
 
 use App\Models\Cidade;
 use App\Models\User;
+use App\Notifications\ConviteCadastroNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
@@ -46,6 +48,8 @@ test('administrador pode listar apenas usuarios de seu municipio', function () {
 });
 
 test('administrador pode cadastrar cadastrador ou instalador para o municipio', function () {
+    Notification::fake();
+
     $cidade = Cidade::factory()->create(['nome' => 'Campinas']);
     $admin = User::factory()->create([
         'nivel' => 'administrador',
@@ -55,8 +59,6 @@ test('administrador pode cadastrar cadastrador ou instalador para o municipio', 
     $payload = [
         'name' => 'Novo Instalador Municipal',
         'email' => 'instalador@campinas.sp.gov.br',
-        'password' => 'senhaSegura123',
-        'password_confirmation' => 'senhaSegura123',
         'nivel' => 'instalador',
     ];
 
@@ -71,9 +73,15 @@ test('administrador pode cadastrar cadastrador ou instalador para o municipio', 
         'cidade_id' => $cidade->id,
         'ativo' => true,
     ]);
+
+    $novoUsuario = User::where('email', 'instalador@campinas.sp.gov.br')->first();
+    expect($novoUsuario)->not->toBeNull();
+    Notification::assertSentTo($novoUsuario, ConviteCadastroNotification::class);
 });
 
 test('administrador municipal pode cadastrar outro administrador sob sucessao desativando a propria conta', function () {
+    Notification::fake();
+
     $cidade = Cidade::factory()->create(['nome' => 'São Paulo']);
     $adminOriginal = User::factory()->create([
         'name' => 'Gestor Municipal',
@@ -86,8 +94,6 @@ test('administrador municipal pode cadastrar outro administrador sob sucessao de
     $payloadNovoAdmin = [
         'name' => 'Prefeito Novo',
         'email' => 'novo.titular@prefeitura.sp.gov.br',
-        'password' => 'senhaNova12345',
-        'password_confirmation' => 'senhaNova12345',
         'nivel' => 'administrador',
     ];
 
@@ -317,4 +323,32 @@ test('listagem de usuarios pagina de 10 em 10 registros', function () {
     $responsePage2->assertSuccessful();
     $usuariosPage2 = $responsePage2->viewData('usuarios');
     expect($usuariosPage2->count())->toBe(3);
+});
+
+test('cadastro de usuario municipal envia email de ativacao e nao exige senha do administrador', function () {
+    Notification::fake();
+
+    $cidade = Cidade::factory()->create();
+    $admin = User::factory()->create([
+        'nivel' => 'administrador',
+        'cidade_id' => $cidade->id,
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('usuarios.store'), [
+        'name' => 'Novo Tecnico',
+        'email' => 'tecnico.novo@prefeitura.sp.gov.br',
+        'nivel' => 'cadastrador',
+    ]);
+
+    $response->assertRedirect(route('usuarios.index'));
+    $response->assertSessionHas('success');
+
+    $this->assertDatabaseHas('users', [
+        'email' => 'tecnico.novo@prefeitura.sp.gov.br',
+        'nivel' => 'cadastrador',
+    ]);
+
+    $novoUser = User::where('email', 'tecnico.novo@prefeitura.sp.gov.br')->first();
+    expect($novoUser->password)->not->toBeEmpty();
+    Notification::assertSentTo($novoUser, ConviteCadastroNotification::class);
 });

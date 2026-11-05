@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\RedefinirSenhaNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -44,6 +45,14 @@ class User extends Authenticatable
             'password' => 'hashed',
             'ativo' => 'boolean',
         ];
+    }
+
+    /**
+     * Envia o e-mail de recuperação de senha em português.
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new RedefinirSenhaNotification($token));
     }
 
     /**

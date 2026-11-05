@@ -30,8 +30,6 @@ test('administrador pode gerenciar usuarios municipais e cadastrar sucessor desa
     $responseCadastrador = $this->actingAs($admin)->post(route('usuarios.store'), [
         'name' => 'Planejador Municipal',
         'email' => 'planejador@prefeitura.sp.gov.br',
-        'password' => 'password123',
-        'password_confirmation' => 'password123',
         'nivel' => 'cadastrador',
     ]);
     $responseCadastrador->assertRedirect(route('usuarios.index'));
@@ -41,8 +39,6 @@ test('administrador pode gerenciar usuarios municipais e cadastrar sucessor desa
     $responseInstalador = $this->actingAs($admin)->post(route('usuarios.store'), [
         'name' => 'Instalador Municipal',
         'email' => 'instalador@prefeitura.sp.gov.br',
-        'password' => 'password123',
-        'password_confirmation' => 'password123',
         'nivel' => 'instalador',
     ]);
     $responseInstalador->assertRedirect(route('usuarios.index'));
@@ -52,8 +48,6 @@ test('administrador pode gerenciar usuarios municipais e cadastrar sucessor desa
     $responseAdmin = $this->actingAs($admin)->post(route('usuarios.store'), [
         'name' => 'Sucessor Admin',
         'email' => 'sucessor.admin@prefeitura.sp.gov.br',
-        'password' => 'password123',
-        'password_confirmation' => 'password123',
         'nivel' => 'administrador',
     ]);
     $responseAdmin->assertRedirect(route('login'));

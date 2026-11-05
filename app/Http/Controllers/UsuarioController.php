@@ -5,10 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\Cidade;
 use App\Models\Estado;
 use App\Models\User;
+use App\Notifications\ConviteCadastroNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\View\View;
 
 class UsuarioController extends Controller
@@ -141,7 +146,6 @@ class UsuarioController extends Controller
             $validated = $request->validate([
                 'name' => ['required', 'string', 'max:255'],
                 'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-                'password' => ['required', 'string', 'min:8', 'confirmed'],
                 'estado_id' => ['nullable', 'exists:estados,id'],
                 'cidade_id' => [
                     'required',
@@ -151,41 +155,36 @@ class UsuarioController extends Controller
                         fn ($q) => $q->where('estado_id', $request->input('estado_id'))
                     ),
                 ],
-                'logradouro' => ['nullable', 'string', 'max:255'],
-                'numero' => ['nullable', 'string', 'max:20'],
-                'complemento' => ['nullable', 'string', 'max:255'],
-                'bairro' => ['nullable', 'string', 'max:255'],
-                'estado' => ['nullable', 'string', 'max:2'],
-                'cep' => ['nullable', 'string', 'max:9'],
             ]);
 
             $validated['nivel'] = 'administrador';
             $validated['ativo'] = true;
+            $validated['password'] = Hash::make(Str::random(60));
             unset($validated['estado_id']);
 
-            User::create($validated);
+            $novoUsuario = User::create($validated);
 
-            return redirect()->route('usuarios.index')->with('success', 'Administrador municipal cadastrado com sucesso!');
+            $token = Password::broker()->createToken($novoUsuario);
+            $novoUsuario->notify(new ConviteCadastroNotification($token));
+
+            return redirect()->route('usuarios.index')->with('success', 'Administrador municipal cadastrado com sucesso! Um e-mail de ativação foi enviado para ele definir sua senha e endereço.');
         }
 
         // Administrador municipal: cadastra técnicos, instaladores ou um sucessor administrador
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
             'nivel' => ['required', 'in:administrador,cadastrador,instalador'],
-            'logradouro' => ['nullable', 'string', 'max:255'],
-            'numero' => ['nullable', 'string', 'max:20'],
-            'complemento' => ['nullable', 'string', 'max:255'],
-            'bairro' => ['nullable', 'string', 'max:255'],
-            'estado' => ['nullable', 'string', 'max:2'],
-            'cep' => ['nullable', 'string', 'max:9'],
         ]);
 
         $validated['cidade_id'] = $currentUser->cidade_id;
         $validated['ativo'] = true;
+        $validated['password'] = Hash::make(Str::random(60));
 
-        User::create($validated);
+        $novoUsuario = User::create($validated);
+
+        $token = Password::broker()->createToken($novoUsuario);
+        $novoUsuario->notify(new ConviteCadastroNotification($token));
 
         if ($validated['nivel'] === 'administrador') {
             $currentUser->update(['ativo' => false]);
@@ -193,10 +192,10 @@ class UsuarioController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')->with('info', 'Novo administrador municipal cadastrado com sucesso. Conforme a regra de sucessão administrativa municipal, sua conta foi desativada e você foi desconectado.');
+            return redirect()->route('login')->with('info', 'Novo administrador municipal cadastrado com sucesso. Um e-mail de ativação foi enviado para ele. Conforme a regra de sucessão administrativa municipal, sua conta foi desativada e você foi desconectado.');
         }
 
-        return redirect()->route('usuarios.index')->with('success', 'Usuário cadastrado com sucesso!');
+        return redirect()->route('usuarios.index')->with('success', 'Usuário cadastrado com sucesso! Um e-mail de ativação foi enviado para ele definir sua senha e endereço.');
     }
 
     /**
@@ -308,14 +307,9 @@ class UsuarioController extends Controller
                 'complemento' => ['nullable', 'string', 'max:255'],
                 'bairro' => ['nullable', 'string', 'max:255'],
                 'cep' => ['nullable', 'string', 'max:9'],
-                'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             ]);
 
             unset($validated['estado_id']);
-
-            if (empty($validated['password'])) {
-                unset($validated['password']);
-            }
 
             $user->update($validated);
 
@@ -340,10 +334,10 @@ class UsuarioController extends Controller
             'complemento' => ['nullable', 'string', 'max:255'],
             'bairro' => ['nullable', 'string', 'max:255'],
             'cep' => ['nullable', 'string', 'max:9'],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ];
 
         if ($isSelf) {
+            $rules['password'] = ['nullable', 'string', 'confirmed', PasswordRule::defaults()];
             $validated = $request->validate($rules);
         } else {
             $rules['email'] = ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)];

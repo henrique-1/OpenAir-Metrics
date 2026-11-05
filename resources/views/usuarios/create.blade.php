@@ -299,68 +299,17 @@
                                     class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border @error('email') border-cinnabar-500 ring-1 ring-cinnabar-500 @else border-athens-gray-300 dark:border-athens-gray-700 @enderror rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
                                 >
                             </div>
-
-                            <!-- Senha -->
-                            <div>
-                                <label for="password" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
-                                    Senha Inicial <span class="text-cinnabar-500">*</span>
-                                </label>
-                                <input 
-                                    type="password" 
-                                    id="password" 
-                                    name="password" 
-                                    required
-                                    minlength="8"
-                                    placeholder="Mínimo 8 caracteres"
-                                    class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border @error('password') border-cinnabar-500 ring-1 ring-cinnabar-500 @else border-athens-gray-300 dark:border-athens-gray-700 @enderror rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
-                                >
-                            </div>
-
-                            <!-- Confirmar Senha -->
-                            <div>
-                                <label for="password_confirmation" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
-                                    Confirmar Senha <span class="text-cinnabar-500">*</span>
-                                </label>
-                                <input 
-                                    type="password" 
-                                    id="password_confirmation" 
-                                    name="password_confirmation" 
-                                    required
-                                    minlength="8"
-                                    placeholder="Repita a senha"
-                                    class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
-                                >
-                            </div>
                         </div>
 
-                        <div class="pt-4">
-                            <h2 class="text-lg font-bold text-blue-dianne-950 dark:text-white border-b border-athens-gray-100 dark:border-athens-gray-800 pb-2">Endereço (Opcional)</h2>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                            <div>
-                                <label for="cep" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">CEP</label>
-                                <input type="text" id="cep" name="cep" value="{{ old('cep') }}" placeholder="00000-000" maxlength="9" class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition">
-                            </div>
-
-                            <div class="sm:col-span-2">
-                                <label for="logradouro" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">Logradouro</label>
-                                <input type="text" id="logradouro" name="logradouro" value="{{ old('logradouro') }}" class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition">
-                            </div>
-
-                            <div>
-                                <label for="numero" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">Número</label>
-                                <input type="text" id="numero" name="numero" value="{{ old('numero') }}" class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition">
-                            </div>
-
-                            <div>
-                                <label for="complemento" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">Complemento</label>
-                                <input type="text" id="complemento" name="complemento" value="{{ old('complemento') }}" class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition">
-                            </div>
-
-                            <div>
-                                <label for="bairro" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">Bairro</label>
-                                <input type="text" id="bairro" name="bairro" value="{{ old('bairro') }}" class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition">
+                        <!-- Aviso sobre envio de convite por e-mail -->
+                        <div class="mt-2 p-4 rounded-xl bg-blue-dianne-50 dark:bg-blue-dianne-950/40 border border-blue-dianne-200 dark:border-blue-dianne-800 flex items-start gap-3">
+                            <x-heroicon-o-information-circle class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400 shrink-0 mt-0.5" />
+                            <div class="text-xs text-blue-dianne-900 dark:text-blue-dianne-200 space-y-1">
+                                <p class="font-semibold">Definição segura de credenciais</p>
+                                <p>
+                                    Conforme as diretrizes de segurança da NIST (SP 800-63B), o administrador não define a senha de outros usuários.
+                                    Ao concluir o cadastro, o sistema enviará automaticamente um e-mail com link de ativação para que o próprio colaborador crie sua senha de acesso e preencha seu endereço (opcional).
+                                </p>
                             </div>
                         </div>
 

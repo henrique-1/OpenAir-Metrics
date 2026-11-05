@@ -283,35 +283,42 @@
                                 @endif
                             </div>
 
-                            <!-- Senha -->
-                            <div>
-                                <label for="password" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
-                                    Nova Senha <span class="text-xs font-normal text-athens-gray-500">(opcional)</span>
-                                </label>
-                                <input 
-                                    type="password" 
-                                    id="password" 
-                                    name="password" 
-                                    minlength="8"
-                                    placeholder="Deixe em branco para manter a atual"
-                                    class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border @error('password') border-cinnabar-500 ring-1 ring-cinnabar-500 @else border-athens-gray-300 dark:border-athens-gray-700 @enderror rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
-                                >
-                            </div>
+                            @if($usuario->id === $currentUser->id)
+                                <!-- Senha -->
+                                <div>
+                                    <label for="password" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
+                                        Nova Senha <span class="text-xs font-normal text-athens-gray-500">(opcional)</span>
+                                    </label>
+                                    <input 
+                                        type="password" 
+                                        id="password" 
+                                        name="password" 
+                                        minlength="15" maxlength="64"
+                                        placeholder="Deixe em branco para manter a atual"
+                                        class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border @error('password') border-cinnabar-500 ring-1 ring-cinnabar-500 @else border-athens-gray-300 dark:border-athens-gray-700 @enderror rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
+                                    >
+                                </div>
 
-                            <!-- Confirmar Senha -->
-                            <div>
-                                <label for="password_confirmation" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
-                                    Confirmar Nova Senha
-                                </label>
-                                <input 
-                                    type="password" 
-                                    id="password_confirmation" 
-                                    name="password_confirmation" 
-                                    minlength="8"
-                                    placeholder="Repita a nova senha"
-                                    class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
-                                >
-                            </div>
+                                <!-- Confirmar Senha -->
+                                <div>
+                                    <label for="password_confirmation" class="block text-sm font-semibold text-blue-dianne-950 dark:text-white mb-1.5">
+                                        Confirmar Nova Senha
+                                    </label>
+                                    <input 
+                                        type="password" 
+                                        id="password_confirmation" 
+                                        name="password_confirmation" 
+                                        minlength="15" maxlength="64"
+                                        placeholder="Repita a nova senha"
+                                        class="w-full px-4 py-2.5 text-sm bg-white dark:bg-athens-gray-800 text-athens-gray-900 dark:text-athens-gray-100 placeholder:text-athens-gray-400 dark:placeholder:text-athens-gray-500 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 transition"
+                                    >
+                                </div>
+                            @else
+                                <div class="sm:col-span-2 p-3 rounded-lg bg-athens-gray-100 dark:bg-athens-gray-800/60 border border-athens-gray-200 dark:border-athens-gray-700 text-xs text-athens-gray-600 dark:text-athens-gray-400 flex items-center gap-2">
+                                    <x-heroicon-o-shield-check class="w-4 h-4 text-blue-dianne-600 dark:text-blue-dianne-400 shrink-0" />
+                                    <span>Por diretrizes de segurança (NIST SP 800-63B), administradores não alteram senhas de outros usuários. Para redefinir o acesso, utilize a recuperação de senha no login.</span>
+                                </div>
+                            @endif
                         </div>
 
                         <div class="pt-4">
