@@ -36,8 +36,8 @@
     {{-- Travamos a tela em 100% de largura e altura, sem scroll --}}
     <body class="font-sans antialiased h-screen w-screen overflow-hidden bg-athens-gray-50 {{ request()->is('/') ? 'text-athens-gray-900' : 'dark:bg-athens-gray-950 text-athens-gray-900 dark:text-athens-gray-100' }} transition-colors duration-200">
         
-        {{-- Header Flutuante e Transparente (Apenas fora do Dashboard e Áreas Administrativas) --}}
-        @if(!request()->routeIs('dashboard*') && !request()->routeIs('estacoes.*') && !request()->routeIs('patrimonios.*') && !request()->routeIs('instalacoes.*') && !request()->routeIs('perfil.*') && !request()->routeIs('usuarios.*') && !request()->routeIs('login*'))
+        {{-- Header Flutuante e Transparente (Apenas fora de telas de autenticação, Dashboard e Áreas Administrativas) --}}
+        @if(!request()->routeIs('dashboard*', 'estacoes.*', 'patrimonios.*', 'instalacoes.*', 'perfil.*', 'usuarios.*', 'login*', 'password.*', 'cadastro.*', 'two-factor.*'))
             <header class="absolute top-0 left-0 w-full z-[2000] pointer-events-none p-4">
                 <div class="relative flex items-center w-full h-12">
                     

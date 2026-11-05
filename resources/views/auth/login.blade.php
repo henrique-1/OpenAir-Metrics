@@ -5,11 +5,11 @@
         <div class="w-full max-w-md bg-white/95 dark:bg-athens-gray-900/95 backdrop-blur-md shadow-2xl rounded-xl border border-athens-gray-200 dark:border-athens-gray-800 overflow-hidden z-10 mx-4">
             
             <!-- Cabeçalho do Cartão -->
-            <div class="bg-blue-dianne-950 text-white p-6 shadow-sm flex flex-col items-center">
-                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-14 w-auto mb-4 drop-shadow-md dark:hidden">
-                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-14 w-auto mb-4 drop-shadow-md hidden dark:block">
-                <h2 class="font-bold text-xl leading-tight tracking-tight">Acesso ao Sistema</h2>
-                <p class="text-sm text-blue-dianne-100 mt-1 opacity-80">Insira suas credenciais para continuar</p>
+            <div class="bg-athens-gray-50 dark:bg-athens-gray-900 border-b border-athens-gray-200 dark:border-athens-gray-800 p-6 flex flex-col items-center">
+                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-14 w-auto mb-4 drop-shadow-sm dark:hidden">
+                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-14 w-auto mb-4 drop-shadow-sm hidden dark:block">
+                <h2 class="font-bold text-xl text-athens-gray-900 dark:text-white leading-tight tracking-tight">Acesso ao Sistema</h2>
+                <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">Insira suas credenciais para continuar</p>
             </div>
 
             <!-- Formulário -->
@@ -37,9 +37,16 @@
                     <!-- Senha -->
                     <div>
                         <label for="password" class="block text-sm font-medium text-athens-gray-800 dark:text-athens-gray-200 mb-1">Senha</label>
-                        <input type="password" id="password" name="password" required
-                            class="w-full px-4 py-2 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 outline-none transition-all text-athens-gray-900 dark:text-athens-gray-100 bg-white dark:bg-athens-gray-800 placeholder-athens-gray-400 dark:placeholder-athens-gray-500"
-                            placeholder="••••••••">
+                        <div class="relative">
+                            <input type="password" id="password" name="password" required
+                                class="w-full pl-4 pr-11 py-2 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg focus:ring-2 focus:ring-blue-dianne-500 focus:border-blue-dianne-500 outline-none transition-all text-athens-gray-900 dark:text-athens-gray-100 bg-white dark:bg-athens-gray-800 placeholder-athens-gray-400 dark:placeholder-athens-gray-500"
+                                placeholder="••••••••">
+                            <button type="button" data-alternar-senha="password" aria-label="Mostrar senha" aria-pressed="false"
+                                class="absolute inset-y-0 right-0 px-3 flex items-center text-athens-gray-500 hover:text-athens-gray-800 dark:hover:text-athens-gray-200 transition">
+                                <x-heroicon-o-eye class="w-5 h-5" data-icone="mostrar" />
+                                <x-heroicon-o-eye-slash class="w-5 h-5 hidden" data-icone="ocultar" />
+                            </button>
+                        </div>
                         @error('password')
                             <span class="text-cinnabar-500 text-xs mt-1 block">{{ $message }}</span>
                         @enderror
@@ -108,6 +115,20 @@
 
     @push('scripts')
         <script>
+            // Alternar visualização da senha digitada (NIST SP 800-63B)
+            document.querySelectorAll('[data-alternar-senha]').forEach((botao) => {
+                botao.addEventListener('click', () => {
+                    const campo = document.getElementById(botao.dataset.alternarSenha);
+                    const exibir = campo.type === 'password';
+
+                    campo.type = exibir ? 'text' : 'password';
+                    botao.setAttribute('aria-pressed', String(exibir));
+                    botao.setAttribute('aria-label', exibir ? 'Ocultar senha' : 'Mostrar senha');
+                    botao.querySelector('[data-icone="mostrar"]').classList.toggle('hidden', exibir);
+                    botao.querySelector('[data-icone="ocultar"]').classList.toggle('hidden', !exibir);
+                });
+            });
+
             // Leva o e-mail já digitado no login para a tela de recuperação de senha.
             document.getElementById('link-recuperar-senha')?.addEventListener('click', (event) => {
                 const email = document.getElementById('email')?.value.trim();

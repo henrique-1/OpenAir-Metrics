@@ -14,6 +14,9 @@ use App\Http\Controllers\PatrimonioController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\PlanejamentoController;
 use App\Http\Controllers\UsuarioController;
+use App\Models\User;
+use App\Notifications\ConviteCadastroNotification;
+use App\Notifications\RedefinirSenhaNotification;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -104,3 +107,26 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 });
+
+// Rotas de Pré-visualização de E-mails (apenas em ambiente local de desenvolvimento)
+if (app()->environment('local')) {
+    Route::get('/preview-email/convite', function () {
+        $user = new User([
+            'name' => 'Henrique Malaman',
+            'email' => 'henrique@exemplo.com',
+            'nivel' => 'administrador',
+        ]);
+
+        return response((new ConviteCadastroNotification('token-exemplo-12345'))->toMail($user)->render());
+    })->name('preview.email.convite');
+
+    Route::get('/preview-email/recuperar-senha', function () {
+        $user = new User([
+            'name' => 'Henrique Malaman',
+            'email' => 'henrique@exemplo.com',
+            'nivel' => 'administrador',
+        ]);
+
+        return response((new RedefinirSenhaNotification('token-exemplo-12345'))->toMail($user)->render());
+    })->name('preview.email.recuperar-senha');
+}
