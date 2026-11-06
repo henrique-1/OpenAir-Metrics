@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Bairro;
 use App\Models\Cidade;
+use App\Models\Estacao;
 use App\Models\Estado;
 use App\Models\User;
 use App\Notifications\ConviteCadastroNotification;
@@ -239,10 +241,43 @@ test('super-usuario nao pode gerenciar usuarios nao administradores', function (
 test('super-usuario e bloqueado com 403 ao tentar acessar modulos operacionais municipais', function () {
     $superadmin = User::factory()->create(['nivel' => 'superadmin', 'cidade_id' => null]);
 
-    $this->actingAs($superadmin)->get(route('dashboard'))->assertStatus(403);
     $this->actingAs($superadmin)->get(route('estacoes.index'))->assertStatus(403);
     $this->actingAs($superadmin)->get(route('patrimonios.index'))->assertStatus(403);
     $this->actingAs($superadmin)->get(route('instalacoes.index'))->assertStatus(403);
+});
+
+test('super-usuario pode acessar a dashboard e selecionar qualquer cidade e seus bairros com estacoes', function () {
+    $superadmin = User::factory()->create(['nivel' => 'superadmin', 'cidade_id' => null]);
+    $cidade1 = Cidade::factory()->create(['nome' => 'Mogi Mirim']);
+    $bairro1 = Bairro::factory()->create(['cidade_id' => $cidade1->id, 'nome' => 'Centro']);
+    Estacao::factory()->create(['bairro_id' => $bairro1->id]);
+
+    $cidade2 = Cidade::factory()->create(['nome' => 'Campinas']);
+    $bairro2 = Bairro::factory()->create(['cidade_id' => $cidade2->id, 'nome' => 'Taquaral']);
+    Estacao::factory()->create(['bairro_id' => $bairro2->id]);
+
+    $response = $this->actingAs($superadmin)->get(route('dashboard'));
+
+    $response->assertOk();
+    $response->assertSee('Mogi Mirim');
+    $response->assertSee('Campinas');
+    $response->assertSee('Painel Global de Monitoramento');
+
+    // Superadmin consulta a API de bairros com estações da cidade selecionada
+    $resBairros = $this->actingAs($superadmin)->getJson(route('dashboard.cidades.bairros', $cidade2->id));
+    $resBairros->assertOk();
+    $resBairros->assertJsonFragment(['id' => $bairro2->id, 'nome' => 'Taquaral']);
+
+    // Superadmin consulta dados do gráfico e alertas para Campinas
+    $resGrafico = $this->actingAs($superadmin)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'cidade',
+        'cidade_id' => $cidade2->id,
+        'metrica' => 'qualidade_ar',
+        'periodo' => '24h',
+    ]));
+
+    $resGrafico->assertOk();
+    expect($resGrafico->json('localidade'))->toContain('Campinas');
 });
 
 test('super-usuario e redirecionado para listagem de administradores ao efetuar login', function () {

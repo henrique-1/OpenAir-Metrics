@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/graficos', [DashboardController::class, 'dadosGrafico'])->name('dashboard.graficos');
+    Route::get('/dashboard/cidades/{cidade}/bairros', [DashboardController::class, 'bairrosComEstacoes'])->name('dashboard.cidades.bairros');
 
     // Módulo de Estações
     Route::get('/estacoes', [EstacaoController::class, 'index'])->name('estacoes.index');

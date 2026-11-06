@@ -11,10 +11,14 @@
                 <!-- Título da Página -->
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">Painel Analítico de Monitoramento</h1>
-                        <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">Acompanhe as métricas e médias históricas de qualidade do ar por cidade ou bairro.</p>
+                        <h1 class="text-2xl font-bold text-blue-dianne-950 dark:text-white tracking-tight">
+                            {{ auth()->user()?->isSuperAdmin() ? 'Painel Global de Monitoramento' : 'Painel Analítico de Monitoramento' }}
+                        </h1>
+                        <p class="text-sm text-athens-gray-600 dark:text-athens-gray-400 mt-1">
+                            {{ auth()->user()?->isSuperAdmin() ? 'Monitore e audite as métricas ambientais de qualquer município e bairro com estações ativas.' : 'Acompanhe as métricas e médias históricas de qualidade do ar por cidade ou bairro.' }}
+                        </p>
                     </div>
-                    @if(!auth()->user()?->isInstalador())
+                    @if(!auth()->user()?->isInstalador() && !auth()->user()?->isSuperAdmin())
                         <a href="{{ route('estacoes.create') }}" class="inline-flex items-center gap-2 bg-blue-dianne-600 hover:bg-blue-dianne-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm self-start sm:self-auto">
                             <x-heroicon-o-plus class="w-4 h-4" />
                             Nova Estação
@@ -340,6 +344,7 @@
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
             document.addEventListener('DOMContentLoaded', function () {
+                const isSuperAdmin = {{ (auth()->user()?->isSuperAdmin() ?? false) ? 'true' : 'false' }};
                 let chartInstance = null;
                 let currentTipo = 'cidade';
                 let currentMetrica = 'qualidade_ar';
@@ -411,12 +416,58 @@
                     currentTipo = 'bairro';
                     atualizarBotoesTipo();
                     containerBairro.classList.remove('hidden');
-                    containerCidade.classList.add('hidden');
+                    if (isSuperAdmin) {
+                        containerCidade.classList.remove('hidden');
+                    } else {
+                        containerCidade.classList.add('hidden');
+                    }
                     carregarDadosGrafico();
                 });
 
+                // Função para atualizar dinamicamente os bairros com estações da cidade selecionada
+                function carregarBairrosCidade(cidadeId, callback) {
+                    if (!cidadeId) {
+                        if (callback) callback();
+                        return;
+                    }
+                    const url = `{{ url('/dashboard/cidades') }}/${cidadeId}/bairros`;
+                    fetch(url)
+                        .then(res => res.json())
+                        .then(bairros => {
+                            selectBairro.innerHTML = '';
+                            if (bairros && bairros.length > 0) {
+                                bairros.forEach(b => {
+                                    const opt = document.createElement('option');
+                                    opt.value = b.id;
+                                    opt.textContent = `Bairro ${b.nome}`;
+                                    selectBairro.appendChild(opt);
+                                });
+                            } else {
+                                const opt = document.createElement('option');
+                                opt.value = '';
+                                opt.textContent = 'Nenhum bairro com estações';
+                                selectBairro.appendChild(opt);
+                            }
+                            if (callback) callback();
+                        })
+                        .catch(err => {
+                            console.error('Erro ao carregar bairros da cidade:', err);
+                            if (callback) callback();
+                        });
+                }
+
                 // Seleção de Cidade ou Bairro
-                selectCidade.addEventListener('change', carregarDadosGrafico);
+                selectCidade.addEventListener('change', function () {
+                    const cidadeId = this.value;
+                    if (isSuperAdmin) {
+                        carregarBairrosCidade(cidadeId, function () {
+                            carregarDadosGrafico();
+                        });
+                    } else {
+                        carregarDadosGrafico();
+                    }
+                });
+
                 selectBairro.addEventListener('change', carregarDadosGrafico);
 
                 // Seleção de Período (24h, 7d, 30d)
@@ -440,6 +491,7 @@
                 // Função de Carregamento AJAX dos Dados do Gráfico
                 function carregarDadosGrafico(silent = false) {
                     const localidadeId = currentTipo === 'cidade' ? selectCidade.value : selectBairro.value;
+                    const cidadeId = selectCidade.value;
 
                     if (!silent) {
                         chartLoading.classList.remove('hidden');
@@ -449,6 +501,9 @@
                     url.searchParams.append('tipo_agrupamento', currentTipo);
                     if (localidadeId) {
                         url.searchParams.append('localidade_id', localidadeId);
+                    }
+                    if (cidadeId) {
+                        url.searchParams.append('cidade_id', cidadeId);
                     }
                     url.searchParams.append('metrica', currentMetrica);
                     url.searchParams.append('periodo', currentPeriodo);

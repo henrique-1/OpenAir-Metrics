@@ -62,6 +62,14 @@
 
         <nav class="flex-1 p-3 space-y-1.5 overflow-y-auto">
             @if(Auth::user() && Auth::user()->isSuperAdmin())
+                <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 px-3 py-2.5 rounded-lg font-medium transition-colors">
+                    <x-heroicon-o-map class="w-5 h-5 text-blue-dianne-600 dark:text-blue-dianne-400" />
+                    Voltar para o Mapa
+                </a>
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'dashboard' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
+                    <x-heroicon-o-chart-pie class="w-5 h-5 {{ $active === 'dashboard' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                    Painel Geral
+                </a>
                 <a href="{{ route('usuarios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'usuarios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-700 dark:text-athens-gray-200 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 font-medium' }}">
                     <x-heroicon-o-users class="w-5 h-5 {{ $active === 'usuarios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
                     Administradores
@@ -142,6 +150,14 @@
     
     <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
         @if(Auth::user() && Auth::user()->isSuperAdmin())
+            <a href="{{ url('/') }}" class="flex items-center gap-3 text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white px-3 py-2.5 rounded-lg font-medium transition-colors">
+                <x-heroicon-o-map class="w-5 h-5" />
+                Voltar para o Mapa
+            </a>
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'dashboard' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
+                <x-heroicon-o-chart-pie class="w-5 h-5 {{ $active === 'dashboard' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
+                Painel Geral
+            </a>
             <a href="{{ route('usuarios.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors {{ $active === 'usuarios' ? 'bg-blue-dianne-50 dark:bg-blue-dianne-950/80 text-blue-dianne-950 dark:text-blue-dianne-300 font-bold border border-blue-dianne-200 dark:border-blue-dianne-800 shadow-sm' : 'text-athens-gray-600 dark:text-athens-gray-300 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 hover:text-blue-dianne-900 dark:hover:text-white font-medium' }}">
                 <x-heroicon-o-users class="w-5 h-5 {{ $active === 'usuarios' ? 'text-blue-dianne-600 dark:text-blue-dianne-400' : 'text-athens-gray-500 dark:text-athens-gray-400' }}" />
                 Administradores

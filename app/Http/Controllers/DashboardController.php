@@ -25,9 +25,7 @@ class DashboardController extends Controller
     public function index(Request $request): View
     {
         $user = Auth::user();
-        if ($user?->isSuperAdmin()) {
-            abort(403, 'O super-usuário só pode gerenciar administradores.');
-        }
+        $isSuperAdmin = $user?->isSuperAdmin() ?? false;
 
         $periodo = $request->input('periodo', '24h');
         $dataInicio = match ($periodo) {
@@ -44,37 +42,36 @@ class DashboardController extends Controller
             default => 'nas últimas 24 horas',
         };
 
-        // A jurisdição (cidade) do usuário gestor é fixa
+        // Para gestor municipal a cidade é fixa; para superadmin pode selecionar qualquer cidade com estações
         $cidadeIdFixa = $user?->cidade_id;
 
         $cidadesQuery = Cidade::whereHas('bairros.estacoes')->with('estado')->orderBy('nome');
-        $bairrosQuery = Bairro::whereHas('estacoes')->with(['cidade.estado'])->orderBy('nome');
+        if ($cidadeIdFixa && ! $isSuperAdmin) {
+            $cidadesQuery->where('id', $cidadeIdFixa);
+        }
+
+        $cidades = $cidadesQuery->get();
+
+        // Determina a cidade inicialmente selecionada
+        $cidadeSelecionadaId = ($cidadeIdFixa && ! $isSuperAdmin)
+            ? $cidadeIdFixa
+            : ($request->input('cidade_id') ?: $cidades->first()?->id);
+
+        $cidadeSelecionada = $cidadeSelecionadaId ? Cidade::with('estado')->find($cidadeSelecionadaId) : $cidades->first();
+        $localidadeInicialNome = $cidadeSelecionada ? "{$cidadeSelecionada->nome} - {$cidadeSelecionada->estado?->uf}" : 'Jurisdição';
+
+        // Bairros da cidade selecionada que possuem estações
+        $bairros = $cidadeSelecionada
+            ? Bairro::where('cidade_id', $cidadeSelecionada->id)->whereHas('estacoes')->orderBy('nome')->get()
+            : collect();
+
         $estacaoQuery = Estacao::query();
         $medicaoQuery = Medicao::query();
 
-        if ($cidadeIdFixa) {
-            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
-            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
-            $cidadesQuery->where('id', $cidadeIdFixa);
-            $bairrosQuery->where('cidade_id', $cidadeIdFixa);
-        } else {
-            $primeiraCidade = (clone $cidadesQuery)->first();
-            if ($primeiraCidade) {
-                $cidadeIdFixa = $primeiraCidade->id;
-                $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
-                $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
-                $bairrosQuery->where('cidade_id', $cidadeIdFixa);
-            }
+        if ($cidadeSelecionada) {
+            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeSelecionada->id));
+            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $cidadeSelecionada->id));
         }
-
-        // Cidades que possuem estações cadastradas na jurisdição
-        $cidades = $cidadesQuery->get();
-
-        // Bairros que possuem estações cadastradas na jurisdição (único parâmetro que pode variar)
-        $bairros = $bairrosQuery->get();
-
-        $cidadeFixa = $cidadeIdFixa ? Cidade::with('estado')->find($cidadeIdFixa) : $cidades->first();
-        $localidadeInicialNome = $cidadeFixa ? "{$cidadeFixa->nome} - {$cidadeFixa->estado?->uf}" : 'Jurisdição';
 
         $totalEstacoes = $estacaoQuery->count();
         $totalLeituras = (clone $medicaoQuery)->count();
@@ -104,6 +101,7 @@ class DashboardController extends Controller
             'localidadeInicialNome' => $localidadeInicialNome,
             'cidades' => $cidades,
             'bairros' => $bairros,
+            'isSuperAdmin' => $isSuperAdmin,
         ]);
     }
 
@@ -113,43 +111,42 @@ class DashboardController extends Controller
     public function dadosGrafico(Request $request): JsonResponse
     {
         $user = Auth::user();
-        if ($user?->isSuperAdmin()) {
-            abort(403, 'O super-usuário só pode gerenciar administradores.');
-        }
+        $isSuperAdmin = $user?->isSuperAdmin() ?? false;
 
         $tipoAgrupamento = $request->input('tipo_agrupamento', 'cidade'); // 'cidade' ou 'bairro'
         $localidadeId = $request->input('localidade_id');
+        $cidadeParam = $request->input('cidade_id');
         $metrica = $request->input('metrica', 'qualidade_ar'); // 'qualidade_ar', 'temperatura', 'umidade', 'poeira', 'co2'
         $periodo = $request->input('periodo', '24h'); // '24h', '7d', '30d', 'todos'
 
-        // 1. Identifica a jurisdição fixa da cidade e a localidade selecionada (apenas o Bairro pode variar)
-        $cidadeIdFixa = $user?->cidade_id;
+        // 1. Identifica a cidade selecionada: para gestor municipal a cidade é fixa; para superadmin usa o parâmetro
+        $cidadeId = ($user?->cidade_id && ! $isSuperAdmin) ? $user->cidade_id : $cidadeParam;
 
-        // Fallback para testes ou administradores sem cidade_id fixa
-        if (! $cidadeIdFixa) {
+        // Fallback para testes ou caso cidade_id não tenha sido passada
+        if (! $cidadeId) {
             if ($tipoAgrupamento === 'bairro' && $localidadeId) {
-                $cidadeIdFixa = Bairro::find($localidadeId)?->cidade_id;
+                $cidadeId = Bairro::find($localidadeId)?->cidade_id;
             } elseif ($localidadeId) {
-                $cidadeIdFixa = $localidadeId;
+                $cidadeId = $localidadeId;
             }
 
-            if (! $cidadeIdFixa) {
+            if (! $cidadeId) {
                 $primeiraCidade = Cidade::whereHas('bairros.estacoes')->orderBy('nome')->first();
-                $cidadeIdFixa = $primeiraCidade?->id;
+                $cidadeId = $primeiraCidade?->id;
             }
         }
 
-        $cidadeFixa = $cidadeIdFixa ? Cidade::with('estado')->find($cidadeIdFixa) : null;
-        $cidadeNome = $cidadeFixa ? "{$cidadeFixa->nome} - {$cidadeFixa->estado?->uf}" : 'Jurisdição';
+        $cidade = $cidadeId ? Cidade::with('estado')->find($cidadeId) : null;
+        $cidadeNome = $cidade ? "{$cidade->nome} - {$cidade->estado?->uf}" : 'Jurisdição';
 
         $localidadeNome = $cidadeNome;
         $estacoesQuery = Estacao::query();
 
         if ($tipoAgrupamento === 'bairro') {
-            // No modo Bairro, filtra pelo bairro selecionado dentro da cidade do usuário
+            // No modo Bairro, filtra pelo bairro selecionado dentro da cidade
             $bairroQuery = Bairro::whereHas('estacoes');
-            if ($cidadeIdFixa) {
-                $bairroQuery->where('cidade_id', $cidadeIdFixa);
+            if ($cidadeId) {
+                $bairroQuery->where('cidade_id', $cidadeId);
             }
 
             $bairro = null;
@@ -163,14 +160,14 @@ class DashboardController extends Controller
             if ($bairro) {
                 $localidadeNome = "Bairro {$bairro->nome}";
                 $estacoesQuery->where('bairro_id', $bairro->id);
-            } elseif ($cidadeIdFixa) {
-                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
+            } elseif ($cidadeId) {
+                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeId));
             }
         } else {
-            // No modo Cidade, a jurisdição é fixa: agrega todas as estações do município
+            // No modo Cidade, congrega todas as estações do município selecionado
             $localidadeNome = $cidadeNome;
-            if ($cidadeIdFixa) {
-                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
+            if ($cidadeId) {
+                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeId));
             }
         }
 
@@ -472,5 +469,23 @@ class DashboardController extends Controller
             $dt->format('Y-m-d'),
             $dt->format('d/m'),
         ];
+    }
+
+    /**
+     * Endpoint API para listar bairros com estações de uma cidade (usado pelo seletor dinâmico da dashboard).
+     */
+    public function bairrosComEstacoes(Cidade $cidade): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user && $user->cidade_id && ! $user->isSuperAdmin() && (int) $user->cidade_id !== (int) $cidade->id) {
+            abort(403, 'Acesso restrito à jurisdição do seu município.');
+        }
+
+        $bairros = $cidade->bairros()
+            ->whereHas('estacoes')
+            ->orderBy('nome')
+            ->get(['id', 'nome']);
+
+        return response()->json($bairros);
     }
 }
