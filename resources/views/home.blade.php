@@ -34,6 +34,55 @@
         {{-- Container do Mapa --}}
         <div id="air-quality-map"></div>
 
+        {{-- Painel Flutuante de Alertas Ambientais em Tempo Real na Home --}}
+        @if(!empty($estacoesAlerta) && count($estacoesAlerta) > 0)
+            <div id="painel-alertas-home" class="absolute top-20 left-4 z-[1000] w-80 max-w-[calc(100vw-2rem)] transition-all duration-300">
+                <div class="bg-white/95 dark:bg-athens-gray-900/95 backdrop-blur-md shadow-2xl rounded-2xl border border-amber-200 dark:border-amber-900/50 overflow-hidden">
+                    <button type="button" id="btn-toggle-alertas-home" class="w-full p-3.5 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent flex items-center justify-between gap-3 text-left cursor-pointer hover:bg-amber-500/15 transition-colors">
+                        <div class="flex items-center gap-2.5">
+                            <span class="flex h-3 w-3 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                            </span>
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-200">Alertas Ambientais Ativos</p>
+                                <p class="text-[11px] font-medium text-athens-gray-600 dark:text-athens-gray-300">
+                                    {{ count($estacoesAlerta) }} {{ count($estacoesAlerta) === 1 ? 'estação requer atenção' : 'estações requerem atenção' }}
+                                </p>
+                            </div>
+                        </div>
+                        <x-heroicon-m-chevron-down id="icone-toggle-alertas" class="w-4 h-4 text-amber-700 dark:text-amber-300 transition-transform duration-200" />
+                    </button>
+
+                    <!-- Lista expansível de estações em alerta -->
+                    <div id="lista-alertas-home" class="hidden max-h-72 overflow-y-auto divide-y divide-athens-gray-100 dark:divide-athens-gray-800 p-2">
+                        @foreach($estacoesAlerta as $itemAlerta)
+                            <div class="p-2.5 hover:bg-athens-gray-50 dark:hover:bg-athens-gray-800/50 rounded-xl transition-colors">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-blue-dianne-950 dark:text-white truncate">{{ $itemAlerta['nome'] }}</p>
+                                        <p class="text-[11px] text-athens-gray-500 dark:text-athens-gray-400">{{ $itemAlerta['bairro'] }} ({{ $itemAlerta['cidade'] }})</p>
+                                    </div>
+                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border shrink-0 {{ $itemAlerta['alerta_maximo']['badge_class'] }}">
+                                        {{ $itemAlerta['alerta_maximo']['status'] }}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-athens-gray-600 dark:text-athens-gray-300 mt-1.5 leading-snug">
+                                    {{ $itemAlerta['alerta_maximo']['descricao'] }}
+                                </p>
+                                <button type="button" 
+                                    onclick="focarEstacaoAlerta({{ $itemAlerta['lat'] }}, {{ $itemAlerta['lng'] }})"
+                                    class="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-blue-dianne-600 dark:text-persian-green-400 hover:underline cursor-pointer">
+                                    <x-heroicon-m-magnifying-glass class="w-3 h-3" />
+                                    Localizar no mapa
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Painel Lateral de Controle --}}
         <div class="absolute top-20 right-4 z-[1000] w-72 bg-white/95 backdrop-blur-md shadow-2xl rounded-xl border border-athens-gray-200 overflow-hidden flex flex-col transition-all">
             <div class="bg-blue-dianne-950 text-white p-4 shadow-sm">
@@ -581,18 +630,49 @@
                     return res ? res.value : null;
                 }
 
-                // Função auxiliar para definir o texto e a cor com base no valor da camada
+                // Função auxiliar para definir o texto, criticidade de alerta e a cor com base no valor da camada
                 function getStatusInfo(val, layerKey) {
                     if (layerKey === 'iqa') {
-                        if (val <= 40) return { text: 'Boa', color: '#2ecc71' };
-                        if (val <= 80) return { text: 'Moderada', color: '#f1c40f' };
-                        if (val <= 120) return { text: 'Ruim', color: '#e67e22' };
-                        if (val <= 200) return { text: 'Muito Ruim', color: '#e74c3c' };
-                        if (val <= 400) return { text: 'Péssima', color: '#8e44ad' };
-                        return { text: 'Extrema', color: '#43110c' };
+                        if (val <= 40) return { text: 'Boa', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
+                        if (val <= 80) return { text: 'Moderada', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        if (val <= 120) return { text: 'Ruim', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        if (val <= 200) return { text: 'Muito Ruim', color: '#ef4444', alert: 'Crítico Severo', isAlert: true };
+                        return { text: 'Péssima', color: '#9333ea', alert: 'Emergência', isAlert: true };
+                    }
+                    if (layerKey === 'temperatura') {
+                        if (val < 0) return { text: 'Congelamento/Geada', color: '#9333ea', alert: 'Emergência', isAlert: true };
+                        if (val < 10) return { text: 'Frio Intenso', color: '#ef4444', alert: 'Crítico Severo', isAlert: true };
+                        if (val < 18) return { text: 'Frio Severo', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        if (val < 20) return { text: 'Frio Leve', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        if (val <= 24) return { text: 'Equilíbrio', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
+                        if (val <= 28) return { text: 'Calor Moderado', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        if (val <= 35) return { text: 'Estresse Térmico', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        return { text: 'Calor Extremo', color: '#ef4444', alert: 'Crítico Extremo', isAlert: true };
+                    }
+                    if (layerKey === 'umidade') {
+                        if (val < 20) return { text: 'Emergência (Ar Seco)', color: '#ef4444', alert: 'Emergência', isAlert: true };
+                        if (val < 30) return { text: 'Ar Seco Crítico', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        if (val < 40) return { text: 'Ar Seco Moderado', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        if (val <= 65) return { text: 'Faixa Saudável', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
+                        if (val <= 75) return { text: 'Umidade Elevada', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        return { text: 'Risco Mofo/Fungos', color: '#f97316', alert: 'Crítico', isAlert: true };
+                    }
+                    if (layerKey === 'pm') {
+                        if (val <= 15) return { text: 'Boa', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
+                        if (val <= 50) return { text: 'Moderada', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        if (val <= 75) return { text: 'Ruim', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        if (val <= 125) return { text: 'Muito Ruim', color: '#ef4444', alert: 'Crítico Severo', isAlert: true };
+                        return { text: 'Péssima', color: '#9333ea', alert: 'Emergência', isAlert: true };
+                    }
+                    if (layerKey === 'co2') {
+                        if (val <= 700) return { text: 'Excelente', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
+                        if (val <= 1000) return { text: 'Atenção (Limite VMR)', color: '#f59e0b', alert: 'Atenção', isAlert: true };
+                        if (val <= 1500) return { text: 'Ventilação Inadequada', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        if (val <= 2500) return { text: 'Crítico Severo', color: '#ef4444', alert: 'Crítico Severo', isAlert: true };
+                        return { text: 'Emergência', color: '#9333ea', alert: 'Emergência', isAlert: true };
                     }
                     const rgb = getColorForValue(val, layerKey);
-                    return { text: mapLayersData[layerKey].name, color: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` };
+                    return { text: mapLayersData[layerKey].name, color: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`, alert: '', isAlert: false };
                 }
 
                 // Renderiza o marcador no estilo visual OpenAir Metrics
@@ -606,6 +686,7 @@
 
                     const val = interpResult.value;
                     const dataHora = interpResult.dataHora;
+                    const isIqa = currentLayerKey === 'iqa';
 
                     // Puxa as informações do Dicionário
                     const layerInfo = mapLayersData[currentLayerKey];
@@ -620,15 +701,13 @@
                     const statusText = statusInfo.text;
                     const badgeColor = statusInfo.color;
 
-                    // Lógica condicional: Verifica se a camada ativa é a de Qualidade do Ar
-                    const isIqa = currentLayerKey === 'iqa';
-
-                    const statusHtml = isIqa ? `
-                        <!-- Legenda (Status ex: "Bom", "Moderado") -->
-                        <div class="text-[13px] text-[#cccccc] mt-1.5 mb-0.5 tracking-wide">
-                            ${statusText}
+                    const statusHtml = `
+                        <!-- Legenda (Status e Alerta) -->
+                        <div class="text-[12px] text-[#cccccc] mt-1.5 mb-0.5 tracking-wide flex items-center justify-between gap-1.5">
+                            <span class="font-medium">${statusText}</span>
+                            ${statusInfo.isAlert ? `<span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded shadow-2xs text-white" style="background-color: ${badgeColor};">${statusInfo.alert}</span>` : ''}
                         </div>
-                    ` : '';
+                    `;
 
                     const dataHoraHtml = dataHora ? `
                         <!-- Data e Hora da Leitura -->
@@ -638,12 +717,12 @@
                         </div>
                     ` : '';
 
-                    const badgeHtml = isIqa ? `
+                    const badgeHtml = `
                         <!-- Botão circular (Canto Inferior Direito) - Cor Dinâmica -->
                         <div class="absolute -right-1 -bottom-2 w-8 h-8 rounded-full flex items-center justify-center border-[3.5px] border-[#4a4b4d] shadow-sm z-20" style="background-color: ${badgeColor};">
                             <x-heroicon-o-chevron-down class="w-4 h-4 text-white stroke-[3]" />
                         </div>
-                    ` : '';
+                    `;
 
                     // HTML reestruturado para usar as classes utilitárias nativas do Tailwind
                     const markerHtml = `
@@ -885,6 +964,32 @@
                     }
                 }
                 inicializarEcho();
+
+                // Controle do Painel Flutuante de Alertas da Home
+                window.focarEstacaoAlerta = function(lat, lng) {
+                    if (window.leafletMap) {
+                        window.leafletMap.flyTo([lat, lng], 16, { duration: 1.0 });
+                        setTimeout(() => {
+                            updateClickMarker(L.latLng(lat, lng));
+                        }, 1100);
+                    }
+                };
+
+                const btnToggleAlertas = document.getElementById('btn-toggle-alertas-home');
+                const listaAlertas = document.getElementById('lista-alertas-home');
+                const iconeToggle = document.getElementById('icone-toggle-alertas');
+                if (btnToggleAlertas && listaAlertas) {
+                    btnToggleAlertas.addEventListener('click', function() {
+                        const fechado = listaAlertas.classList.contains('hidden');
+                        if (fechado) {
+                            listaAlertas.classList.remove('hidden');
+                            if (iconeToggle) iconeToggle.classList.add('rotate-180');
+                        } else {
+                            listaAlertas.classList.add('hidden');
+                            if (iconeToggle) iconeToggle.classList.remove('rotate-180');
+                        }
+                    });
+                }
             }
 
             if (document.readyState === 'loading') {

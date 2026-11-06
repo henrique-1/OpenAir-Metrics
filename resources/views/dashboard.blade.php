@@ -23,7 +23,7 @@
                 </div>
 
                 <!-- Grid de Métricas Gerais da Rede -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     
                     <!-- Sensores Ativos -->
                     <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
@@ -46,26 +46,71 @@
                             <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($totalLeituras, 0, ',', '.') }}</p>
                         </div>
                     </div>
-                    
-                    <!-- Alertas IQA -->
-                    <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
-                        <div class="p-3 bg-ebony-clay-50 dark:bg-ebony-clay-950/50 rounded-lg text-ebony-clay-600 dark:text-ebony-clay-400">
-                            <x-heroicon-o-globe-americas class="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Qualidade (IQA)</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $alertasIqa }}</p>
-                        </div>
-                    </div>
+                </div>
 
-                    <!-- Alertas de PM -->
-                    <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
-                        <div class="p-3 bg-cinnabar-50 dark:bg-cinnabar-950/50 rounded-lg text-cinnabar-500">
-                            <x-heroicon-o-shield-exclamation class="w-6 h-6" />
+                <!-- Grid de Alertas Ambientais -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400 flex items-center gap-2">
+                            <x-heroicon-m-bell-alert class="w-4 h-4 text-cinnabar-500" />
+                            <span>Alertas Ambientais</span>
+                            <span id="alerta-subtitulo-periodo" class="font-normal lowercase text-athens-gray-400 dark:text-athens-gray-500">({{ $periodoRotulo }})</span>
+                        </h2>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <!-- Alertas IQA -->
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                            <div class="p-3 bg-ebony-clay-50 dark:bg-ebony-clay-950/50 rounded-lg text-ebony-clay-600 dark:text-ebony-clay-400">
+                                <x-heroicon-o-globe-americas class="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Qualidade (IQA)</p>
+                                <p id="alerta-card-iqa" class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($alertasIqa, 0, ',', '.') }}</p>
+                            </div>
                         </div>
-                        <div>
-                            <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Particulado</p>
-                            <p class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ $alertasPm }}</p>
+
+                        <!-- Alertas Particulado -->
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                            <div class="p-3 bg-cinnabar-50 dark:bg-cinnabar-950/50 rounded-lg text-cinnabar-500">
+                                <x-heroicon-o-shield-exclamation class="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Particulado</p>
+                                <p id="alerta-card-pm" class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($alertasPm, 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Alertas Temperatura -->
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                            <div class="p-3 bg-tahiti-gold-50 dark:bg-tahiti-gold-950/50 rounded-lg text-tahiti-gold-500">
+                                <x-heroicon-o-fire class="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Temperatura</p>
+                                <p id="alerta-card-temp" class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($alertasTemp, 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Alertas Umidade -->
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                            <div class="p-3 bg-dodger-blue-50 dark:bg-dodger-blue-950/50 rounded-lg text-dodger-blue-500">
+                                <x-heroicon-o-cloud class="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas Umidade</p>
+                                <p id="alerta-card-umidade" class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($alertasUmidade, 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Alertas CO2 -->
+                        <div class="bg-white dark:bg-athens-gray-900 rounded-xl shadow-sm border border-athens-gray-200 dark:border-athens-gray-800 p-5 flex items-center gap-4 transition-colors">
+                            <div class="p-3 bg-purple-50 dark:bg-purple-950/50 rounded-lg text-purple-600 dark:text-purple-400">
+                                <x-heroicon-o-building-office-2 class="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-athens-gray-500 dark:text-athens-gray-400 uppercase tracking-wide">Alertas CO₂</p>
+                                <p id="alerta-card-co2" class="text-2xl font-bold text-blue-dianne-950 dark:text-white">{{ number_format($alertasCo2, 0, ',', '.') }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -445,21 +490,106 @@
 
                     statClassificacao.textContent = data.status_classificacao;
                     statClassificacao.className = `px-2 py-0.5 text-[11px] font-bold rounded-full border ${data.status_cor}`;
+                    if (data.status_descricao) {
+                        statClassificacao.title = data.status_descricao;
+                    }
 
                     statEstacoesAtivas.textContent = `${data.estacoes_ativas} estação(ões) ativa(s) em ${data.localidade}`;
 
-                    // Atualiza a legenda descritiva dos blocos com o período selecionado
+                    // Atualiza a legenda descritiva dos blocos com o período selecionado e alerta se aplicável
                     const descPeriodo = data.periodo_rotulo || (currentPeriodo === '7d' ? 'nos últimos 7 dias' : (currentPeriodo === '30d' ? 'nos últimos 30 dias' : 'nas últimas 24 horas'));
                     const statDescMedia = document.getElementById('stat-desc-media');
                     const statDescMax = document.getElementById('stat-desc-max');
                     const statDescMin = document.getElementById('stat-desc-min');
 
-                    if (statDescMedia) statDescMedia.textContent = `Média ponderada ${descPeriodo}`;
+                    if (statDescMedia) {
+                        if (data.status_alerta && data.status_alerta !== 'Sem Alerta') {
+                            statDescMedia.innerHTML = `<span class="font-semibold text-amber-600 dark:text-amber-400">${data.status_alerta}</span> · ${descPeriodo}`;
+                        } else {
+                            statDescMedia.textContent = `Média ponderada ${descPeriodo}`;
+                        }
+                    }
                     if (statDescMax) statDescMax.textContent = `Pico máximo registrado ${descPeriodo}`;
                     if (statDescMin) statDescMin.textContent = `Ponto mínimo observado ${descPeriodo}`;
+
+                    // Atualiza os contadores dos 5 cards de alertas ambientais de acordo com o período e localidade
+                    if (data.contadores_alertas) {
+                        const elIqa = document.getElementById('alerta-card-iqa');
+                        const elPm = document.getElementById('alerta-card-pm');
+                        const elTemp = document.getElementById('alerta-card-temp');
+                        const elUmid = document.getElementById('alerta-card-umidade');
+                        const elCo2 = document.getElementById('alerta-card-co2');
+
+                        if (elIqa) elIqa.textContent = Number(data.contadores_alertas.iqa ?? 0).toLocaleString('pt-BR');
+                        if (elPm) elPm.textContent = Number(data.contadores_alertas.pm ?? 0).toLocaleString('pt-BR');
+                        if (elTemp) elTemp.textContent = Number(data.contadores_alertas.temperatura ?? 0).toLocaleString('pt-BR');
+                        if (elUmid) elUmid.textContent = Number(data.contadores_alertas.umidade ?? 0).toLocaleString('pt-BR');
+                        if (elCo2) elCo2.textContent = Number(data.contadores_alertas.co2 ?? 0).toLocaleString('pt-BR');
+                    }
+
+                    const elSubtituloPeriodo = document.getElementById('alerta-subtitulo-periodo');
+                    if (elSubtituloPeriodo && data.periodo_rotulo) {
+                        elSubtituloPeriodo.textContent = `(${data.periodo_rotulo})`;
+                    }
                 }
 
                 let ultimoDadoCarregado = null;
+
+                // Plugin inline do Chart.js para demarcação visual das faixas de alerta na área do gráfico
+                const alertBandsPlugin = {
+                    id: 'alertBandsPlugin',
+                    beforeDatasetsDraw(chart) {
+                        const { ctx, chartArea, scales } = chart;
+                        if (!chartArea || !scales || !scales.y || !chart.config._faixasAlerta) return;
+
+                        const y = scales.y;
+                        const faixas = chart.config._faixasAlerta;
+
+                        ctx.save();
+                        faixas.forEach(faixa => {
+                            const minVal = faixa.min;
+                            const maxVal = faixa.max !== null ? faixa.max : y.max;
+
+                            // Checa se a faixa intercepta a escala visível do eixo Y
+                            if (maxVal >= y.min && minVal <= y.max) {
+                                const boundedMax = Math.min(y.max, maxVal);
+                                const boundedMin = Math.max(y.min, minVal);
+
+                                const topPixel = y.getPixelForValue(boundedMax);
+                                const bottomPixel = y.getPixelForValue(boundedMin);
+                                const height = Math.abs(bottomPixel - topPixel);
+                                const yStart = Math.min(topPixel, bottomPixel);
+
+                                if (height > 0) {
+                                    // Área sombreada demarcada correspondente à faixa
+                                    ctx.fillStyle = faixa.bg_cor;
+                                    ctx.fillRect(chartArea.left, yStart, chartArea.width, height);
+
+                                    // Linha pontilhada no limiar de corte
+                                    if (topPixel >= chartArea.top && topPixel <= chartArea.bottom) {
+                                        ctx.strokeStyle = faixa.cor;
+                                        ctx.lineWidth = 0.8;
+                                        ctx.setLineDash([4, 4]);
+                                        ctx.beginPath();
+                                        ctx.moveTo(chartArea.left, topPixel);
+                                        ctx.lineTo(chartArea.right, topPixel);
+                                        ctx.stroke();
+                                    }
+
+                                    // Rótulo da área demarcada
+                                    if (height >= 16) {
+                                        ctx.fillStyle = faixa.cor;
+                                        ctx.font = 'bold 9px sans-serif';
+                                        ctx.textAlign = 'right';
+                                        ctx.textBaseline = 'top';
+                                        ctx.fillText(faixa.label, chartArea.right - 8, yStart + 3);
+                                    }
+                                }
+                            }
+                        });
+                        ctx.restore();
+                    }
+                };
 
                 // Criação dos datasets de Média, Máximo e Mínimo
                 function gerarDatasetsGrafico(data, isDark) {
@@ -467,6 +597,21 @@
                     const corMaximo = data.metrica === 'poeira' ? '#dc2626' : '#ef4444';
                     const corMinimo = data.metrica === 'umidade' ? '#0284c7' : '#3b82f6';
                     const isMuitosPontos = data.labels && data.labels.length > 30;
+
+                    // Demarcação de pontos em alerta na linha de Média
+                    const alertasPontos = data.alertas_pontos || [];
+                    const pointColors = alertasPontos.length > 0
+                        ? alertasPontos.map(a => (a.peso > 0 ? a.cor : (isDark ? '#111827' : '#ffffff')))
+                        : (isDark ? '#111827' : '#ffffff');
+                    const pointBorderColors = alertasPontos.length > 0
+                        ? alertasPontos.map(a => (a.peso > 0 ? a.cor : corMedia))
+                        : corMedia;
+                    const pointRadii = alertasPontos.length > 0
+                        ? alertasPontos.map(a => (a.peso > 0 ? 5 : (isMuitosPontos ? 2 : 4)))
+                        : (isMuitosPontos ? 2 : 4);
+                    const pointHoverRadii = alertasPontos.length > 0
+                        ? alertasPontos.map(a => (a.peso > 0 ? 7 : 6))
+                        : 6;
 
                     return [
                         {
@@ -478,12 +623,12 @@
                             borderDash: [],
                             fill: false,
                             tension: 0.35,
-                            pointBackgroundColor: isDark ? '#111827' : '#ffffff',
-                            pointBorderColor: corMedia,
+                            pointBackgroundColor: pointColors,
+                            pointBorderColor: pointBorderColors,
                             pointBorderWidth: 2,
-                            pointRadius: isMuitosPontos ? 2 : 4,
-                            pointHoverRadius: 6,
-                            pointHoverBackgroundColor: corMedia,
+                            pointRadius: pointRadii,
+                            pointHoverRadius: pointHoverRadii,
+                            pointHoverBackgroundColor: pointBorderColors,
                             pointHoverBorderColor: isDark ? '#111827' : '#ffffff',
                             pointHoverBorderWidth: 2,
                         },
@@ -582,8 +727,19 @@
                         return `${datasetLabel}: ${formatado} ${data.unidade}`;
                     };
 
+                    const tooltipAfterLabelCallback = function (context) {
+                        if (context.datasetIndex === 0 && data.alertas_pontos && data.alertas_pontos[context.dataIndex]) {
+                            const ap = data.alertas_pontos[context.dataIndex];
+                            if (ap.peso > 0) {
+                                return `⚠️ ${ap.status}: ${ap.descricao}`;
+                            }
+                        }
+                        return '';
+                    };
+
                     if (chartInstance) {
-                        // Atualização in-place suave sem destruir o canvas (evita o reset visual do gráfico)
+                        // Atualização in-place suave sem destruir o canvas
+                        chartInstance.config._faixasAlerta = data.faixas_alerta || [];
                         chartInstance.data.labels = data.labels;
                         chartInstance.data.datasets = datasets;
                         
@@ -594,6 +750,7 @@
                         chartInstance.options.scales.y.ticks.precision = isInteiro ? 0 : 2;
                         chartInstance.options.scales.y.ticks.callback = yAxisTicksCallback;
                         chartInstance.options.plugins.tooltip.callbacks.label = tooltipLabelCallback;
+                        chartInstance.options.plugins.tooltip.callbacks.afterLabel = tooltipAfterLabelCallback;
 
                         chartInstance.update();
                         return;
@@ -605,6 +762,7 @@
                             labels: data.labels,
                             datasets: datasets
                         },
+                        plugins: [alertBandsPlugin],
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
@@ -634,7 +792,8 @@
                                     cornerRadius: 8,
                                     displayColors: true,
                                     callbacks: {
-                                        label: tooltipLabelCallback
+                                        label: tooltipLabelCallback,
+                                        afterLabel: tooltipAfterLabelCallback,
                                     }
                                 }
                             },
@@ -665,6 +824,8 @@
                             }
                         }
                     });
+
+                    chartInstance.config._faixasAlerta = data.faixas_alerta || [];
                 }
 
                 window.addEventListener('themechanged', function () {

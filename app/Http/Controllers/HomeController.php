@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Estacao;
 use App\Models\Medicao;
+use App\Services\AlertaAmbientalService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 
 class HomeController extends Controller
 {
+    public function __construct(
+        protected AlertaAmbientalService $alertaService
+    ) {}
+
     /**
      * Exibe o mapa público com dados em tempo real dos sensores persistidos no banco.
      */
@@ -17,7 +22,7 @@ class HomeController extends Controller
         $estacoes = Estacao::query()
             ->withCoordinates()
             ->whereHas('medicoes')
-            ->with(['ultimaMedicao'])
+            ->with(['ultimaMedicao', 'bairro.cidade.estado'])
             ->get();
 
         $dadosIqa = [];
@@ -25,6 +30,7 @@ class HomeController extends Controller
         $dadosUmidade = [];
         $dadosPm = [];
         $dadosCo2 = [];
+        $estacoesAlerta = [];
 
         $sumLat = 0.0;
         $sumLng = 0.0;
@@ -47,6 +53,32 @@ class HomeController extends Controller
 
                 $dataHoraObj = $medicao->data_hora ?? $medicao->created_at;
                 $dataHoraFormatada = $dataHoraObj ? Carbon::parse($dataHoraObj)->format('d/m/Y H:i') : null;
+
+                // Avaliação dos alertas ambientais para a estação
+                $resAlerta = $this->alertaService->avaliarMedicao($medicao);
+                if ($resAlerta['tem_alerta']) {
+                    $estacoesAlerta[] = [
+                        'public_id' => $estacao->public_id,
+                        'nome' => $estacao->logradouro ? "{$estacao->logradouro}, {$estacao->numero}" : "Estação {$estacao->mac_address}",
+                        'bairro' => $estacao->bairro?->nome ?? $estacao->bairro_nome,
+                        'cidade' => $estacao->bairro?->cidade?->nome ?? $estacao->cidade_nome,
+                        'lat' => $latFloat,
+                        'lng' => $lngFloat,
+                        'alerta_maximo' => [
+                            'nivel' => $resAlerta['alerta_maximo']['nivel']->value,
+                            'peso' => $resAlerta['alerta_maximo']['nivel']->peso(),
+                            'status' => $resAlerta['alerta_maximo']['status'],
+                            'classe' => $resAlerta['alerta_maximo']['classe'],
+                            'descricao' => $resAlerta['alerta_maximo']['descricao'],
+                            'cor' => $resAlerta['alerta_maximo']['cor'],
+                            'badge_class' => $resAlerta['alerta_maximo']['badge_class'],
+                            'parametro' => $resAlerta['alerta_maximo']['parametro'] ?? 'Ambiente',
+                            'valor' => $resAlerta['alerta_maximo']['valor'] ?? null,
+                            'unidade' => $resAlerta['alerta_maximo']['unidade'] ?? '',
+                        ],
+                        'alertas_ativos' => array_values($resAlerta['alertas_ativos']),
+                    ];
+                }
 
                 $dadosIqa[] = [
                     'estacao_id' => $estacao->public_id,
@@ -102,7 +134,8 @@ class HomeController extends Controller
             'dadosUmidade',
             'dadosPm',
             'dadosCo2',
-            'centroMapa'
+            'centroMapa',
+            'estacoesAlerta'
         ));
     }
 }

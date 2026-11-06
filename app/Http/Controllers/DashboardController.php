@@ -6,6 +6,7 @@ use App\Models\Bairro;
 use App\Models\Cidade;
 use App\Models\Estacao;
 use App\Models\Medicao;
+use App\Services\AlertaAmbientalService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,15 +15,34 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        protected AlertaAmbientalService $alertaService
+    ) {}
+
     /**
      * Exibe a página principal do Dashboard com os filtros e dados iniciais.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         $user = Auth::user();
         if ($user?->isSuperAdmin()) {
             abort(403, 'O super-usuário só pode gerenciar administradores.');
         }
+
+        $periodo = $request->input('periodo', '24h');
+        $dataInicio = match ($periodo) {
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            'todos' => null,
+            default => now()->subHours(24),
+        };
+
+        $periodoRotulo = match ($periodo) {
+            '7d' => 'nos últimos 7 dias',
+            '30d' => 'nos últimos 30 dias',
+            'todos' => 'em todo o período',
+            default => 'nas últimas 24 horas',
+        };
 
         $estacaoQuery = Estacao::query();
         $medicaoQuery = Medicao::query();
@@ -39,18 +59,33 @@ class DashboardController extends Controller
         $totalEstacoes = $estacaoQuery->count();
         $totalLeituras = (clone $medicaoQuery)->count();
 
-        // Alertas reais computados a partir das medições
-        $alertasIqa = (clone $medicaoQuery)->where(fn ($q) => $q->where('poeira', '>', 50)->orWhere('co2', '>', 1000))->count();
-        $alertasTemp = (clone $medicaoQuery)->where(fn ($q) => $q->where('temperatura', '>', 35)->orWhere('temperatura', '<', 10))->count();
-        $alertasUmidade = (clone $medicaoQuery)->where(fn ($q) => $q->where('umidade', '<', 30)->orWhere('umidade', '>', 85))->count();
-        $alertasCo2 = (clone $medicaoQuery)->where('co2', '>', 1000)->count();
-        $alertasPm = (clone $medicaoQuery)->where('poeira', '>', 50)->count();
-
         // Cidades que possuem estações cadastradas
         $cidades = $cidadesQuery->get();
 
         // Bairros que possuem estações cadastradas
         $bairros = $bairrosQuery->get();
+
+        // Alertas reais computados a partir dos limiares de segurança multicritério no período inicial (24h)
+        // Se o usuário não possui cidade_id fixa, foca na primeira cidade disponível (selecionada por padrão na UI)
+        $alertasQuery = Medicao::query();
+        if ($user && $user->cidade_id) {
+            $alertasQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+        } else {
+            $primeiraCidadeId = $cidades->first()?->id;
+            if ($primeiraCidadeId) {
+                $alertasQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $primeiraCidadeId));
+            }
+        }
+
+        if ($dataInicio !== null) {
+            $alertasQuery->where('data_hora', '>=', $dataInicio);
+        }
+
+        $alertasIqa = (clone $alertasQuery)->where(fn ($q) => $q->where('iqa', '>', 40)->orWhere('poeira', '>', 15.0)->orWhere('co2', '>', 700))->count();
+        $alertasPm = (clone $alertasQuery)->where('poeira', '>', 15.0)->count();
+        $alertasTemp = (clone $alertasQuery)->where(fn ($q) => $q->where('temperatura', '<', 20.0)->orWhere('temperatura', '>', 24.0))->count();
+        $alertasUmidade = (clone $alertasQuery)->where(fn ($q) => $q->where('umidade', '<', 40.0)->orWhere('umidade', '>', 65.0))->count();
+        $alertasCo2 = (clone $alertasQuery)->where('co2', '>', 700)->count();
 
         return view('dashboard', [
             'totalEstacoes' => $totalEstacoes,
@@ -60,6 +95,8 @@ class DashboardController extends Controller
             'alertasUmidade' => $alertasUmidade,
             'alertasCo2' => $alertasCo2,
             'alertasPm' => $alertasPm,
+            'periodo' => $periodo,
+            'periodoRotulo' => $periodoRotulo,
             'cidades' => $cidades,
             'bairros' => $bairros,
         ]);
@@ -179,6 +216,23 @@ class DashboardController extends Controller
             default => 'nas últimas 24 horas',
         };
 
+        $faixasAlerta = $this->alertaService->obterFaixasGrafico($metrica);
+
+        // Contadores reais de alertas ambientais para a localidade e período selecionados
+        $alertasIqa = (clone $medicoesQuery)->where(fn ($q) => $q->where('iqa', '>', 40)->orWhere('poeira', '>', 15.0)->orWhere('co2', '>', 700))->count();
+        $alertasPm = (clone $medicoesQuery)->where('poeira', '>', 15.0)->count();
+        $alertasTemp = (clone $medicoesQuery)->where(fn ($q) => $q->where('temperatura', '<', 20.0)->orWhere('temperatura', '>', 24.0))->count();
+        $alertasUmidade = (clone $medicoesQuery)->where(fn ($q) => $q->where('umidade', '<', 40.0)->orWhere('umidade', '>', 65.0))->count();
+        $alertasCo2 = (clone $medicoesQuery)->where('co2', '>', 700)->count();
+
+        $contadoresAlertas = [
+            'iqa' => $alertasIqa,
+            'pm' => $alertasPm,
+            'temperatura' => $alertasTemp,
+            'umidade' => $alertasUmidade,
+            'co2' => $alertasCo2,
+        ];
+
         if ($medicoes->isEmpty()) {
             return response()->json([
                 'localidade' => $localidadeNome,
@@ -198,8 +252,18 @@ class DashboardController extends Controller
                 'valores' => [],
                 'maximos' => [],
                 'minimos' => [],
+                'faixas_alerta' => $faixasAlerta,
+                'alertas_pontos' => [],
+                'contadores_alertas' => [
+                    'iqa' => 0,
+                    'pm' => 0,
+                    'temperatura' => 0,
+                    'umidade' => 0,
+                    'co2' => 0,
+                ],
                 'status_classificacao' => 'Sem Dados',
                 'status_cor' => 'text-athens-gray-500',
+                'status_descricao' => 'Nenhuma medição encontrada para a localidade no período.',
             ]);
         }
 
@@ -251,6 +315,27 @@ class DashboardController extends Controller
         // Classificação e badge de status da Média
         $classificacao = $this->obterClassificacao($metrica, $mediaGeral);
 
+        // Avaliação de alerta individual para cada ponto médio da série temporal
+        $alertasPontos = [];
+        foreach ($valores as $valPonto) {
+            $aval = match ($metrica) {
+                'temperatura' => $this->alertaService->avaliarTemperatura($valPonto),
+                'umidade' => $this->alertaService->avaliarUmidade($valPonto),
+                'poeira' => $this->alertaService->avaliarPm($valPonto),
+                'co2' => $this->alertaService->avaliarCo2($valPonto),
+                default => $this->alertaService->avaliarIqa($valPonto),
+            };
+
+            $alertasPontos[] = [
+                'nivel' => $aval['nivel']->value,
+                'peso' => $aval['nivel']->peso(),
+                'status' => $aval['status'],
+                'classe' => $aval['classe'],
+                'descricao' => $aval['descricao'],
+                'cor' => $aval['cor'],
+            ];
+        }
+
         return response()->json([
             'localidade' => $localidadeNome,
             'metrica' => $metrica,
@@ -269,50 +354,38 @@ class DashboardController extends Controller
             'valores' => $valores,
             'maximos' => $maximos,
             'minimos' => $minimos,
+            'faixas_alerta' => $faixasAlerta,
+            'alertas_pontos' => $alertasPontos,
+            'contadores_alertas' => $contadoresAlertas,
             'status_classificacao' => $classificacao['texto'],
             'status_cor' => $classificacao['cor'],
+            'status_descricao' => $classificacao['descricao'],
+            'status_alerta' => $classificacao['status'],
         ]);
     }
 
     /**
      * Classifica o valor médio para exibição de status contextual.
      *
-     * @return array{texto: string, cor: string}
+     * @return array{texto: string, cor: string, status: string, descricao: string, nivel: string}
      */
     protected function obterClassificacao(string $metrica, float $valor): array
     {
-        return match ($metrica) {
-            'qualidade_ar' => match (true) {
-                $valor <= 40 => ['texto' => 'Boa', 'cor' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800'],
-                $valor <= 80 => ['texto' => 'Moderada', 'cor' => 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'],
-                $valor <= 120 => ['texto' => 'Ruim', 'cor' => 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 border-orange-200 dark:border-orange-800'],
-                $valor <= 200 => ['texto' => 'Muito Ruim', 'cor' => 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'],
-                default => ['texto' => 'Péssima', 'cor' => 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800'],
-            },
-            'temperatura' => match (true) {
-                $valor < 15 => ['texto' => 'Frio', 'cor' => 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'],
-                $valor <= 26 => ['texto' => 'Agradável', 'cor' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800'],
-                $valor <= 32 => ['texto' => 'Quente', 'cor' => 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 border-orange-200 dark:border-orange-800'],
-                default => ['texto' => 'Muito Quente', 'cor' => 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'],
-            },
-            'umidade' => match (true) {
-                $valor < 30 => ['texto' => 'Estado de Alerta', 'cor' => 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'],
-                $valor <= 40 => ['texto' => 'Atenção', 'cor' => 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'],
-                $valor <= 70 => ['texto' => 'Ideal', 'cor' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800'],
-                default => ['texto' => 'Elevada', 'cor' => 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'],
-            },
-            'poeira' => match (true) {
-                $valor <= 15 => ['texto' => 'Baixo', 'cor' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800'],
-                $valor <= 50 => ['texto' => 'Moderado', 'cor' => 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'],
-                default => ['texto' => 'Elevado', 'cor' => 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'],
-            },
-            'co2' => match (true) {
-                $valor <= 700 => ['texto' => 'Excelente', 'cor' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800'],
-                $valor <= 1000 => ['texto' => 'Aceitável', 'cor' => 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'],
-                default => ['texto' => 'Alto', 'cor' => 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'],
-            },
-            default => ['texto' => 'Normal', 'cor' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800'],
+        $avaliacao = match ($metrica) {
+            'temperatura' => $this->alertaService->avaliarTemperatura($valor),
+            'umidade' => $this->alertaService->avaliarUmidade($valor),
+            'poeira' => $this->alertaService->avaliarPm($valor),
+            'co2' => $this->alertaService->avaliarCo2($valor),
+            default => $this->alertaService->avaliarIqa($valor),
         };
+
+        return [
+            'texto' => $avaliacao['classe'],
+            'cor' => $avaliacao['badge_class'],
+            'status' => $avaliacao['status'],
+            'descricao' => $avaliacao['descricao'],
+            'nivel' => $avaliacao['nivel']->value,
+        ];
     }
 
     /**

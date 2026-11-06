@@ -399,3 +399,134 @@ test('api de graficos agrupa automaticamente a cada 5 minutos quando medicoes ab
     expect($response->json('minimos')[0])->toEqual(20.0);
     expect($response->json('maximos')[0])->toEqual(22.0);
 });
+
+test('dashboard exibe contadores e cards dos 5 tipos de alerta ambiental', function () {
+    $user = User::factory()->create();
+    $cidade = Cidade::factory()->create();
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
+
+    // Medição 1: Alerta de Temperatura (30 °C - Estresse Térmico) e Umidade (25% - Ar Seco)
+    Medicao::factory()->create([
+        'estacao_id' => $estacao->private_id,
+        'temperatura' => 30.0,
+        'umidade' => 25.0,
+        'poeira' => 10.0,
+        'co2' => 500,
+        'data_hora' => now()->subHours(2),
+    ]);
+
+    // Medição 2: Alerta de Particulado e IQA (60 µg/m³) e CO2 (1200 ppm)
+    Medicao::factory()->create([
+        'estacao_id' => $estacao->private_id,
+        'temperatura' => 22.0,
+        'umidade' => 50.0,
+        'poeira' => 60.0,
+        'co2' => 1200,
+        'data_hora' => now()->subHour(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertOk();
+    $response->assertSee('Alertas Qualidade (IQA)');
+    $response->assertSee('Alertas Particulado');
+    $response->assertSee('Alertas Temperatura');
+    $response->assertSee('Alertas Umidade');
+    $response->assertSee('Alertas CO₂');
+    $response->assertViewHas('alertasTemp', 1);
+    $response->assertViewHas('alertasUmidade', 1);
+    $response->assertViewHas('alertasPm', 1);
+    $response->assertViewHas('alertasCo2', 1);
+    $response->assertViewHas('alertasIqa', 1);
+});
+
+test('api de graficos retorna faixas de alerta e status de criticidade dos pontos', function () {
+    $user = User::factory()->create();
+    $cidade = Cidade::factory()->create();
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
+
+    Medicao::factory()->create([
+        'estacao_id' => $estacao->private_id,
+        'temperatura' => 31.0, // Alerta Crítico - Estresse Térmico
+        'data_hora' => now()->subHours(1),
+    ]);
+
+    $response = $this->actingAs($user)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'cidade',
+        'localidade_id' => $cidade->id,
+        'metrica' => 'temperatura',
+        'periodo' => '24h',
+    ]));
+
+    $response->assertOk();
+    $response->assertJsonStructure([
+        'faixas_alerta' => [
+            '*' => ['min', 'max', 'label', 'nivel', 'cor', 'bg_cor'],
+        ],
+        'alertas_pontos' => [
+            '*' => ['nivel', 'peso', 'status', 'classe', 'descricao', 'cor'],
+        ],
+    ]);
+
+    expect($response->json('faixas_alerta'))->not->toBeEmpty();
+    expect($response->json('alertas_pontos.0.nivel'))->toBe('critico');
+    expect($response->json('alertas_pontos.0.status'))->toContain('Estresse Térmico');
+});
+
+test('api de graficos retorna contadores de alertas ambientais filtrados pelo periodo selecionado', function () {
+    $user = User::factory()->create();
+    $cidade = Cidade::factory()->create();
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id]);
+    $estacao = Estacao::factory()->create(['bairro_id' => $bairro->id]);
+
+    // Medição 1 (recente, últimas 24h): gera alerta de temperatura (30°C) e PM (60 µg/m³)
+    Medicao::factory()->create([
+        'estacao_id' => $estacao->private_id,
+        'temperatura' => 30.0,
+        'umidade' => 50.0,
+        'poeira' => 60.0,
+        'co2' => 500,
+        'data_hora' => now()->subHours(2),
+    ]);
+
+    // Medição 2 (antiga, de 3 dias atrás): gera outro alerta de temperatura (32°C) e de umidade (25%)
+    Medicao::factory()->create([
+        'estacao_id' => $estacao->private_id,
+        'temperatura' => 32.0,
+        'umidade' => 25.0,
+        'poeira' => 10.0,
+        'co2' => 500,
+        'data_hora' => now()->subDays(3),
+    ]);
+
+    // 1. Consulta para 24 horas: deve contar apenas a Medição 1
+    $response24h = $this->actingAs($user)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'cidade',
+        'localidade_id' => $cidade->id,
+        'metrica' => 'temperatura',
+        'periodo' => '24h',
+    ]));
+
+    $response24h->assertOk();
+    $response24h->assertJsonStructure([
+        'contadores_alertas' => ['iqa', 'pm', 'temperatura', 'umidade', 'co2'],
+    ]);
+    expect($response24h->json('contadores_alertas.temperatura'))->toBe(1);
+    expect($response24h->json('contadores_alertas.pm'))->toBe(1);
+    expect($response24h->json('contadores_alertas.umidade'))->toBe(0);
+
+    // 2. Consulta para 7 dias: deve abranger ambas as medições
+    $response7d = $this->actingAs($user)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'cidade',
+        'localidade_id' => $cidade->id,
+        'metrica' => 'temperatura',
+        'periodo' => '7d',
+    ]));
+
+    $response7d->assertOk();
+    expect($response7d->json('contadores_alertas.temperatura'))->toBe(2);
+    expect($response7d->json('contadores_alertas.pm'))->toBe(1);
+    expect($response7d->json('contadores_alertas.umidade'))->toBe(1);
+});
