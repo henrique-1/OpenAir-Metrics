@@ -58,7 +58,7 @@ class GeocodingService
                 try {
                     $rows = DB::select("
                         SELECT id, logradouro, tipo_via,
-                               ST_AsText(ST_SRID(geometria, 0)) as wkt
+                               ST_AsText(geometria) as wkt
                         FROM malha_viaria
                         WHERE (
                             MBRIntersects(geometria, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))
@@ -67,13 +67,23 @@ class GeocodingService
                           AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
                     ", [$boxWkt, $boxWkt]);
                 } catch (\Throwable) {
-                    $rows = DB::select("
-                        SELECT id, logradouro, tipo_via,
-                               ST_AsText(ST_SRID(geometria, 0)) as wkt
-                        FROM malha_viaria
-                        WHERE MBRIntersects(geometria, ST_GeomFromText(?, 0))
-                          AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
-                    ", [$boxWkt]);
+                    try {
+                        $rows = DB::select("
+                            SELECT id, logradouro, tipo_via,
+                                   ST_AsText(geometria) as wkt
+                            FROM malha_viaria
+                            WHERE MBRIntersects(geometria, ST_GeomFromText(?, 1))
+                              AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
+                        ", [$boxWkt]);
+                    } catch (\Throwable) {
+                        $rows = DB::select("
+                            SELECT id, logradouro, tipo_via,
+                                   ST_AsText(geometria) as wkt
+                            FROM malha_viaria
+                            WHERE MBRIntersects(geometria, ST_GeomFromText(?, 0))
+                              AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
+                        ", [$boxWkt]);
+                    }
                 }
             } else {
                 $rows = DB::select("

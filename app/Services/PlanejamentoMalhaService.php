@@ -176,45 +176,51 @@ class PlanejamentoMalhaService
         $raioBuscaMetros = ($quantidadeSatelites * 200) + 200;
         $cacheKey = "osm_streets_cascade_{$roundLat}_{$roundLng}_{$raioBuscaMetros}";
 
-        return Cache::remember($cacheKey, now()->addHours(24), function () use ($centerLat, $centerLng, $raioBuscaMetros) {
-            $query = <<<OVERPASS
-[out:json][timeout:10];
+        $cached = Cache::get($cacheKey);
+        if (! empty($cached) && is_array($cached)) {
+            return $cached;
+        }
+
+        $query = <<<OVERPASS
+[out:json][timeout:15];
 (
   way["highway"~"^(residential|tertiary|secondary|primary)$"](around:{$raioBuscaMetros}, {$centerLat}, {$centerLng});
 );
 out geom;
 OVERPASS;
 
-            $endpoints = [
-                'https://overpass.private.coffee/api/interpreter',
-                'https://overpass-api.de/api/interpreter',
-                'https://maps.mail.ru/osm/tools/overpass/api/interpreter ',
-            ];
+        $endpoints = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://overpass.private.coffee/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        ];
 
-            foreach ($endpoints as $endpoint) {
-                try {
-                    $response = Http::timeout(6)
-                        ->asForm()
-                        ->withUserAgent('OpenAir_Metrics/1.0 (contato.henrique.bissoli@gmail.com)')
-                        ->post($endpoint, [
-                            'data' => $query,
-                        ]);
+        foreach ($endpoints as $endpoint) {
+            try {
+                $response = Http::timeout(15)
+                    ->asForm()
+                    ->withUserAgent('OpenAir_Metrics/1.0 (contato.henrique.bissoli@gmail.com)')
+                    ->post($endpoint, [
+                        'data' => $query,
+                    ]);
 
-                    if ($response->successful()) {
-                        $data = $response->json();
-                        $elements = $data['elements'] ?? [];
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $elements = $data['elements'] ?? [];
 
-                        if (! empty($elements)) {
-                            return $elements;
-                        }
+                    if (! empty($elements)) {
+                        Cache::put($cacheKey, $elements, now()->addHours(24));
+
+                        return $elements;
                     }
-                } catch (\Throwable $e) {
-                    Log::info("Servidor Overpass ({$endpoint}) falhou ao buscar vias: ".$e->getMessage());
                 }
+            } catch (\Throwable $e) {
+                Log::warning("Servidor Overpass ({$endpoint}) falhou ao buscar vias: ".$e->getMessage());
             }
+        }
 
-            return [];
-        });
+        return [];
     }
 
     /**
