@@ -37,5 +37,6 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="TELEMETRY_API_KEY" value=""/>
+        <env name="INITIAL_SUPERADMIN_PASSWORD" value=""/>
     </php>
 </phpunit>

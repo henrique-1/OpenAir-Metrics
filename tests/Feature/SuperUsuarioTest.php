@@ -271,6 +271,9 @@ test('superadmin seeder cria super usuario com sucesso', function () {
 });
 
 test('superadmin seeder aceita senha customizada via INITIAL_SUPERADMIN_PASSWORD', function () {
+    putenv('INITIAL_SUPERADMIN_PASSWORD=SenhaCustomizada999!');
+    $_ENV['INITIAL_SUPERADMIN_PASSWORD'] = 'SenhaCustomizada999!';
+    $_SERVER['INITIAL_SUPERADMIN_PASSWORD'] = 'SenhaCustomizada999!';
     Env::getRepository()->set('INITIAL_SUPERADMIN_PASSWORD', 'SenhaCustomizada999!');
 
     $this->seed(SuperAdminSeeder::class);
@@ -278,5 +281,7 @@ test('superadmin seeder aceita senha customizada via INITIAL_SUPERADMIN_PASSWORD
     $user = User::where('email', 'superadmin@openair.com')->first();
     expect(Hash::check('SenhaCustomizada999!', $user->password))->toBeTrue();
 
+    putenv('INITIAL_SUPERADMIN_PASSWORD');
+    unset($_ENV['INITIAL_SUPERADMIN_PASSWORD'], $_SERVER['INITIAL_SUPERADMIN_PASSWORD']);
     Env::getRepository()->clear('INITIAL_SUPERADMIN_PASSWORD');
 });

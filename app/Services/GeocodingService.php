@@ -56,16 +56,24 @@ class GeocodingService
 
             if (Estacao::isMySql8()) {
                 try {
+                    // Consulta sem 'OR' para permitir o uso pleno do SPATIAL INDEX (R-Tree) no MySQL 8
                     $rows = DB::select("
                         SELECT id, logradouro, tipo_via,
                                ST_AsText(geometria) as wkt
                         FROM malha_viaria
-                        WHERE (
-                            MBRIntersects(geometria, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))
-                            OR MBRIntersects(geometria, ST_GeomFromText(?, 4326))
-                        )
+                        WHERE MBRIntersects(geometria, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))
                           AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
-                    ", [$boxWkt, $boxWkt]);
+                    ", [$boxWkt]);
+
+                    if (empty($rows)) {
+                        $rows = DB::select("
+                            SELECT id, logradouro, tipo_via,
+                                   ST_AsText(geometria) as wkt
+                            FROM malha_viaria
+                            WHERE MBRIntersects(geometria, ST_GeomFromText(?, 4326))
+                              AND (tipo_via IS NULL OR tipo_via NOT IN ('motorway', 'trunk', 'motorway_link', 'trunk_link'))
+                        ", [$boxWkt]);
+                    }
                 } catch (\Throwable) {
                     try {
                         $rows = DB::select("
@@ -473,8 +481,14 @@ class GeocodingService
      *     endereco_formatado: ?string
      * }|null
      */
-    public static function obterDetalhesEndereco(float $lat, float $lng, ?int $estacaoId = null, bool $dispatchJobIfMissing = true, bool $sync = false): ?array
-    {
+    public static function obterDetalhesEndereco(
+        float $lat,
+        float $lng,
+        ?int $estacaoId = null,
+        bool $dispatchJobIfMissing = true,
+        bool $sync = false,
+        ?string $conhecidoLogradouro = null
+    ): ?array {
         $roundLat = round($lat, 6);
         $roundLng = round($lng, 6);
         $cacheKey = "geocoding_details_{$roundLat}_{$roundLng}";
@@ -521,10 +535,13 @@ class GeocodingService
             return $detalhes;
         }
 
-        // 3. Tenta obter o nome da rua mais próxima a partir da malha_viaria local
-        $service = new self;
-        $viasProximas = $service->buscarViasProximas($lat, $lng, 50.0);
-        $nomeRuaLocal = $viasProximas[0]['tags']['name'] ?? null;
+        // 3. Tenta obter o nome da rua mais próxima a partir da malha_viaria local (ou utiliza o informado)
+        $nomeRuaLocal = $conhecidoLogradouro;
+        if (empty($nomeRuaLocal)) {
+            $service = new self;
+            $viasProximas = $service->buscarViasProximas($lat, $lng, 50.0);
+            $nomeRuaLocal = $viasProximas[0]['tags']['name'] ?? null;
+        }
 
         $detalhesPreliminares = [
             'logradouro' => $nomeRuaLocal,

@@ -736,7 +736,7 @@ OVERPASS;
         $lng = (float) $snapped['longitude'];
         $nomeRua = $snapped['nome_rua'] ?? null;
 
-        $enderecoDetalhes = GeocodingService::obterDetalhesEndereco($lat, $lng) ?? [];
+        $enderecoDetalhes = GeocodingService::obterDetalhesEndereco($lat, $lng, conhecidoLogradouro: $nomeRua) ?? [];
 
         $logradouro = $nomeRua ?: ($enderecoDetalhes['logradouro'] ?? null);
         $bairro = $enderecoDetalhes['bairro_nome'] ?? $enderecoDetalhes['bairro'] ?? null;
