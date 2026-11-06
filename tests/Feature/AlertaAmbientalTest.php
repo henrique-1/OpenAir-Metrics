@@ -54,7 +54,7 @@ test('alerta service avalia faixas de temperatura incluindo extremos e congelame
     expect($service->avaliarTemperatura(36.5)['nivel'])->toBe(NivelAlerta::CriticoSevero);
 });
 
-test('alerta service avalia faixas de umidade para ar seco e mofo', function () {
+test('alerta service avalia faixas de umidade para ar seco', function () {
     $service = new AlertaAmbientalService;
 
     // Abaixo de 20%: Emergência / Secura Severa
@@ -66,14 +66,10 @@ test('alerta service avalia faixas de umidade para ar seco e mofo', function () 
     // 30 a 39.9%: Ar Seco Moderado
     expect($service->avaliarUmidade(35.0)['nivel'])->toBe(NivelAlerta::Atencao);
 
-    // 40 a 65%: Saudável
+    // A partir de 40%: Saudável / Sem Alerta
     expect($service->avaliarUmidade(50.0)['nivel'])->toBe(NivelAlerta::Nenhum);
-
-    // 66 a 75%: Umidade Elevada
-    expect($service->avaliarUmidade(70.0)['nivel'])->toBe(NivelAlerta::Atencao);
-
-    // Acima de 75%: Risco de Mofo e Fungos
-    expect($service->avaliarUmidade(80.0)['nivel'])->toBe(NivelAlerta::Critico);
+    expect($service->avaliarUmidade(70.0)['nivel'])->toBe(NivelAlerta::Nenhum);
+    expect($service->avaliarUmidade(80.0)['nivel'])->toBe(NivelAlerta::Nenhum);
 });
 
 test('alerta service avalia material particulado PM2.5 e CO2', function () {

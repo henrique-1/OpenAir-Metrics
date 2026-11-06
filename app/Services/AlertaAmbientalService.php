@@ -360,9 +360,7 @@ class AlertaAmbientalService
                 ['min' => 0.0, 'max' => 20.0, 'label' => 'Emergência (Ar Seco)', 'nivel' => 'critico_severo', 'cor' => '#ef4444', 'bg_cor' => 'rgba(239, 68, 68, 0.12)'],
                 ['min' => 20.0, 'max' => 30.0, 'label' => 'Alerta Ar Seco', 'nivel' => 'critico', 'cor' => '#f97316', 'bg_cor' => 'rgba(249, 115, 22, 0.08)'],
                 ['min' => 30.0, 'max' => 40.0, 'label' => 'Ar Seco Moderado', 'nivel' => 'atencao', 'cor' => '#f59e0b', 'bg_cor' => 'rgba(245, 158, 11, 0.08)'],
-                ['min' => 40.0, 'max' => 65.0, 'label' => 'Conforto Saudável', 'nivel' => 'nenhum', 'cor' => '#10b981', 'bg_cor' => 'rgba(16, 185, 129, 0.08)'],
-                ['min' => 65.0, 'max' => 75.0, 'label' => 'Umidade Elevada', 'nivel' => 'atencao', 'cor' => '#f59e0b', 'bg_cor' => 'rgba(245, 158, 11, 0.08)'],
-                ['min' => 75.0, 'max' => 100.0, 'label' => 'Risco Mofo/Fungos', 'nivel' => 'critico', 'cor' => '#f97316', 'bg_cor' => 'rgba(249, 115, 22, 0.10)'],
+                ['min' => 40.0, 'max' => 100.0, 'label' => 'Ideal / Confortável', 'nivel' => 'nenhum', 'cor' => '#10b981', 'bg_cor' => 'rgba(16, 185, 129, 0.08)'],
             ],
             'poeira' => [
                 ['min' => 0.0, 'max' => 15.0, 'label' => 'Boa (Sem Alerta)', 'nivel' => 'nenhum', 'cor' => '#10b981', 'bg_cor' => 'rgba(16, 185, 129, 0.08)'],

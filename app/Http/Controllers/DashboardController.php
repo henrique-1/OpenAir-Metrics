@@ -85,7 +85,7 @@ class DashboardController extends Controller
         $alertasIqa = (clone $alertasQuery)->where(fn ($q) => $q->where('iqa', '>', 40)->orWhere('poeira', '>', 15.0)->orWhere('co2', '>', 700))->count();
         $alertasPm = (clone $alertasQuery)->where('poeira', '>', 15.0)->count();
         $alertasTemp = (clone $alertasQuery)->where(fn ($q) => $q->where('temperatura', '<', 20.0)->orWhere('temperatura', '>', 24.0))->count();
-        $alertasUmidade = (clone $alertasQuery)->where(fn ($q) => $q->where('umidade', '<', 40.0)->orWhere('umidade', '>', 65.0))->count();
+        $alertasUmidade = (clone $alertasQuery)->where('umidade', '<', 40.0)->count();
         $alertasCo2 = (clone $alertasQuery)->where('co2', '>', 700)->count();
 
         return view('dashboard', [
@@ -235,7 +235,7 @@ class DashboardController extends Controller
         $alertasIqa = (clone $medicoesQuery)->where(fn ($q) => $q->where('iqa', '>', 40)->orWhere('poeira', '>', 15.0)->orWhere('co2', '>', 700))->count();
         $alertasPm = (clone $medicoesQuery)->where('poeira', '>', 15.0)->count();
         $alertasTemp = (clone $medicoesQuery)->where(fn ($q) => $q->where('temperatura', '<', 20.0)->orWhere('temperatura', '>', 24.0))->count();
-        $alertasUmidade = (clone $medicoesQuery)->where(fn ($q) => $q->where('umidade', '<', 40.0)->orWhere('umidade', '>', 65.0))->count();
+        $alertasUmidade = (clone $medicoesQuery)->where('umidade', '<', 40.0)->count();
         $alertasCo2 = (clone $medicoesQuery)->where('co2', '>', 700)->count();
 
         $contadoresAlertas = [
