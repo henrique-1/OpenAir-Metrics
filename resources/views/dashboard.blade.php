@@ -793,7 +793,7 @@
                         if (context.datasetIndex === 0 && data.alertas_pontos && data.alertas_pontos[context.dataIndex]) {
                             const ap = data.alertas_pontos[context.dataIndex];
                             if (ap.peso > 0) {
-                                return `⚠️ ${ap.status}: ${ap.descricao}`;
+                                return `⚠️ ${ap.status}`;
                             }
                         }
                         return '';
