@@ -51,9 +51,11 @@
                 <!-- Grid de Alertas Ambientais -->
                 <div>
                     <div class="flex items-center justify-between mb-3">
-                        <h2 class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400 flex items-center gap-2">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-athens-gray-500 dark:text-athens-gray-400 flex items-center flex-wrap gap-2">
                             <x-heroicon-m-bell-alert class="w-4 h-4 text-cinnabar-500" />
                             <span>Alertas Ambientais</span>
+                            <span class="text-athens-gray-300 dark:text-athens-gray-700">·</span>
+                            <span id="alerta-localidade-rotulo" class="text-blue-dianne-950 dark:text-white font-bold">{{ $localidadeInicialNome }}</span>
                             <span id="alerta-subtitulo-periodo" class="font-normal lowercase text-athens-gray-400 dark:text-athens-gray-500">({{ $periodoRotulo }})</span>
                         </h2>
                     </div>
@@ -161,7 +163,7 @@
                                 <div id="container-select-bairro" class="min-w-[240px] hidden">
                                     <select id="select-bairro" class="w-full text-xs font-medium bg-athens-gray-50 dark:bg-athens-gray-800 border border-athens-gray-300 dark:border-athens-gray-700 rounded-lg px-3 py-2 text-blue-dianne-950 dark:text-white focus:ring-2 focus:ring-blue-dianne-500 focus:outline-none">
                                         @forelse ($bairros as $bairro)
-                                            <option value="{{ $bairro->id }}">{{ $bairro->nome }} ({{ $bairro->cidade?->nome }} - {{ $bairro->cidade?->estado?->uf }})</option>
+                                            <option value="{{ $bairro->id }}">Bairro {{ $bairro->nome }}</option>
                                         @empty
                                             <option value="">Nenhum bairro com estações</option>
                                         @endforelse
@@ -525,6 +527,11 @@
                         if (elTemp) elTemp.textContent = Number(data.contadores_alertas.temperatura ?? 0).toLocaleString('pt-BR');
                         if (elUmid) elUmid.textContent = Number(data.contadores_alertas.umidade ?? 0).toLocaleString('pt-BR');
                         if (elCo2) elCo2.textContent = Number(data.contadores_alertas.co2 ?? 0).toLocaleString('pt-BR');
+                    }
+
+                    const elLocalidadeRotulo = document.getElementById('alerta-localidade-rotulo');
+                    if (elLocalidadeRotulo && data.localidade) {
+                        elLocalidadeRotulo.textContent = data.localidade;
                     }
 
                     const elSubtituloPeriodo = document.getElementById('alerta-subtitulo-periodo');

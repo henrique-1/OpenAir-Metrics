@@ -44,39 +44,43 @@ class DashboardController extends Controller
             default => 'nas últimas 24 horas',
         };
 
-        $estacaoQuery = Estacao::query();
-        $medicaoQuery = Medicao::query();
+        // A jurisdição (cidade) do usuário gestor é fixa
+        $cidadeIdFixa = $user?->cidade_id;
+
         $cidadesQuery = Cidade::whereHas('bairros.estacoes')->with('estado')->orderBy('nome');
         $bairrosQuery = Bairro::whereHas('estacoes')->with(['cidade.estado'])->orderBy('nome');
+        $estacaoQuery = Estacao::query();
+        $medicaoQuery = Medicao::query();
 
-        if ($user && $user->cidade_id) {
-            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
-            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
-            $cidadesQuery->where('id', $user->cidade_id);
-            $bairrosQuery->where('cidade_id', $user->cidade_id);
+        if ($cidadeIdFixa) {
+            $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
+            $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
+            $cidadesQuery->where('id', $cidadeIdFixa);
+            $bairrosQuery->where('cidade_id', $cidadeIdFixa);
+        } else {
+            $primeiraCidade = (clone $cidadesQuery)->first();
+            if ($primeiraCidade) {
+                $cidadeIdFixa = $primeiraCidade->id;
+                $estacaoQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
+                $medicaoQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
+                $bairrosQuery->where('cidade_id', $cidadeIdFixa);
+            }
         }
+
+        // Cidades que possuem estações cadastradas na jurisdição
+        $cidades = $cidadesQuery->get();
+
+        // Bairros que possuem estações cadastradas na jurisdição (único parâmetro que pode variar)
+        $bairros = $bairrosQuery->get();
+
+        $cidadeFixa = $cidadeIdFixa ? Cidade::with('estado')->find($cidadeIdFixa) : $cidades->first();
+        $localidadeInicialNome = $cidadeFixa ? "{$cidadeFixa->nome} - {$cidadeFixa->estado?->uf}" : 'Jurisdição';
 
         $totalEstacoes = $estacaoQuery->count();
         $totalLeituras = (clone $medicaoQuery)->count();
 
-        // Cidades que possuem estações cadastradas
-        $cidades = $cidadesQuery->get();
-
-        // Bairros que possuem estações cadastradas
-        $bairros = $bairrosQuery->get();
-
-        // Alertas reais computados a partir dos limiares de segurança multicritério no período inicial (24h)
-        // Se o usuário não possui cidade_id fixa, foca na primeira cidade disponível (selecionada por padrão na UI)
-        $alertasQuery = Medicao::query();
-        if ($user && $user->cidade_id) {
-            $alertasQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
-        } else {
-            $primeiraCidadeId = $cidades->first()?->id;
-            if ($primeiraCidadeId) {
-                $alertasQuery->whereHas('estacao.bairro', fn ($q) => $q->where('cidade_id', $primeiraCidadeId));
-            }
-        }
-
+        // Alertas ambientais computados a partir dos limiares multicritério no período inicial (24h)
+        $alertasQuery = clone $medicaoQuery;
         if ($dataInicio !== null) {
             $alertasQuery->where('data_hora', '>=', $dataInicio);
         }
@@ -97,6 +101,7 @@ class DashboardController extends Controller
             'alertasPm' => $alertasPm,
             'periodo' => $periodo,
             'periodoRotulo' => $periodoRotulo,
+            'localidadeInicialNome' => $localidadeInicialNome,
             'cidades' => $cidades,
             'bairros' => $bairros,
         ]);
@@ -117,44 +122,55 @@ class DashboardController extends Controller
         $metrica = $request->input('metrica', 'qualidade_ar'); // 'qualidade_ar', 'temperatura', 'umidade', 'poeira', 'co2'
         $periodo = $request->input('periodo', '24h'); // '24h', '7d', '30d', 'todos'
 
-        // 1. Identifica as estações vinculadas à localidade selecionada
-        $localidadeNome = 'Geral';
-        $estacoesQuery = Estacao::query();
+        // 1. Identifica a jurisdição fixa da cidade e a localidade selecionada (apenas o Bairro pode variar)
+        $cidadeIdFixa = $user?->cidade_id;
 
-        if ($user && $user->cidade_id) {
-            $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $user->cidade_id));
+        // Fallback para testes ou administradores sem cidade_id fixa
+        if (! $cidadeIdFixa) {
+            if ($tipoAgrupamento === 'bairro' && $localidadeId) {
+                $cidadeIdFixa = Bairro::find($localidadeId)?->cidade_id;
+            } elseif ($localidadeId) {
+                $cidadeIdFixa = $localidadeId;
+            }
+
+            if (! $cidadeIdFixa) {
+                $primeiraCidade = Cidade::whereHas('bairros.estacoes')->orderBy('nome')->first();
+                $cidadeIdFixa = $primeiraCidade?->id;
+            }
         }
 
-        if ($tipoAgrupamento === 'bairro' && $localidadeId) {
-            $bairroQuery = Bairro::with('cidade.estado');
-            if ($user && $user->cidade_id) {
-                $bairroQuery->where('cidade_id', $user->cidade_id);
+        $cidadeFixa = $cidadeIdFixa ? Cidade::with('estado')->find($cidadeIdFixa) : null;
+        $cidadeNome = $cidadeFixa ? "{$cidadeFixa->nome} - {$cidadeFixa->estado?->uf}" : 'Jurisdição';
+
+        $localidadeNome = $cidadeNome;
+        $estacoesQuery = Estacao::query();
+
+        if ($tipoAgrupamento === 'bairro') {
+            // No modo Bairro, filtra pelo bairro selecionado dentro da cidade do usuário
+            $bairroQuery = Bairro::whereHas('estacoes');
+            if ($cidadeIdFixa) {
+                $bairroQuery->where('cidade_id', $cidadeIdFixa);
             }
-            $bairro = $bairroQuery->find($localidadeId);
+
+            $bairro = null;
+            if ($localidadeId) {
+                $bairro = (clone $bairroQuery)->find($localidadeId);
+            }
+            if (! $bairro) {
+                $bairro = (clone $bairroQuery)->orderBy('nome')->first();
+            }
+
             if ($bairro) {
-                $localidadeNome = "{$bairro->nome} ({$bairro->cidade?->nome} - {$bairro->cidade?->estado?->uf})";
+                $localidadeNome = "Bairro {$bairro->nome}";
                 $estacoesQuery->where('bairro_id', $bairro->id);
-            }
-        } elseif ($localidadeId) {
-            $cidadeQuery = Cidade::with('estado');
-            if ($user && $user->cidade_id) {
-                $cidadeQuery->where('id', $user->cidade_id);
-            }
-            $cidade = $cidadeQuery->find($localidadeId);
-            if ($cidade) {
-                $localidadeNome = "{$cidade->nome} - {$cidade->estado?->uf}";
-                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidade->id));
+            } elseif ($cidadeIdFixa) {
+                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
             }
         } else {
-            // Se nenhuma localidade foi informada, seleciona a primeira cidade disponível com estações
-            $primeiraCidadeQuery = Cidade::whereHas('bairros.estacoes')->with('estado');
-            if ($user && $user->cidade_id) {
-                $primeiraCidadeQuery->where('id', $user->cidade_id);
-            }
-            $primeiraCidade = $primeiraCidadeQuery->first();
-            if ($primeiraCidade) {
-                $localidadeNome = "{$primeiraCidade->nome} - {$primeiraCidade->estado?->uf}";
-                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $primeiraCidade->id));
+            // No modo Cidade, a jurisdição é fixa: agrega todas as estações do município
+            $localidadeNome = $cidadeNome;
+            if ($cidadeIdFixa) {
+                $estacoesQuery->whereHas('bairro', fn ($q) => $q->where('cidade_id', $cidadeIdFixa));
             }
         }
 

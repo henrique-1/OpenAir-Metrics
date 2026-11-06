@@ -530,3 +530,72 @@ test('api de graficos retorna contadores de alertas ambientais filtrados pelo pe
     expect($response7d->json('contadores_alertas.pm'))->toBe(1);
     expect($response7d->json('contadores_alertas.umidade'))->toBe(1);
 });
+
+test('api de graficos calcula contadores de alertas especificos para o bairro selecionado dentro da jurisdicao fixa', function () {
+    $cidade = Cidade::factory()->create(['nome' => 'Mogi Mirim']);
+    $user = User::factory()->create(['cidade_id' => $cidade->id]);
+
+    $bairroCentro = Bairro::factory()->create(['cidade_id' => $cidade->id, 'nome' => 'Centro']);
+    $bairroVila = Bairro::factory()->create(['cidade_id' => $cidade->id, 'nome' => 'Vila Dias']);
+
+    $estacaoCentro = Estacao::factory()->create(['bairro_id' => $bairroCentro->id]);
+    $estacaoVila = Estacao::factory()->create(['bairro_id' => $bairroVila->id]);
+
+    // Alerta no Centro: temperatura 32°C
+    Medicao::factory()->create([
+        'estacao_id' => $estacaoCentro->private_id,
+        'temperatura' => 32.0,
+        'umidade' => 50.0,
+        'poeira' => 10.0,
+        'co2' => 500,
+        'data_hora' => now()->subHours(1),
+    ]);
+
+    // Alertas na Vila: temperatura 34°C e umidade 20%
+    Medicao::factory()->create([
+        'estacao_id' => $estacaoVila->private_id,
+        'temperatura' => 34.0,
+        'umidade' => 20.0,
+        'poeira' => 10.0,
+        'co2' => 500,
+        'data_hora' => now()->subHours(1),
+    ]);
+
+    // 1. Agrupamento Cidade: congrega toda a jurisdição do gestor
+    $resCidade = $this->actingAs($user)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'cidade',
+        'metrica' => 'temperatura',
+        'periodo' => '24h',
+    ]));
+
+    $resCidade->assertOk();
+    expect($resCidade->json('contadores_alertas.temperatura'))->toBe(2);
+    expect($resCidade->json('contadores_alertas.umidade'))->toBe(1);
+    expect($resCidade->json('localidade'))->toContain('Mogi Mirim');
+
+    // 2. Agrupamento Bairro selecionando Centro: contadores restritos ao Centro
+    $resCentro = $this->actingAs($user)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'bairro',
+        'localidade_id' => $bairroCentro->id,
+        'metrica' => 'temperatura',
+        'periodo' => '24h',
+    ]));
+
+    $resCentro->assertOk();
+    expect($resCentro->json('contadores_alertas.temperatura'))->toBe(1);
+    expect($resCentro->json('contadores_alertas.umidade'))->toBe(0);
+    expect($resCentro->json('localidade'))->toBe('Bairro Centro');
+
+    // 3. Agrupamento Bairro selecionando Vila Dias: contadores restritos à Vila Dias
+    $resVila = $this->actingAs($user)->getJson(route('dashboard.graficos', [
+        'tipo_agrupamento' => 'bairro',
+        'localidade_id' => $bairroVila->id,
+        'metrica' => 'temperatura',
+        'periodo' => '24h',
+    ]));
+
+    $resVila->assertOk();
+    expect($resVila->json('contadores_alertas.temperatura'))->toBe(1);
+    expect($resVila->json('contadores_alertas.umidade'))->toBe(1);
+    expect($resVila->json('localidade'))->toBe('Bairro Vila Dias');
+});
