@@ -118,3 +118,30 @@ test('home exibe painel flutuante de alertas quando ha estacoes com alertas ativ
     $response->assertSee('Cambuí');
     $response->assertSee('Alerta Crítico - Estresse Térmico');
 });
+
+test('home nao ativa alerta para umidade elevada acima de 40%', function () {
+    $estado = Estado::factory()->create();
+    $cidade = Cidade::factory()->create(['estado_id' => $estado->id, 'nome' => 'Campinas']);
+    $bairro = Bairro::factory()->create(['cidade_id' => $cidade->id, 'nome' => 'Cambuí']);
+
+    $estacao = Estacao::factory()->create([
+        'bairro_id' => $bairro->id,
+        'latitude' => -22.900000,
+        'longitude' => -47.050000,
+    ]);
+
+    // Medição com 75% de umidade e demais valores em faixa normal/segura
+    Medicao::factory()->create([
+        'estacao_id' => $estacao->private_id,
+        'temperatura' => 22.0,
+        'umidade' => 75.0,
+        'poeira' => 10.0,
+        'co2' => 450,
+        'data_hora' => now(),
+    ]);
+
+    $response = $this->get('/');
+
+    $response->assertOk();
+    $response->assertDontSee('Alertas Ambientais Ativos');
+});

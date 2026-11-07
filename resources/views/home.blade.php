@@ -653,9 +653,7 @@
                         if (val < 20) return { text: 'Emergência (Ar Seco)', color: '#ef4444', alert: 'Emergência', isAlert: true };
                         if (val < 30) return { text: 'Ar Seco Crítico', color: '#f97316', alert: 'Crítico', isAlert: true };
                         if (val < 40) return { text: 'Ar Seco Moderado', color: '#f59e0b', alert: 'Atenção', isAlert: true };
-                        if (val <= 65) return { text: 'Faixa Saudável', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
-                        if (val <= 75) return { text: 'Umidade Elevada', color: '#f59e0b', alert: 'Atenção', isAlert: true };
-                        return { text: 'Risco Mofo/Fungos', color: '#f97316', alert: 'Crítico', isAlert: true };
+                        return { text: 'Ideal / Confortável', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
                     }
                     if (layerKey === 'pm') {
                         if (val <= 15) return { text: 'Boa', color: '#10b981', alert: 'Sem Alerta', isAlert: false };
