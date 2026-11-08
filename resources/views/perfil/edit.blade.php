@@ -725,11 +725,13 @@
                                 }
                             });
 
-                            if (! optRes.ok) {
-                                throw new Error('Não foi possível obter opções de registro.');
+                            const isOptJson = optRes.headers.get('content-type')?.includes('application/json');
+                            const optData = isOptJson ? await optRes.json() : null;
+
+                            if (! optRes.ok || ! optData) {
+                                throw new Error(optData?.message || 'Não foi possível obter opções de registro biométrico.');
                             }
 
-                            const optData = await optRes.json();
                             const creationOptions = optData.options ?? optData.publicKey ?? optData;
 
                             if (! creationOptions || ! creationOptions.challenge || ! creationOptions.user) {
@@ -742,6 +744,8 @@
                                     { type: 'public-key', alg: -257 }
                                 ];
                             }
+
+                            creationOptions.attestation = creationOptions.attestation || 'none';
 
                             creationOptions.challenge = base64UrlToBuffer(creationOptions.challenge);
                             creationOptions.user.id = base64UrlToBuffer(creationOptions.user.id);
@@ -781,9 +785,11 @@
                                 })
                             });
 
-                            const saveData = await saveRes.json();
+                            const isSaveJson = saveRes.headers.get('content-type')?.includes('application/json');
+                            const saveData = isSaveJson ? await saveRes.json() : null;
+
                             if (! saveRes.ok) {
-                                throw new Error(saveData.message || 'Falha ao salvar Passkey.');
+                                throw new Error(saveData?.message || 'Falha ao salvar Passkey no servidor (Status ' + saveRes.status + ').');
                             }
 
                             exibirPasskeyFeedback('Passkey cadastrada com sucesso! Recarregando página...', 'sucesso');

@@ -3,9 +3,17 @@
 use App\Actions\FindPasskeyToAuthenticateAction;
 use App\Models\Cidade;
 use App\Models\User;
+use App\Support\WebauthnSerializer;
+use CBOR\ByteStringObject;
+use CBOR\MapObject;
+use CBOR\NegativeIntegerObject;
+use CBOR\TextStringObject;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use ParagonIE\ConstantTime\Base64UrlSafe;
 use Spatie\LaravelPasskeys\Models\Passkey;
+use Webauthn\AuthenticatorAttestationResponse;
+use Webauthn\PublicKeyCredential;
 
 uses(RefreshDatabase::class);
 
@@ -275,4 +283,76 @@ test('administrador municipal nao pode resetar MFA de usuario de outro municipio
     $response->assertForbidden();
     $instaladorOutraCidade->refresh();
     expect($instaladorOutraCidade->two_factor_secret)->not->toBeNull();
+});
+
+test('registro de passkey falha com json 422 caso sessao de registro esteja expirada', function () {
+    $admin = User::factory()->create(['nivel' => 'administrador', 'ativo' => true]);
+
+    $response = $this->actingAs($admin)->postJson(route('passkey.store'), [
+        'name' => 'Meu Dispositivo',
+        'credential' => ['id' => 'abc', 'type' => 'public-key', 'rawId' => 'abc', 'response' => []],
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJson([
+            'message' => 'Sessão de registro de Passkey expirada. Por favor, tente novamente.',
+        ]);
+});
+
+test('registro de passkey com dados invalidos retorna json 422 em vez de pagina html', function () {
+    $admin = User::factory()->create(['nivel' => 'administrador', 'ativo' => true]);
+
+    $response = $this->actingAs($admin)
+        ->withSession(['passkey-registration-options' => '{"challenge":"test"}'])
+        ->postJson(route('passkey.store'), [
+            'name' => 'Meu Dispositivo',
+            'credential' => 'not-a-valid-credential-payload',
+        ]);
+
+    $response->assertStatus(422)
+        ->assertJsonStructure(['message']);
+});
+
+test('WebauthnSerializer suporta formatos de atestacao packed fido-u2f e none', function () {
+    $mgr = WebauthnSerializer::createAttestationStatementSupportManager();
+
+    expect($mgr->has('none'))->toBeTrue()
+        ->and($mgr->has('packed'))->toBeTrue()
+        ->and($mgr->has('fido-u2f'))->toBeTrue()
+        ->and($mgr->has('apple'))->toBeTrue()
+        ->and($mgr->has('android-key'))->toBeTrue()
+        ->and($mgr->has('tpm'))->toBeTrue();
+});
+
+test('StorePasskeyAction pode desserializar atestacao packed gerada por linux-passkey ou tokens CTAP2', function () {
+    $map = MapObject::create()
+        ->add(TextStringObject::create('fmt'), TextStringObject::create('packed'))
+        ->add(TextStringObject::create('attStmt'), MapObject::create()
+            ->add(TextStringObject::create('alg'), NegativeIntegerObject::create(-7))
+            ->add(TextStringObject::create('sig'), ByteStringObject::create('dummy_signature'))
+        )
+        ->add(TextStringObject::create('authData'), ByteStringObject::create(str_repeat("\0", 37)));
+
+    $cbor = (string) $map;
+    $b64Attestation = Base64UrlSafe::encodeUnpadded($cbor);
+    $b64ClientData = Base64UrlSafe::encodeUnpadded(json_encode([
+        'type' => 'webauthn.create',
+        'challenge' => Base64UrlSafe::encodeUnpadded('test-challenge'),
+        'origin' => 'https://openair.bissoli.tech',
+    ]));
+
+    $passkeyJson = json_encode([
+        'id' => Base64UrlSafe::encodeUnpadded('test'),
+        'rawId' => base64_encode('test'),
+        'type' => 'public-key',
+        'response' => [
+            'clientDataJSON' => $b64ClientData,
+            'attestationObject' => $b64Attestation,
+        ],
+    ]);
+
+    $credential = WebauthnSerializer::make()->fromJson($passkeyJson, PublicKeyCredential::class);
+
+    expect($credential)->toBeInstanceOf(PublicKeyCredential::class)
+        ->and($credential->response)->toBeInstanceOf(AuthenticatorAttestationResponse::class);
 });

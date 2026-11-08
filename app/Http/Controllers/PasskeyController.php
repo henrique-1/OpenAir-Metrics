@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\StorePasskeyAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Spatie\LaravelPasskeys\Actions\GeneratePasskeyRegisterOptionsAction;
-use Spatie\LaravelPasskeys\Actions\StorePasskeyAction;
 use Spatie\LaravelPasskeys\Models\Passkey;
+use Throwable;
 
 class PasskeyController extends Controller
 {
@@ -56,27 +58,50 @@ class PasskeyController extends Controller
             'credential' => ['required'],
         ]);
 
+        if ($request->getHost()) {
+            config([
+                'passkeys.relying_party.id' => $request->getHost(),
+                'passkeys.relying_party_id' => $request->getHost(),
+            ]);
+        }
+
         $optionsJson = session()->pull('passkey-registration-options');
-        abort_unless($optionsJson, 422, 'Sessão de registro de Passkey expirada. Tente novamente.');
+        if (! $optionsJson) {
+            return response()->json([
+                'message' => 'Sessão de registro de Passkey expirada. Por favor, tente novamente.',
+            ], 422);
+        }
 
         $credentialPayload = is_string($request->input('credential'))
             ? $request->input('credential')
             : json_encode($request->input('credential'));
 
-        $passkey = $storePasskey->execute(
-            authenticatable: $user,
-            passkeyJson: $credentialPayload,
-            passkeyOptionsJson: $optionsJson,
-            hostName: $request->getHost(),
-            additionalProperties: [
-                'name' => $request->input('name'),
-            ]
-        );
+        try {
+            $passkey = $storePasskey->execute(
+                authenticatable: $user,
+                passkeyJson: $credentialPayload,
+                passkeyOptionsJson: $optionsJson,
+                hostName: $request->getHost(),
+                additionalProperties: [
+                    'name' => $request->input('name'),
+                ]
+            );
 
-        return response()->json([
-            'message' => 'Passkey cadastrada com sucesso!',
-            'passkey' => $passkey,
-        ], 201);
+            return response()->json([
+                'message' => 'Passkey cadastrada com sucesso!',
+                'passkey' => $passkey,
+            ], 201);
+        } catch (Throwable $e) {
+            Log::error('Erro ao registrar Passkey:', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Falha ao validar credencial biométrica: '.$e->getMessage(),
+            ], 422);
+        }
     }
 
     /**

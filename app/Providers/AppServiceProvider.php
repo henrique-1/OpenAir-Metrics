@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Actions\ConfigureCeremonyStepManagerFactoryAction;
+use App\Actions\StorePasskeyAction;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -16,7 +18,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            \Spatie\LaravelPasskeys\Actions\StorePasskeyAction::class,
+            StorePasskeyAction::class
+        );
+
+        $this->app->bind(
+            \Spatie\LaravelPasskeys\Actions\ConfigureCeremonyStepManagerFactoryAction::class,
+            ConfigureCeremonyStepManagerFactoryAction::class
+        );
     }
 
     /**

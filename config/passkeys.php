@@ -1,11 +1,11 @@
 <?php
 
+use App\Actions\ConfigureCeremonyStepManagerFactoryAction;
 use App\Actions\FindPasskeyToAuthenticateAction;
+use App\Actions\StorePasskeyAction;
 use App\Models\User;
-use Spatie\LaravelPasskeys\Actions\ConfigureCeremonyStepManagerFactoryAction;
 use Spatie\LaravelPasskeys\Actions\GeneratePasskeyAuthenticationOptionsAction;
 use Spatie\LaravelPasskeys\Actions\GeneratePasskeyRegisterOptionsAction;
-use Spatie\LaravelPasskeys\Actions\StorePasskeyAction;
 use Spatie\LaravelPasskeys\Models\Passkey;
 
 return [
