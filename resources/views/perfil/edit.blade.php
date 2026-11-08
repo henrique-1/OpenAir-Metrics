@@ -730,7 +730,18 @@
                             }
 
                             const optData = await optRes.json();
-                            const creationOptions = optData.options;
+                            const creationOptions = optData.options ?? optData.publicKey ?? optData;
+
+                            if (! creationOptions || ! creationOptions.challenge || ! creationOptions.user) {
+                                throw new Error('Opções de registro de Passkey inválidas retornadas pelo servidor.');
+                            }
+
+                            if (! Array.isArray(creationOptions.pubKeyCredParams) || creationOptions.pubKeyCredParams.length === 0) {
+                                creationOptions.pubKeyCredParams = [
+                                    { type: 'public-key', alg: -7 },
+                                    { type: 'public-key', alg: -257 }
+                                ];
+                            }
 
                             creationOptions.challenge = base64UrlToBuffer(creationOptions.challenge);
                             creationOptions.user.id = base64UrlToBuffer(creationOptions.user.id);

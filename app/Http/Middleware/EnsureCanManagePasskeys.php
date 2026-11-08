@@ -13,6 +13,13 @@ class EnsureCanManagePasskeys
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->getHost()) {
+            config([
+                'passkeys.relying_party.id' => $request->getHost(),
+                'passkeys.relying_party_id' => $request->getHost(),
+            ]);
+        }
+
         if ($request->is('user/passkeys*')) {
             $user = $request->user();
 

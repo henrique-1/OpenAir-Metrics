@@ -15,15 +15,32 @@ class PasskeyController extends Controller
     /**
      * Gera e retorna as opções de registro de uma nova Passkey para o usuário autenticado.
      */
-    public function options(GeneratePasskeyRegisterOptionsAction $generateOptions): JsonResponse
+    public function options(Request $request, GeneratePasskeyRegisterOptionsAction $generateOptions): JsonResponse
     {
         $user = Auth::user();
         abort_unless($user && $user->podeUsarPasskey(), 403, 'Acesso restrito a Administradores Municipais e Instaladores.');
 
+        if ($request->getHost()) {
+            config([
+                'passkeys.relying_party.id' => $request->getHost(),
+                'passkeys.relying_party_id' => $request->getHost(),
+            ]);
+        }
+
         $options = $generateOptions->execute($user, asJson: true);
+        $optionsData = json_decode($options, true);
+
+        if (empty($optionsData['pubKeyCredParams'])) {
+            $optionsData['pubKeyCredParams'] = [
+                ['type' => 'public-key', 'alg' => -7],   // ES256 (ECDSA w/ SHA-256)
+                ['type' => 'public-key', 'alg' => -257], // RS256 (RSASSA-PKCS1-v1_5 w/ SHA-256)
+            ];
+            $options = json_encode($optionsData);
+        }
+
         session(['passkey-registration-options' => $options]);
 
-        return response()->json(json_decode($options, true));
+        return response()->json($optionsData);
     }
 
     /**

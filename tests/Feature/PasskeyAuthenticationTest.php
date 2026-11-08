@@ -22,9 +22,31 @@ test('administrador municipal pode solicitar opcoes de registro de passkey via S
             'challenge',
             'rp' => ['id'],
             'user' => ['name', 'displayName', 'id'],
+            'pubKeyCredParams' => [
+                ['type', 'alg'],
+            ],
         ]);
 
-    expect(session('passkey-registration-options'))->not->toBeNull();
+    expect($response->json('pubKeyCredParams'))->not->toBeEmpty()
+        ->and(session('passkey-registration-options'))->not->toBeNull();
+});
+
+test('opcoes de registro e autenticacao de passkey sincronizam rpId com o host da requisicao', function () {
+    $authResponse = $this->getJson('https://openair.bissoli.tech/passkeys/authentication-options');
+
+    $authResponse->assertOk()
+        ->assertJsonPath('rpId', 'openair.bissoli.tech');
+
+    $admin = User::factory()->create([
+        'nivel' => 'administrador',
+        'ativo' => true,
+    ]);
+
+    $registerResponse = $this->actingAs($admin)
+        ->getJson('https://openair.bissoli.tech/user/passkeys/options');
+
+    $registerResponse->assertOk()
+        ->assertJsonPath('rp.id', 'openair.bissoli.tech');
 });
 
 test('instalador pode solicitar opcoes de registro de passkey via Spatie', function () {
