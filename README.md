@@ -31,7 +31,7 @@
   - [2.4 Modelagem de Dados e Domínio Espacial](#24-modelagem-de-dados-e-domínio-espacial)
 - [3. Requisitos do Sistema](#3-requisitos-do-sistema)
   - [3.1 Requisitos Funcionais (RF01 a RF24)](#31-requisitos-funcionais-rf01-a-rf24)
-  - [3.2 Requisitos Não Funcionais (RNF01 a RNF12)](#32-requisitos-não-funcionais-rnf01-a-rnf12)
+  - [3.2 Requisitos Não Funcionais (RNF01 a RNF14)](#32-requisitos-não-funcionais-rnf01-a-rnf14)
   - [3.3 Regras de Negócio Fundamentais (RN01 a RN16)](#33-regras-de-negócio-fundamentais-rn01-a-rn16)
 - [4. Especificação de Casos de Uso](#4-especificação-de-casos-de-uso)
   - [4.1 Catálogo de Atores do Sistema](#41-catálogo-de-atores-do-sistema)
@@ -271,11 +271,11 @@ erDiagram
 | **RF21** | Segurança | Redefinição de senha por autoatendimento (*Forgot Password*) com token assinado e expiração de 60 minutos. |
 | **RF22** | Segurança | Conclusão de primeiro acesso / convite de operadores com definição de senha forte e verificação de e-mail. |
 | **RF23** | Segurança | Autenticação Multifator via TOTP (RFC 6238) com QR Code, segredo Base32 e 8 códigos de recuperação. |
-| **RF24** | Segurança | Autenticação sem senha (*Passwordless*) via Passkeys / WebAuthn (FIDO2) com criptografia assimétrica de chave pública. |
+| **RF24** | Segurança | Autenticação sem senha (*Passwordless*) via Passkeys / WebAuthn (FIDO2 - NIST AAL3) com suporte abrangente a biometria nativa, chaves físicas e autenticadores virtuais CTAP2 em Linux (`linux-passkey`). |
 
 ---
 
-### 3.2 Requisitos Não Funcionais (RNF01 a RNF12)
+### 3.2 Requisitos Não Funcionais (RNF01 a RNF14)
 
 - **RNF01 — Stack Tecnológica:** PHP 8.5, Laravel 13, Sanctum v4, Reverb v1, Tailwind CSS v4, Leaflet 1.9 e Laravel MCP.
 - **RNF02 — Persistência Geoespacial:** Armazenamento em geometrias nativas `POINT` e `LINESTRING` com SRID 4326 e `SPATIAL INDEX` no MariaDB.
@@ -289,6 +289,8 @@ erDiagram
 - **RNF10 — Transacionalidade e Preservação de Histórico:** Atomicidade estrita em transações compostas (`DB::beginTransaction`) e descarte lógico de patrimônios (preservação de histórico).
 - **RNF11 — Padronização Visual e Internacionalização de Notificações Transacionais:** Templates de e-mail responsivos, compatíveis com modo claro/escuro e tradução integral para Português do Brasil (`lang/pt_BR/`) e Inglês (`lang/en/`).
 - **RNF12 — Isolamento de Ferramentas e Rotas de Diagnóstico:** Rotas de pré-visualização de e-mails (`/preview-email/*`) bloqueadas em ambiente de produção (`app.env === 'production'`) via comando `php artisan env:prod`.
+- **RNF13 — Conformidade Criptográfica e Diretrizes de Identidade Digital (NIST SP 800-63B Rev. 4 & AAL3):** Armazenamento de senhas via hash lento e unidirecional (bcrypt com custo adaptativo), segredos de autenticação multifator (TOTP / RFC 6238) criptografados com AES-256 no banco e suporte a Passkeys (FIDO2 / WebAuthn AAL3) com serializador resiliente (`WebauthnSerializer`), habilitando suporte a múltiplos formatos de atestação (`none`, `packed`, `fido-u2f`, `android-key`, `apple`, `tpm`) e tratamento estrito de exceções em JSON.
+- **RNF14 — Privacidade por Padrão (*Privacy by Design* & LGPD):** Ausência de rastreadores comportamentais invasivos de terceiros, mapas de calor ou scripts analíticos externos no painel de gestão, mitigando riscos de vazamento de dados de operadores municipais conforme o Art. 46 da Lei Geral de Proteção de Dados (Lei nº 13.709/2018).
 
 ---
 
@@ -381,7 +383,7 @@ flowchart TD
 | **UC17** | Redefinir Senha por Autoatendimento | Usuário Visitante | Solicitação de link temporário assinado via e-mail e redefinição segura segundo NIST SP 800-63B. |
 | **UC18** | Concluir Cadastro de Primeiro Acesso | Novo Operador | Conclusão do convite enviado por e-mail com definição da primeira senha e verificação instantânea. |
 | **UC19** | Gerenciar e Autenticar com 2FA TOTP | Usuário Autenticado | Configuração de segredo RFC 6238 via QR Code, códigos de recuperação e desafio no login. |
-| **UC20** | Gerenciar e Autenticar com Passkeys | Usuário Autenticado | Registro de credencial biométrica/FIDO2 via WebAuthn e login moderno sem senha (*Passwordless*). |
+| **UC20** | Gerenciar e Autenticar com Passkeys | Usuário Autenticado | Registro de credencial biométrica/FIDO2 via WebAuthn (NIST AAL3) com ampla interoperabilidade (Windows Hello, Touch ID, YubiKey e Linux CTAP2/linux-passkey) e login sem senha (*Passwordless*). |
 
 ---
 
@@ -429,6 +431,7 @@ Onde:
 | **Serviços de Cartografia** | **OpenStreetMap (Nominatim & Overpass)** | Geocodificação reversa e extração de geometria de logradouros urbanos. |
 | **Frontend & Estilização** | **Blade & Tailwind CSS v4** | Interface responsiva e moderna com compilação ultra-rápida via Vite v8. |
 | **Visualização de Mapas** | **Leaflet v1.9** | Cartografia interativa com camadas de calor e marcadores dinâmicos. |
+| **Autenticação Biométrica / FIDO2** | **WebAuthn (Spatie Passkeys & web-auth)** | Autenticação sem senha resistente a phishing (NIST AAL3) com suporte a múltiplos formatos de atestação (macOS, Windows, Linux, Android). |
 | **Suíte de Testes** | **Pest PHP v4 & PHPUnit 12** | Testes automatizados de unidade, integração e feature com alta cobertura. |
 
 ---
@@ -438,6 +441,7 @@ Onde:
 ```text
 OpenAir-Metrics/
 ├── app/
+│   ├── Actions/                    # Ações de domínio e autenticação avançada (Passkeys, Resoluções)
 │   ├── Events/                     # Eventos de difusão em tempo real (ex: NovaMedicaoRecebida)
 │   ├── Http/
 │   │   ├── Controllers/            # Controladores MVC e API de Ingestão de Sensores
@@ -446,13 +450,15 @@ OpenAir-Metrics/
 │   ├── Jobs/                       # Processamento assíncrono (ResolveReverseGeocodingJob)
 │   ├── Mcp/                        # Servidores, ferramentas e recursos do Model Context Protocol (Laravel MCP)
 │   ├── Models/                     # Modelos Eloquent com lógica de domínio e IQA
-│   └── Services/                   # Serviços de Geocodificação e Planejamento de Malha
-├── config/                         # Configurações de telemetria, reverb, cache e banco
+│   ├── Providers/                  # Provedores de serviços e injeção de dependências
+│   ├── Services/                   # Serviços de Geocodificação e Planejamento de Malha
+│   └── Support/                    # Serializadores e utilitários auxiliares (WebauthnSerializer)
+├── config/                         # Configurações de telemetria, reverb, passkeys, cache e banco
 ├── database/
 │   ├── migrations/                 # Esquemas relacionais e tabelas espaciais (SRID 4326)
 │   └── seeders/                    # Carga de dados, malha viária OSM e usuários de teste
 ├── docs/                           # 📚 Documentação Técnica Exaustiva do Projeto
-│   ├── ANALISE_DE_REQUISITOS.md    # Requisitos Funcionais (RF01–RF24), Não Funcionais (RNF01–RNF12) e Regras
+│   ├── ANALISE_DE_REQUISITOS.md    # Requisitos Funcionais (RF01–RF24), Não Funcionais (RNF01–RNF14) e Regras
 │   └── ESPECIFICACAO_CASOS_DE_USO.md # Especificação Completa dos Casos de Uso (UC01 a UC20) e Matriz de Rastreabilidade
 ├── lang/                           # 🌐 Internacionalização (pt_BR e en) para templates e validações
 ├── resources/
@@ -644,7 +650,7 @@ Após iniciar os serviços, você pode testar todas as funcionalidades do sistem
 
 ### 9.1 Execução da Suíte de Testes (Pest PHP)
 
-O projeto conta com testes unitários e de integração abrangendo algoritmos geoespaciais, cálculo do IQA, fluxos de autenticação (convite, redefinição de senha, TOTP, Passkeys) e ingestão de telemetria:
+O projeto conta com mais de 240 testes unitários e de integração abrangendo algoritmos geoespaciais, cálculo do IQA, fluxos de autenticação (convite, redefinição de senha, 2FA TOTP com QR Code, Passkeys WebAuthn/FIDO2 com suporte multiplataforma incluindo CTAP2 em Linux) e ingestão de telemetria:
 
 ```bash
 # Executa todos os testes automatizados
