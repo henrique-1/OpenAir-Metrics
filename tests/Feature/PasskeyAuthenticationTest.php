@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\FindPasskeyToAuthenticateAction;
+use App\Actions\StorePasskeyAction;
 use App\Models\Cidade;
 use App\Models\User;
 use App\Support\WebauthnSerializer;
@@ -355,4 +356,36 @@ test('StorePasskeyAction pode desserializar atestacao packed gerada por linux-pa
 
     expect($credential)->toBeInstanceOf(PublicKeyCredential::class)
         ->and($credential->response)->toBeInstanceOf(AuthenticatorAttestationResponse::class);
+});
+
+test('registro de passkey retorna resposta json sanitizada sem expor atributos binarios', function () {
+    $admin = User::factory()->create(['nivel' => 'administrador', 'ativo' => true]);
+
+    $mockStoreAction = Mockery::mock(StorePasskeyAction::class);
+    $dummyPasskey = new Passkey;
+    $dummyPasskey->id = 42;
+    $dummyPasskey->name = 'YubiKey 5 NFC';
+    $dummyPasskey->credential_id = random_bytes(32);
+
+    $mockStoreAction->shouldReceive('execute')
+        ->once()
+        ->andReturn($dummyPasskey);
+
+    $this->app->instance(StorePasskeyAction::class, $mockStoreAction);
+
+    $response = $this->actingAs($admin)
+        ->withSession(['passkey-registration-options' => '{"challenge":"dummy"}'])
+        ->postJson(route('passkey.store'), [
+            'name' => 'YubiKey 5 NFC',
+            'credential' => 'dummy-credential',
+        ]);
+
+    $response->assertStatus(201)
+        ->assertJson([
+            'message' => 'Passkey cadastrada com sucesso!',
+            'passkey' => [
+                'id' => 42,
+                'name' => 'YubiKey 5 NFC',
+            ],
+        ]);
 });

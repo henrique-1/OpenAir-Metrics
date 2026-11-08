@@ -89,7 +89,10 @@ class PasskeyController extends Controller
 
             return response()->json([
                 'message' => 'Passkey cadastrada com sucesso!',
-                'passkey' => $passkey,
+                'passkey' => [
+                    'id' => $passkey->id,
+                    'name' => $passkey->name,
+                ],
             ], 201);
         } catch (Throwable $e) {
             Log::error('Erro ao registrar Passkey:', [
