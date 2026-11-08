@@ -389,3 +389,22 @@ test('registro de passkey retorna resposta json sanitizada sem expor atributos b
             ],
         ]);
 });
+
+test('pagina de login contem formulario de login passkey separado fora do formulario principal', function () {
+    $response = $this->get('/login');
+
+    $response->assertOk();
+    $html = $response->getContent();
+
+    expect($html)->toContain('id="passkey-login-form"')
+        ->and($html)->toContain('id="passkey-start-auth-response"')
+        ->and($html)->toContain('id="btn-login-passkey"');
+
+    // Garante que o form do passkey nao esta aninhado dentro de outro form
+    $mainFormClosingPos = strpos($html, '</form>');
+    $passkeyFormPos = strpos($html, 'id="passkey-login-form"');
+
+    expect($mainFormClosingPos)->not->toBeFalse()
+        ->and($passkeyFormPos)->not->toBeFalse()
+        ->and($passkeyFormPos)->toBeGreaterThan($mainFormClosingPos);
+});

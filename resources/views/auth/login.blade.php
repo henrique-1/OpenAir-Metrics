@@ -87,12 +87,6 @@
                         </p>
                     @endif
 
-                    <form id="passkey-login-form" method="POST" action="{{ route('passkeys.login') }}" class="hidden">
-                        @csrf
-                        <input type="hidden" name="start_authentication_response" id="passkey-start-auth-response">
-                        <input type="hidden" name="remember" id="passkey-remember">
-                    </form>
-
                     <!-- Recuperação de senha -->
                     @if (Route::has('password.request'))
                         <p class="text-sm text-center text-athens-gray-600 dark:text-athens-gray-400">
@@ -100,6 +94,12 @@
                             <a href="{{ route('password.request') }}" id="link-recuperar-senha" class="text-blue-dianne-600 dark:text-blue-dianne-400 hover:text-blue-dianne-800 dark:hover:text-blue-dianne-300 font-medium underline-offset-2 hover:underline transition">Recupere aqui</a>
                         </p>
                     @endif
+                </form>
+
+                <form id="passkey-login-form" method="POST" action="{{ route('passkeys.login') }}" class="hidden">
+                    @csrf
+                    <input type="hidden" name="start_authentication_response" id="passkey-start-auth-response">
+                    <input type="hidden" name="remember" id="passkey-remember">
                 </form>
             </div>
             
