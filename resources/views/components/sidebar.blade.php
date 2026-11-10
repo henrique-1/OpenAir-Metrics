@@ -14,8 +14,16 @@
         </button>
 
         <a href="/" class="flex items-center gap-2">
-            <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-8 w-auto drop-shadow-xs dark:hidden">
-            <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-8 w-auto drop-shadow-xs hidden dark:block">
+            <picture class="dark:hidden">
+                <source srcset="{{ asset('images/3.avif') }}" type="image/avif">
+                <source srcset="{{ asset('images/3.webp') }}" type="image/webp">
+                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" width="96" height="32" class="h-8 w-auto drop-shadow-xs">
+            </picture>
+            <picture class="hidden dark:block">
+                <source srcset="{{ asset('images/3 - dark.avif') }}" type="image/avif">
+                <source srcset="{{ asset('images/3 - dark.webp') }}" type="image/webp">
+                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" width="96" height="32" class="h-8 w-auto drop-shadow-xs">
+            </picture>
         </a>
     </div>
     
@@ -47,8 +55,16 @@
         <!-- Topo do Drawer -->
         <div class="p-4 border-b border-athens-gray-200 dark:border-athens-gray-800 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2">
-                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-9 w-auto drop-shadow-xs dark:hidden">
-                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-9 w-auto drop-shadow-xs hidden dark:block">
+                <picture class="dark:hidden">
+                    <source srcset="{{ asset('images/3.avif') }}" type="image/avif">
+                    <source srcset="{{ asset('images/3.webp') }}" type="image/webp">
+                    <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" width="108" height="36" class="h-9 w-auto drop-shadow-xs">
+                </picture>
+                <picture class="hidden dark:block">
+                    <source srcset="{{ asset('images/3 - dark.avif') }}" type="image/avif">
+                    <source srcset="{{ asset('images/3 - dark.webp') }}" type="image/webp">
+                    <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" width="108" height="36" class="h-9 w-auto drop-shadow-xs">
+                </picture>
             </a>
             <button type="button" onclick="fecharSidebarMobile()" aria-label="Fechar menu" class="p-2 rounded-lg text-athens-gray-500 hover:bg-athens-gray-100 dark:hover:bg-athens-gray-800 cursor-pointer">
                 <x-heroicon-o-x-mark class="w-6 h-6" />
@@ -139,8 +155,16 @@
     <!-- Logotipo embutido na Sidebar -->
     <div class="p-6 border-b border-athens-gray-200 dark:border-athens-gray-800 flex items-center justify-center bg-white/50 dark:bg-athens-gray-900/50">
         <a href="/" class="transition hover:opacity-80 block">
-            <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-12 w-auto drop-shadow-sm dark:hidden">
-            <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-12 w-auto drop-shadow-sm hidden dark:block">
+            <picture class="dark:hidden">
+                <source srcset="{{ asset('images/3.avif') }}" type="image/avif">
+                <source srcset="{{ asset('images/3.webp') }}" type="image/webp">
+                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" width="144" height="48" class="h-12 w-auto drop-shadow-sm">
+            </picture>
+            <picture class="hidden dark:block">
+                <source srcset="{{ asset('images/3 - dark.avif') }}" type="image/avif">
+                <source srcset="{{ asset('images/3 - dark.webp') }}" type="image/webp">
+                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" width="144" height="48" class="h-12 w-auto drop-shadow-sm">
+            </picture>
         </a>
     </div>
 

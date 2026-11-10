@@ -1,2 +1,13 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /dashboard
+Disallow: /estacoes
+Disallow: /patrimonios
+Disallow: /instalacoes
+Disallow: /usuarios
+Disallow: /perfil
+Disallow: /login
+Disallow: /esqueci-senha
+Disallow: /redefinir-senha/
+Disallow: /completar-cadastro/
+Disallow: /api/

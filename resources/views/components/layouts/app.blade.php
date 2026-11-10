@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         
         <title>{{ $title ?? config('app.name', 'OpenAir Metrics') }}</title>
+        <meta name="description" content="{{ $description ?? 'OpenAir Metrics - Monitoramento em tempo real da qualidade do ar, dispersão de poluentes e variáveis meteorológicas com IoT e redes mesh.' }}">
         <link rel="icon" type="image/x-icon" href="{{ asset('images/icons/OpenAir_Metrics.ico') }}">
         
         @fonts
@@ -45,10 +46,22 @@
                     <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
                         <a href="/" class="transition hover:opacity-80 block">
                             @if(request()->is('/'))
-                                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md">
+                                <picture>
+                                    <source srcset="{{ asset('images/3.avif') }}" type="image/avif">
+                                    <source srcset="{{ asset('images/3.webp') }}" type="image/webp">
+                                    <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" width="192" height="64" fetchpriority="high" class="h-16 w-auto drop-shadow-md">
+                                </picture>
                             @else
-                                <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md dark:hidden">
-                                <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" class="h-16 w-auto drop-shadow-md hidden dark:block">
+                                <picture class="dark:hidden">
+                                    <source srcset="{{ asset('images/3.avif') }}" type="image/avif">
+                                    <source srcset="{{ asset('images/3.webp') }}" type="image/webp">
+                                    <img src="{{ asset('images/3.png') }}" alt="Logo OpenAir Metrics" width="192" height="64" fetchpriority="high" class="h-16 w-auto drop-shadow-md">
+                                </picture>
+                                <picture class="hidden dark:block">
+                                    <source srcset="{{ asset('images/3 - dark.avif') }}" type="image/avif">
+                                    <source srcset="{{ asset('images/3 - dark.webp') }}" type="image/webp">
+                                    <img src="{{ asset('images/3 - dark.png') }}" alt="Logo OpenAir Metrics" width="192" height="64" fetchpriority="high" class="h-16 w-auto drop-shadow-md">
+                                </picture>
                             @endif
                         </a>
                     </div>
