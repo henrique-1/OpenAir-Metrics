@@ -6,6 +6,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    config(['services.telemetry.key' => 'test-telemetry-key']);
+    $this->withHeader('X-Sensor-Key', 'test-telemetry-key');
+});
+
 test('telemetry endpoint enforces rate limiting against unauthenticated flood', function () {
     $bairro = Bairro::factory()->create();
     $estacao = Estacao::factory()->create([

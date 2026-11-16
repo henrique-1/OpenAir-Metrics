@@ -214,7 +214,7 @@ test('api de graficos retorna estado vazio elegante quando nao ha dados', functi
 test('visitante nao autenticado nao pode acessar rota de graficos do dashboard', function () {
     $response = $this->getJson(route('dashboard.graficos'));
 
-    $response->assertRedirect(route('login'));
+    $response->assertUnauthorized();
 });
 
 test('dashboard escopa contadores e localidades pela jurisdicao municipal do usuario', function () {

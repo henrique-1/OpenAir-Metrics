@@ -28,10 +28,10 @@ class MedicaoApiController extends Controller
             'poeira' => ['required', 'numeric', 'min:0', 'max:5000'],
         ]);
 
-        // Validação de autenticidade da telemetria (Chave de API / Segredo do Dispositivo)
+        // Validação de autenticidade da telemetria (Chave de API / Segredo do Dispositivo - fail-closed)
         $sensorKey = $request->header('X-Sensor-Key');
         $expectedKey = config('services.telemetry.key') ?: env('TELEMETRY_API_KEY');
-        if (! empty($expectedKey) && (! $sensorKey || ! hash_equals((string) $expectedKey, (string) $sensorKey))) {
+        if (empty($expectedKey) || ! $sensorKey || ! hash_equals((string) $expectedKey, (string) $sensorKey)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Dispositivo não autorizado. Chave de sensor inválida ou ausente.',

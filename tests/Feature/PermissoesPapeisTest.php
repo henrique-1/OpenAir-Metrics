@@ -296,8 +296,8 @@ test('super-usuario gerencia administradores e nao acessa modulos operacionais m
     $this->actingAs($superadmin)->get(route('usuarios.index'))->assertOk();
     $this->actingAs($superadmin)->get(route('usuarios.create'))->assertOk();
 
-    // Não acessa telas operacionais
-    $this->actingAs($superadmin)->get(route('dashboard'))->assertStatus(403);
+    // Visualiza painel analítico global, mas não acessa telas operacionais de municípios
+    $this->actingAs($superadmin)->get(route('dashboard'))->assertOk();
     $this->actingAs($superadmin)->get(route('patrimonios.index'))->assertStatus(403);
     $this->actingAs($superadmin)->get(route('estacoes.index'))->assertStatus(403);
     $this->actingAs($superadmin)->get(route('instalacoes.index'))->assertStatus(403);

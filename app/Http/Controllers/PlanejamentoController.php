@@ -280,10 +280,11 @@ class PlanejamentoController extends Controller
                 ->with('success', 'Malha com 1 Matriz e '.count($satelitesData).' Satélites planejada com sucesso! A ordem de instalação foi gerada.');
         } catch (\Throwable $e) {
             DB::rollBack();
+            report($e);
 
             return redirect()
                 ->back()
-                ->with('error', 'Erro ao salvar planejamento da malha: '.$e->getMessage())
+                ->with('error', 'Erro interno ao salvar planejamento da malha. Tente novamente.')
                 ->withInput();
         }
     }

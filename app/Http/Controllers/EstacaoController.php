@@ -220,13 +220,18 @@ class EstacaoController extends Controller
         }
 
         // 3. Resolução de topologia de rede para Satélites
+        $cidadeEscopoId = ($user && $user->cidade_id) ? (int) $user->cidade_id : Bairro::find($data['bairro_id'])?->cidade_id;
         if ($data['tipo_estacao'] === 'Estação Satélite') {
             $origemId = $data['estacao_origem_id'] ?? null;
-            $estacaoOrigem = $origemId ? Estacao::find($origemId) : null;
+            $estacaoOrigem = $origemId
+                ? Estacao::when($user?->cidade_id, fn ($q) => $q->whereHas('bairro', fn ($b) => $b->where('cidade_id', $user->cidade_id)))->find($origemId)
+                : null;
 
             if (! $estacaoOrigem) {
                 // Encontra a estação mais próxima no banco para vincular
-                $todasEstacoes = Estacao::withCoordinates()->get();
+                $todasEstacoes = Estacao::withCoordinates()
+                    ->when($user?->cidade_id, fn ($q) => $q->whereHas('bairro', fn ($b) => $b->where('cidade_id', $user->cidade_id)))
+                    ->get();
                 $menorDist = null;
                 $maisProxima = null;
 
@@ -259,9 +264,11 @@ class EstacaoController extends Controller
             $estacao->update(['matriz_pai_id' => $estacao->private_id]);
         }
 
-        // Se o MAC Address pertencer a um item em estoque no patrimônio, vincula e atualiza seu status para Instalada
+        // Se o MAC Address pertencer a um item em estoque no patrimônio do mesmo município, vincula e atualiza seu status para Instalada
         if (! empty($estacao->mac_address)) {
-            $patrimonio = Patrimonio::where('mac_address', $estacao->mac_address)->first();
+            $patrimonio = Patrimonio::where('mac_address', $estacao->mac_address)
+                ->when($cidadeEscopoId, fn ($q) => $q->where('cidade_id', $cidadeEscopoId))
+                ->first();
             if ($patrimonio) {
                 $estacao->update(['patrimonio_id' => $patrimonio->private_id]);
                 $patrimonio->update(['status' => 'Instalada']);
@@ -400,10 +407,11 @@ class EstacaoController extends Controller
                 ->with('success', "Sensor da estação substituído com sucesso! O patrimônio anterior foi marcado como Descartado e o novo equipamento #{$novoPatrimonio->numero_patrimonio} está ativo.");
         } catch (\Throwable $e) {
             DB::rollBack();
+            report($e);
 
             return redirect()
                 ->route('estacoes.index')
-                ->with('error', 'Erro ao substituir sensor: '.$e->getMessage());
+                ->with('error', 'Erro interno ao substituir sensor. Tente novamente.');
         }
     }
 }

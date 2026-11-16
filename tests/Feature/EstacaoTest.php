@@ -164,6 +164,7 @@ test('endpoint de coordenadas retorna todas as estacoes para o mapa', function (
 });
 
 test('pode cadastrar uma estacao matriz com coordenadas livres', function () {
+    Http::fake();
     $user = User::factory()->create();
     $bairro = Bairro::factory()->create();
 
@@ -336,6 +337,7 @@ test('usuario com jurisdicao municipal vinculada nao pode cadastrar estacao em b
 });
 
 test('usuario com jurisdicao municipal vinculada pode cadastrar estacao em bairro do seu municipio', function () {
+    Http::fake();
     $cidadeUsuario = Cidade::factory()->create(['nome' => 'Campinas']);
     $user = User::factory()->create(['cidade_id' => $cidadeUsuario->id]);
 

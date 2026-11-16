@@ -9,6 +9,7 @@ use App\Notifications\ConviteCadastroNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
@@ -226,7 +227,16 @@ class UsuarioController extends Controller
         }
 
         $novoStatus = ! $user->ativo;
-        $user->update(['ativo' => $novoStatus]);
+        $user->forceFill([
+            'ativo' => $novoStatus,
+            'remember_token' => ! $novoStatus ? Str::random(60) : $user->remember_token,
+        ])->save();
+
+        if (! $novoStatus) {
+            DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)
+                ->delete();
+        }
 
         $mensagem = $novoStatus
             ? "O usuário {$user->name} foi reativado com sucesso!"
@@ -256,14 +266,18 @@ class UsuarioController extends Controller
             }
         }
 
-        // Limpa segredos TOTP e remove Passkeys associadas
+        // Limpa segredos TOTP, rotaciona remember_token, remove Passkeys e sessões ativas
         $user->forceFill([
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
+            'remember_token' => Str::random(60),
         ])->save();
 
         $user->passkeys()->delete();
+        DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $user->id)
+            ->delete();
 
         Log::warning(
             "MFA emergencialmente resetado para o usuário ID: {$user->id} ({$user->email}) pelo administrador ID: {$currentUser->id} ({$currentUser->email})."

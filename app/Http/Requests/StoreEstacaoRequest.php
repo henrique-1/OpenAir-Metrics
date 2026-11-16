@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Bairro;
 use App\Models\Estacao;
+use App\Models\Patrimonio;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -86,14 +87,31 @@ class StoreEstacaoRequest extends FormRequest
 
                 $user = $this->user();
                 $bairroId = (int) $this->input('bairro_id');
+                $bairro = Bairro::find($bairroId);
 
                 // Validação de Jurisdição Municipal
                 if ($user && $user->cidade_id) {
-                    $bairro = Bairro::find($bairroId);
                     if (! $bairro || $bairro->cidade_id !== $user->cidade_id) {
                         $validator->errors()->add(
                             'bairro_id',
                             'Você só tem permissão para cadastrar estações na cidade de '.($user->cidade?->nome ?? 'sua jurisdição municipal').'.'
+                        );
+
+                        return;
+                    }
+                }
+
+                $mac = $this->input('mac_address');
+                if ($mac && $user && $user->cidade_id) {
+                    $patrimonioAlheio = Patrimonio::where('mac_address', $mac)
+                        ->whereNotNull('cidade_id')
+                        ->where('cidade_id', '!=', $user->cidade_id)
+                        ->exists();
+
+                    if ($patrimonioAlheio) {
+                        $validator->errors()->add(
+                            'mac_address',
+                            'Este endereço MAC pertence ao patrimônio de outro município fora da sua jurisdição.'
                         );
 
                         return;
@@ -107,7 +125,15 @@ class StoreEstacaoRequest extends FormRequest
 
                 if ($tipo === 'Estação Satélite') {
                     if ($origemId) {
-                        $origem = Estacao::find($origemId);
+                        $origem = Estacao::with('bairro')->find($origemId);
+                        if ($origem && $user && $user->cidade_id && $origem->bairro?->cidade_id !== $user->cidade_id) {
+                            $validator->errors()->add(
+                                'estacao_origem_id',
+                                'A estação de origem selecionada pertence a outro município fora da sua jurisdição.'
+                            );
+
+                            return;
+                        }
                         if ($origem && $origem->latitude !== null && $origem->longitude !== null) {
                             $dist = Estacao::calcularDistanciaHaversine($lat, $lng, (float) $origem->latitude, (float) $origem->longitude);
                             if ($dist > 200.0) {
@@ -121,7 +147,7 @@ class StoreEstacaoRequest extends FormRequest
                         }
                     }
 
-                    $menorDistancia = Estacao::menorDistanciaAte($lat, $lng);
+                    $menorDistancia = Estacao::menorDistanciaAte($lat, $lng, null, $user?->cidade_id);
 
                     if ($menorDistancia === null) {
                         $validator->errors()->add(

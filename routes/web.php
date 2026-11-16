@@ -81,8 +81,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/localidades/estados', [LocalidadeController::class, 'estados'])->name('localidades.estados');
     Route::get('/localidades/estados/{estado}/cidades', [LocalidadeController::class, 'cidades'])->name('localidades.estados.cidades');
     Route::get('/localidades/cidades/{uf}', [LocalidadeController::class, 'cidadesPorUf'])->name('localidades.cidades.por-uf');
-    Route::get('/localidades/cidades/{cidade}/bairros', [LocalidadeController::class, 'bairros'])->name('localidades.cidades.bairros');
-    Route::get('/geocoding/reverse', [LocalidadeController::class, 'reverse'])->name('geocoding.reverse');
+    Route::get('/localidades/cidades/{cidade}/bairros', [LocalidadeController::class, 'bairros'])->middleware('throttle:30,1')->name('localidades.cidades.bairros');
+    Route::get('/geocoding/reverse', [LocalidadeController::class, 'reverse'])->middleware('throttle:30,1')->name('geocoding.reverse');
     Route::post('/estacoes/{public_id}/solicitar-substituicao', [EstacaoController::class, 'solicitarSubstituicao'])->name('estacoes.solicitar-substituicao');
     Route::post('/estacoes/{public_id}/substituir-sensor', [EstacaoController::class, 'substituirSensor'])->name('estacoes.substituir-sensor');
 

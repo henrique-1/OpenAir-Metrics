@@ -13,7 +13,8 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['services.telemetry.key' => null]);
+    config(['services.telemetry.key' => 'test-telemetry-key']);
+    $this->withHeader('X-Sensor-Key', 'test-telemetry-key');
 });
 
 test('estacao em campo pode enviar medicoes com sucesso via mac_address', function () {
@@ -359,7 +360,7 @@ test('rejeita medicao com 401 se TELEMETRY_API_KEY estiver configurada e header 
     ];
 
     // Sem header
-    $this->postJson(route('api.medicoes.store'), $payload)->assertStatus(401);
+    $this->withoutHeader('X-Sensor-Key')->postJson(route('api.medicoes.store'), $payload)->assertStatus(401);
 
     // Com chave incorreta
     $this->withHeader('X-Sensor-Key', 'chave-errada')->postJson(route('api.medicoes.store'), $payload)->assertStatus(401);

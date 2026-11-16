@@ -42,7 +42,7 @@ class CompletarCadastroRequest extends FormRequest
     {
         return [
             'token' => ['required', 'string'],
-            'email' => ['required', 'string', 'email', 'max:255', 'exists:users,email'],
+            'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'cep' => ['nullable', 'string', 'max:9'],
             'logradouro' => ['nullable', 'string', 'max:255'],
@@ -64,7 +64,6 @@ class CompletarCadastroRequest extends FormRequest
             'token.required' => 'Link de ativação inválido. Solicite um novo link.',
             'email.required' => 'Informe o e-mail cadastrado.',
             'email.email' => 'Informe um endereço de e-mail válido.',
-            'email.exists' => 'Não encontramos nenhuma conta com o e-mail informado.',
             'password.required' => 'Defina sua senha de acesso.',
             'password.confirmed' => 'A confirmação da senha não confere.',
             'password.min' => 'A senha deve ter pelo menos :min caracteres.',

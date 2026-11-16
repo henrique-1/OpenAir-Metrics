@@ -102,7 +102,7 @@ class PasskeyController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Falha ao validar credencial biométrica: '.$e->getMessage(),
+                'message' => 'Falha ao validar credencial biométrica. Tente novamente.',
             ], 422);
         }
     }

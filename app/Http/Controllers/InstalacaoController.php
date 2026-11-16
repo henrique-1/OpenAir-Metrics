@@ -313,10 +313,11 @@ class InstalacaoController extends Controller
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
+            report($e);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro interno ao registrar instalação: '.$e->getMessage(),
+                'message' => 'Erro interno ao registrar instalação. Tente novamente.',
             ], 500);
         }
     }

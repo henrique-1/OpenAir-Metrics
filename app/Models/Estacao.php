@@ -579,14 +579,19 @@ class Estacao extends Model
      * Calcula a menor distância em metros de uma coordenada até qualquer Estação Matriz cadastrada no banco.
      *
      * @param  int|null  $exceptPrivateId  ID de estação a desconsiderar (opcional para updates)
+     * @param  int|null  $cidadeId  ID do município para restringir a busca (opcional)
      * @return float|null Retorna a distância em metros ou null se não houver estações matrizes cadastradas.
      */
-    public static function menorDistanciaAteMatriz(float $latitude, float $longitude, ?int $exceptPrivateId = null): ?float
+    public static function menorDistanciaAteMatriz(float $latitude, float $longitude, ?int $exceptPrivateId = null, ?int $cidadeId = null): ?float
     {
         $query = static::query()->where('tipo_estacao', 'Estação Matriz');
 
         if ($exceptPrivateId !== null) {
             $query->where('private_id', '!=', $exceptPrivateId);
+        }
+
+        if ($cidadeId !== null) {
+            $query->whereHas('bairro', fn (Builder $q) => $q->where('cidade_id', $cidadeId));
         }
 
         $connection = DB::connection();
@@ -633,14 +638,19 @@ class Estacao extends Model
      * Calcula a menor distância em metros de uma coordenada até qualquer estação cadastrada no banco.
      *
      * @param  int|null  $exceptPrivateId  ID de estação a desconsiderar (opcional para updates)
+     * @param  int|null  $cidadeId  ID do município para restringir a busca (opcional)
      * @return float|null Retorna a distância em metros ou null se não houver estações cadastradas.
      */
-    public static function menorDistanciaAte(float $latitude, float $longitude, ?int $exceptPrivateId = null): ?float
+    public static function menorDistanciaAte(float $latitude, float $longitude, ?int $exceptPrivateId = null, ?int $cidadeId = null): ?float
     {
         $query = static::query();
 
         if ($exceptPrivateId !== null) {
             $query->where('private_id', '!=', $exceptPrivateId);
+        }
+
+        if ($cidadeId !== null) {
+            $query->whereHas('bairro', fn (Builder $q) => $q->where('cidade_id', $cidadeId));
         }
 
         $connection = DB::connection();

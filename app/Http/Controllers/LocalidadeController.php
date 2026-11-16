@@ -56,6 +56,11 @@ class LocalidadeController extends Controller
      */
     public function bairros(Cidade $cidade): JsonResponse
     {
+        $user = Auth::user();
+        if ($user && $user->cidade_id && ! $user->isSuperAdmin() && (int) $user->cidade_id !== (int) $cidade->id) {
+            abort(403, 'Acesso restrito ao município da sua jurisdição.');
+        }
+
         if ($cidade->bairros()->doesntExist()) {
             $this->importarBairrosOverpass($cidade);
         }
@@ -227,6 +232,11 @@ OVERPASS;
         $lat = (float) $validated['lat'];
         $lng = (float) $validated['lng'];
         $cidadeId = isset($validated['cidade_id']) ? (int) $validated['cidade_id'] : null;
+        $user = Auth::user();
+
+        if ($user && $user->cidade_id && ! $user->isSuperAdmin() && $cidadeId !== null && (int) $user->cidade_id !== $cidadeId) {
+            abort(403, 'Acesso restrito ao município da sua jurisdição.');
+        }
 
         // Busca síncrona via Nominatim / cache
         $detalhes = GeocodingService::obterDetalhesEndereco($lat, $lng, sync: true);
@@ -255,15 +265,17 @@ OVERPASS;
             }
         }
 
-        // Se encontrou o bairro via Nominatim, garante cadastro no banco se ainda não estiver cadastrado
+        // Se encontrou o bairro via Nominatim, garante cadastro no banco se ainda não estiver cadastrado e respeitar a jurisdição
         $bairroModel = null;
         $bairroNome = ! empty($detalhes['bairro']) ? trim((string) $detalhes['bairro']) : null;
 
         if ($bairroNome && $cidadeId) {
-            $bairroModel = Bairro::firstOrCreate([
-                'cidade_id' => $cidadeId,
-                'nome' => $bairroNome,
-            ]);
+            if (! $user?->cidade_id || $user->isSuperAdmin() || (int) $user->cidade_id === (int) $cidadeId) {
+                $bairroModel = Bairro::firstOrCreate([
+                    'cidade_id' => $cidadeId,
+                    'nome' => $bairroNome,
+                ]);
+            }
         }
 
         return response()->json([
