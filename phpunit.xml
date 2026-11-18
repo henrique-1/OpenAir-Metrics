@@ -36,6 +36,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="CLARITY_ENABLED" value="false"/>
         <env name="TELEMETRY_API_KEY" value="test-telemetry-key"/>
         <env name="INITIAL_SUPERADMIN_PASSWORD" value=""/>
     </php>

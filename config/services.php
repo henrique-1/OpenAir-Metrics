@@ -39,4 +39,9 @@ return [
         'key' => env('TELEMETRY_API_KEY'),
     ],
 
+    'clarity' => [
+        'project_id' => env('CLARITY_PROJECT_ID', 'za9s6fwdcz'),
+        'enabled' => (bool) env('CLARITY_ENABLED', true),
+    ],
+
 ];
